@@ -17,7 +17,8 @@
 *)
 
 Require Export Metatheory.
-
+Require Export CaptureSets.
+Require Import Coq.Program.Wf.
 
 (* ********************************************************************** *)
 (** * #<a name="syntax"></a># Syntax (pre-terms) *)
@@ -40,15 +41,16 @@ Require Export Metatheory.
     indices for bound expression variables.  We make this explicit in
     the definitions below of the opening operations. *)
 
-Inductive typ : Set :=
+Inductive typ : Type :=
   | typ_top : typ
   | typ_bvar : nat -> typ
   | typ_fvar : atom -> typ
   | typ_arrow : typ -> typ -> typ
   | typ_all : typ -> typ -> typ
+  | typ_capt : captureset -> typ -> typ
 .
 
-Inductive exp : Set :=
+Inductive exp : Type :=
   | exp_bvar : nat -> exp
   | exp_fvar : atom -> exp
   | exp_abs : typ -> exp -> exp
@@ -109,6 +111,8 @@ Fixpoint open_tt_rec (K : nat) (U : typ) (T : typ)  {struct T} : typ :=
   | typ_fvar X => typ_fvar X
   | typ_arrow T1 T2 => typ_arrow (open_tt_rec K U T1) (open_tt_rec K U T2)
   | typ_all T1 T2 => typ_all (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
+  (** No change here: capture sets don't affect type variables *)
+  | typ_capt C T => typ_capt C (open_tt_rec K U T)
   end.
 
 Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
@@ -119,6 +123,8 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   | exp_app e1 e2 => exp_app  (open_te_rec K U e1) (open_te_rec K U e2)
   | exp_tabs V e1 => exp_tabs (open_tt_rec K U V)  (open_te_rec (S K) U e1)
   | exp_tapp e1 V => exp_tapp (open_te_rec K U e1) (open_tt_rec K U V)
+  (** Opening a type variable within an expression doesn't affect capture sets....
+      no change here. *)
   end.
 
 Fixpoint open_ee_rec (k : nat) (f : exp) (e : exp)  {struct e} : exp :=
@@ -129,6 +135,34 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (e : exp)  {struct e} : exp :=
   | exp_app e1 e2 => exp_app (open_ee_rec k f e1) (open_ee_rec k f e2)
   | exp_tabs V e1 => exp_tabs V (open_ee_rec k f e1)
   | exp_tapp e1 V => exp_tapp (open_ee_rec k f e1) V
+  (** Opening an expression with an expression doesn't affect capture sets....
+      but we need to write a handler for opening a capture set within an expression
+      and within a type. *)
+  end.
+
+Fixpoint open_tc_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
+  match T with
+  | typ_top => typ_top
+  | typ_bvar i => (typ_bvar i)
+  | typ_fvar x => (typ_fvar x)
+  (** A function type A -> B introduces a binding for a capture variable.
+      Note that we don't allow capture variables to show up in their own type constraints. *)
+  | typ_arrow T1 T2 => typ_arrow (open_tc_rec k c T1) (open_tc_rec (S k) c T2)
+  | typ_all T1 T2 => typ_all (open_tc_rec k c T1) (open_tc_rec k c T2)
+  (** We actually need to perform the substitution here. *)
+  | typ_capt C T => typ_capt (open_captureset_bvar k c C) (open_tc_rec k c T)
+  end.
+
+Fixpoint open_ec_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
+  match e with
+  | exp_bvar i => (exp_bvar i)
+  | exp_fvar x => (exp_fvar x)
+  (** A function abstraction V -> e introduces a binding for a capture variable.
+      Note that we don't allow capture variables to show up in their own type constraints. *)
+  | exp_abs V e1 => exp_abs (open_tc_rec k c V) (open_ec_rec (S k) c e1)
+  | exp_app e1 e2 => exp_app (open_ec_rec k c e1) (open_ec_rec k c e2)
+  | exp_tabs V e1 => exp_tabs (open_tc_rec k c V) (open_ec_rec k c e1)
+  | exp_tapp e1 V => exp_tapp (open_ec_rec k c e1) (open_tc_rec k c V)
   end.
 
 (** Many common applications of opening replace index zero with an
@@ -143,7 +177,8 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (e : exp)  {struct e} : exp :=
 Definition open_tt T U := open_tt_rec 0 U T.
 Definition open_te e U := open_te_rec 0 U e.
 Definition open_ee e1 e2 := open_ee_rec 0 e2 e1.
-
+Definition open_ec e c := open_ec_rec 0 c e.
+Definition open_tc T c := open_tc_rec 0 c T.
 
 (* ********************************************************************** *)
 (** * #<a name="lc"></a># Local closure *)
@@ -209,6 +244,10 @@ Inductive type : typ -> Prop :=
       type T1 ->
       (forall X : atom, X `notin` L -> type (open_tt T2 X)) ->
       type (typ_all T1 T2)
+  | type_capt : forall C T,
+      type T ->
+      (empty_cset_bvar_references C) ->
+      type (typ_capt C T)
 .
 
 Inductive expr : exp -> Prop :=
@@ -216,7 +255,7 @@ Inductive expr : exp -> Prop :=
       expr (exp_fvar x)
   | expr_abs : forall L T e1,
       type T ->
-      (forall x : atom, x `notin` L -> expr (open_ee e1 x)) ->
+      (forall x : atom, x `notin` L -> expr (open_ec (open_ee e1 x) {}C)) ->
       expr (exp_abs T e1)
   | expr_app : forall e1 e2,
       expr e1 ->
@@ -251,7 +290,7 @@ Inductive expr : exp -> Prop :=
     a particular binding is a typing or subtyping assumption.  Thus,
     we instantiate [A] with the type [binding], defined below. *)
 
-Inductive binding : Set :=
+Inductive binding : Type :=
   | bind_sub : typ -> binding
   | bind_typ : typ -> binding.
 
@@ -326,21 +365,29 @@ Notation "[ x ]" := (x :: nil).
     not an expression-variable; [(dom E)] does not distinguish between
     the two kinds of bindings. *)
 
-Inductive wf_typ : env -> typ -> Prop :=
-  | wf_typ_top : forall E,
-      wf_typ E typ_top
-  | wf_typ_var : forall U E (X : atom),
+Inductive wf_typ : env -> env -> env -> typ -> Prop :=
+  | wf_typ_top : forall E Ep Em,
+      wf_typ E Ep Em typ_top
+  | wf_typ_var : forall U E Ep Em (X : atom),
       binds X (bind_sub U) E ->
-      wf_typ E (typ_fvar X)
-  | wf_typ_arrow : forall E T1 T2,
-      wf_typ E T1 ->
-      wf_typ E T2 ->
-      wf_typ E (typ_arrow T1 T2)
-  | wf_typ_all : forall L E T1 T2,
-      wf_typ E T1 ->
+      wf_typ E Ep Em (typ_fvar X)
+  | wf_typ_arrow : forall L E Ep Em T1 T2,
+      wf_typ E Em Ep T1 ->
+      (** NEW: we need to be able to open capture sets.  Capture
+          variables can only be opened in covariant positions. *)
       (forall X : atom, X `notin` L ->
-        wf_typ ([(X, bind_sub T1)] ++ E) (open_tt T2 X)) ->
-      wf_typ E (typ_all T1 T2)
+        wf_typ E ([(X, bind_typ T1)] ++ Ep) Em (open_tc T2 (cset_singleton_fvar X))) ->
+      wf_typ E Ep Em (typ_arrow T1 T2)
+  | wf_typ_all : forall L E Ep Em T1 T2,
+      wf_typ E Em Ep T1 ->
+      (forall X : atom, X `notin` L ->
+        wf_typ ([(X, bind_sub T1)] ++ E) Ep Em (open_tt T2 X)) ->
+      wf_typ E Ep Em (typ_all T1 T2)
+  (** NEW: capture sets check if their variables are defined in covariant positions. *)
+  | wf_typ_capt : forall E Ep Em C T,
+    wf_typ E Ep Em T ->
+    (forall X : atom, cset_references_fvar X C -> exists U, binds X (bind_typ U) E \/ binds X (bind_typ U) Ep) ->
+    wf_typ E Ep Em (typ_capt C T)
 .
 
 (** An environment E is well-formed, denoted [(wf_env E)], if each
@@ -357,18 +404,69 @@ Inductive wf_env : env -> Prop :=
       wf_env empty
   | wf_env_sub : forall (E : env) (X : atom) (T : typ),
       wf_env E ->
-      wf_typ E T ->
+      wf_typ E empty empty T ->
       X `notin` dom E ->
       wf_env ([(X, bind_sub T)] ++ E)
   | wf_env_typ : forall (E : env) (x : atom) (T : typ),
       wf_env E ->
-      wf_typ E T ->
+      wf_typ E empty empty T ->
       x `notin` dom E ->
       wf_env ([(x, bind_typ T)] ++ E).
 
+Fixpoint binding_environment (x : atom) (E : env) :=
+  match E with
+  | nil => empty
+  | (y, _) :: E' => if eq_atom_dec x y then E' else binding_environment x E'
+  end.
+
+(** The capture set C of a type is the outermost capture set on that type,
+    modulo flattening definitions. *)
+Program Fixpoint cv (T : typ) (E : env)  {measure (length E)}: captureset :=
+  match T with
+  | typ_top => {}C
+  | typ_bvar i => {}C (** I don't think we care here, as we should only be manipulating
+                            locally closed types *)
+  | typ_fvar x => match get x E with
+                    | Some (bind_sub T1) => cv T1 (binding_environment x E)
+                    | Some (bind_typ T1) => {}C (** Shouldn't happen. *)
+                    | None => {}C
+                    end
+  | typ_arrow T1 T2 => {}C
+  | typ_all T1 T2 => {}C
+  (** We actually need to perform the substitution here. *)
+  | typ_capt C T1 => cset_union C (cv T1 E)
+  end.
+Next Obligation.
+Admitted.
+Next Obligation.
+Admitted.
 
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
+
+(** Subcapturing captures (mind the pun) the notion that one capture
+    set can be subsumed by another. *)
+Inductive subcapt : env -> captureset -> captureset -> Prop :=
+  (** the universal capture set captures all. *)
+  | subcapt_universal : forall E C1 C2,
+      cset_universal_prop C2 ->
+      subcapt E C1 C2
+  (** If x : T is bound in the environment, then a capture set referencing {x}
+      can be resolved as if it were cv(T). *)
+  | subcapt_var : forall E C X T,
+      binds X (bind_typ T) E ->
+      subcapt E (cv T E) C ->
+      subcapt E (cset_singleton_fvar X) C
+  (** Subcapturing behaves well across taking subsets *)
+  | subcapt_split : forall E C1 C2,
+      cset_subset_prop C1 C2 ->
+      subcapt E C1 C2
+  (** ... and taking unions. *)
+  | subcapt_join : forall E C1 C2 C,
+      subcapt E C1 C ->
+      subcapt E C2 C ->
+      subcapt E (cset_union C1 C2) C
+.
 
 (** The definition of subtyping is straightforward.  It uses the
     [binds] relation from the [Environment] library (in the
@@ -378,11 +476,13 @@ Inductive wf_env : env -> Prop :=
 Inductive sub : env -> typ -> typ -> Prop :=
   | sub_top : forall E S,
       wf_env E ->
-      wf_typ E S ->
+      wf_typ E empty empty S ->
+      (** NEW: S can't capture anything *)
+      cset_empty (cv S) ->
       sub E S typ_top
   | sub_refl_tvar : forall E X,
       wf_env E ->
-      wf_typ E (typ_fvar X) ->
+      wf_typ E empty empty (typ_fvar X) ->
       sub E (typ_fvar X) (typ_fvar X)
   | sub_trans_tvar : forall U E T X,
       binds X (bind_sub U) E ->
@@ -397,6 +497,7 @@ Inductive sub : env -> typ -> typ -> Prop :=
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
       sub E (typ_all S1 S2) (typ_all T1 T2)
+  (** NEW : Capture Sets *)
 .
 
 
