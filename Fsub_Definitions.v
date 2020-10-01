@@ -413,33 +413,25 @@ Inductive wf_env : env -> Prop :=
       x `notin` dom E ->
       wf_env ([(x, bind_typ T)] ++ E).
 
-Fixpoint binding_environment (x : atom) (E : env) :=
-  match E with
-  | nil => empty
-  | (y, _) :: E' => if eq_atom_dec x y then E' else binding_environment x E'
-  end.
+(** Dealing with cv -- as a fixpoint is problematic. *)
+Inductive cv : typ -> env -> captureset -> Prop :=
+  (** C T has cv C cup cv T *)
+  | cv_typ_capt : forall T E C1 C2,
+    cv T E C1 ->
+    cv (typ_capt C1 T) E (cset_union C1 C2)
+  (** Looking up in the environment *)
+  | cv_typ_var : forall (X : atom) T E C,
+    binds X (bind_sub T) E ->
+    cv T E C ->
+    cv (typ_fvar X) E C
+  (** Function types and arrow types are just {} *)
+  | cv_typ_arrow : forall T1 T2 E,
+    cv (typ_arrow T1 T2) E {}C
+  | cv_typ_all : forall T1 T2 E,
+    cv (typ_all T1 T2) E {}C
+  (** Maybe: a capture-environment irrelevance term? *)
+.
 
-(** The capture set C of a type is the outermost capture set on that type,
-    modulo flattening definitions. *)
-Program Fixpoint cv (T : typ) (E : env)  {measure (length E)}: captureset :=
-  match T with
-  | typ_top => {}C
-  | typ_bvar i => {}C (** I don't think we care here, as we should only be manipulating
-                            locally closed types *)
-  | typ_fvar x => match get x E with
-                    | Some (bind_sub T1) => cv T1 (binding_environment x E)
-                    | Some (bind_typ T1) => {}C (** Shouldn't happen. *)
-                    | None => {}C
-                    end
-  | typ_arrow T1 T2 => {}C
-  | typ_all T1 T2 => {}C
-  (** We actually need to perform the substitution here. *)
-  | typ_capt C T1 => cset_union C (cv T1 E)
-  end.
-Next Obligation.
-Admitted.
-Next Obligation.
-Admitted.
 
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
@@ -453,10 +445,11 @@ Inductive subcapt : env -> captureset -> captureset -> Prop :=
       subcapt E C1 C2
   (** If x : T is bound in the environment, then a capture set referencing {x}
       can be resolved as if it were cv(T). *)
-  | subcapt_var : forall E C X T,
+  | subcapt_var : forall E C1 C2 X T,
       binds X (bind_typ T) E ->
-      subcapt E (cv T E) C ->
-      subcapt E (cset_singleton_fvar X) C
+      cv T E C2 ->
+      subcapt E C2 C1 ->
+      subcapt E (cset_singleton_fvar X) C1
   (** Subcapturing behaves well across taking subsets *)
   | subcapt_split : forall E C1 C2,
       cset_subset_prop C1 C2 ->
@@ -474,11 +467,12 @@ Inductive subcapt : env -> captureset -> captureset -> Prop :=
     [sub_all] case). *)
 
 Inductive sub : env -> typ -> typ -> Prop :=
-  | sub_top : forall E S,
+  | sub_top : forall E S C1,
       wf_env E ->
       wf_typ E empty empty S ->
       (** NEW: S can't capture anything *)
-      cset_empty (cv S) ->
+      cv S E C1 ->
+      cset_empty C1 ->
       sub E S typ_top
   | sub_refl_tvar : forall E X,
       wf_env E ->
@@ -498,11 +492,36 @@ Inductive sub : env -> typ -> typ -> Prop :=
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
       sub E (typ_all S1 S2) (typ_all T1 T2)
   (** NEW : Capture Sets *)
+  | sub_capt : forall E C1 C2 T1 T2,
+      sub E T1 T2 ->
+      subcapt E C1 C2 ->
+      sub E (typ_capt C1 T1) (typ_capt C2 T2)
 .
 
 
 (* ********************************************************************** *)
 (** * #<a name="typing_doc"></a># Typing *)
+
+(** A helper for computing the free variables of a term in an environment *)
+Inductive cv_free : exp -> captureset -> Prop :=
+  | cv_free_bvar : forall n,
+                    cv_free (exp_bvar n) {}C
+  | cv_free_fvar : forall x,
+                    cv_free (exp_fvar x) (cset_singleton_fvar x)
+  | cv_free_abs : forall T e1 C,
+                    cv_free e1 C ->
+                    cv_free (exp_abs T e1) C
+  | cv_free_app : forall e1 e2 C1 C2,
+                    cv_free e1 C1 ->
+                    cv_free e2 C2 ->
+                    cv_free (exp_app e1 e2) (cset_union C1 C2)
+  | cv_free_tabs : forall T e1 C,
+                    cv_free e1 C ->
+                    cv_free (exp_tabs T e1) C
+  | cv_free_tapp : forall e1 T C,
+                    cv_free e1 C ->
+                    cv_free (exp_tapp e1 T) C
+.
 
 (** The definition of typing is straightforward.  It uses the [binds]
     relation from the [Environment] library (in the [typing_var] case)
@@ -513,21 +532,30 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_var : forall E x T,
       wf_env E ->
       binds x (bind_typ T) E ->
-      typing E (exp_fvar x) T
-  | typing_abs : forall L E V e1 T1,
+      (** NEW: a variable always gets the type {x} T *)
+      typing E (exp_fvar x) (typ_capt (cset_singleton_fvar x) T)
+  | typing_abs : forall L E V e1 T1 C,
       (forall x : atom, x `notin` L ->
         typing ([(x, bind_typ V)] ++ E) (open_ee e1 x) T1) ->
-      typing E (exp_abs V e1) (typ_arrow V T1)
-  | typing_app : forall T1 E e1 e2 T2,
-      typing E e1 (typ_arrow T1 T2) ->
+      (** NEW: a function always gets the type C A -> B, where C = fv(body). 
+          Formally we do U cv(x) | x free in body, but cv(x) = {x} by the above typing judgement. 
+
+          In a type-variable-only-land, we'd probably do cv(x) = {T} if x : T in E.*)
+      cv_free e1 C ->
+      typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))
+  | typing_app : forall T1 E e1 e2 T2 Cf Cv,
+      typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
       typing E e2 T1 ->
-      typing E (exp_app e1 e2) T2
-  | typing_tabs : forall L E V e1 T1,
+      cv T1 E Cv ->
+      (** NEW: function application opens the capture set in the type. *)
+      typing E (exp_app e1 e2) (open_tc T2 Cv)
+  | typing_tabs : forall L E V e1 T1 C,
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
-      typing E (exp_tabs V e1) (typ_all V T1)
-  | typing_tapp : forall T1 E e1 T T2,
-      typing E e1 (typ_all T1 T2) ->
+      cv_free e1 C ->
+      typing E (exp_tabs V e1) (typ_capt C (typ_all V T1))
+  | typing_tapp : forall T1 E e1 T T2 C,
+      typing E e1 (typ_capt C (typ_all T1 T2)) ->
       sub E T T1 ->
       typing E (exp_tapp e1 T) (open_tt T2 T)
   | typing_sub : forall S E e T,
@@ -566,10 +594,16 @@ Inductive red : exp -> exp -> Prop :=
       type V ->
       red e1 e1' ->
       red (exp_tapp e1 V) (exp_tapp e1' V)
-  | red_abs : forall T e1 v2,
+  | red_abs : forall T e1 v2 C,
       expr (exp_abs T e1) ->
       value v2 ->
-      red (exp_app (exp_abs T e1) v2) (open_ee e1 v2)
+      (** NEW: We open the capture set here with the computed capture set
+          of the value, aka the free variables of the value.
+
+          WIP: Maybe we shouldn't do this dynamic computation of capture sets,
+          and explicitly write down which capture set we wish to substitute in. *)
+      cv_free v2 C ->
+      red (exp_app (exp_abs T e1) v2) (open_ee (open_ec e1 C) v2)
   | red_tabs : forall T1 e1 T2,
       expr (exp_tabs T1 e1) ->
       type T2 ->

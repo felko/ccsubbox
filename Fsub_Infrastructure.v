@@ -41,6 +41,8 @@ Fixpoint fv_tt (T : typ) {struct T} : atoms :=
   | typ_fvar X => singleton X
   | typ_arrow T1 T2 => (fv_tt T1) `union` (fv_tt T2)
   | typ_all T1 T2 => (fv_tt T1) `union` (fv_tt T2)
+  (** NEW: Capture set free variables need to also be mentioned. *)
+  | typ_capt C T => (cset_fvar C) `union` (fv_tt T)
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
@@ -87,6 +89,7 @@ Fixpoint subst_tt (Z : atom) (U : typ) (T : typ) {struct T} : typ :=
   | typ_fvar X => if X == Z then U else T
   | typ_arrow T1 T2 => typ_arrow (subst_tt Z U T1) (subst_tt Z U T2)
   | typ_all T1 T2 => typ_all (subst_tt Z U T1) (subst_tt Z U T2)
+  | typ_capt C T1 => typ_capt C (subst_tt Z U T1)
   end.
 
 Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
@@ -346,16 +349,38 @@ Proof.
     f_equal; eauto using open_tt_rec_type_aux.
 Qed.
 
+Lemma open_tc_rec_capt_aux : forall t j C i P,
+  open_tc_rec j C t = open_tt_rec i P (open_tc_rec j C t) ->
+  t = open_tt_rec i P t.
+Proof with eauto*.
+  induction t; intros j C i P H; simpl in *; inversion H; f_equal...
+Qed.
+
+Lemma open_te_rec_capt_aux : forall e j C i P,
+  open_ec_rec j C e = open_te_rec i P (open_ec_rec j C e) ->
+  e = open_te_rec i P e.
+Proof with eauto*.
+  induction e;
+  intros j C i P H;
+  simpl in *; inversion H; f_equal...
+  (** Three cases introduced by the new capture variables. *)
+  * apply open_tc_rec_capt_aux with (j := j) (C := C); auto.
+  * apply open_tc_rec_capt_aux with (j := j) (C := C); auto.
+  * apply open_tc_rec_capt_aux with (j := j) (C := C); auto.
+Qed.
+
 Lemma open_te_rec_expr : forall e U k,
   expr e ->
   e = open_te_rec k U e.
 Proof with auto*.
-  intros e U k WF. revert k.
+  intros e U k WF; revert k;
   induction WF; intros k; simpl; f_equal; auto using open_tt_rec_type;
   try solve [
-    unfold open_ee in *;
+    (** NEW: Dealing with capture variables; need to unwrap the capture sets.*)
+    unfold open_ec in *; unfold open_ee in *;
     pick fresh x;
     eapply open_te_rec_expr_aux with (j := 0) (u := exp_fvar x);
+    eapply open_te_rec_capt_aux with (j := 0) (C := {}C);
     auto*
   | unfold open_te in *;
     pick fresh X;
@@ -441,6 +466,13 @@ Proof.
   induction e; intros j V u i H; simpl; inversion H; f_equal; eauto.
 Qed.
 
+Lemma open_ee_rec_capt_aux : forall e j C u i,
+  open_ec_rec j C e = open_ee_rec i u (open_ec_rec j C e) ->
+  e = open_ee_rec i u e.
+Proof.
+  induction e; intros j C u i H; simpl; inversion H; f_equal; eauto.
+Qed.
+
 Lemma open_ee_rec_expr : forall u e k,
   expr e ->
   e = open_ee_rec k u e.
@@ -448,9 +480,12 @@ Proof with auto*.
   intros u e k Hexpr. revert k.
   induction Hexpr; intro k; simpl; f_equal; auto*;
   try solve [
-    unfold open_ee in *;
+    (** NEW: Something to deal with capture sets. *)
+    unfold open_ee in *; unfold open_ec in *;
     pick fresh x;
     eapply open_ee_rec_expr_aux with (j := 0) (v := exp_fvar x);
+    auto*;
+    eapply open_ee_rec_capt_aux with (j := 0) (C := {}C);
     auto*
   | unfold open_te in *;
     pick fresh X;
@@ -573,6 +608,7 @@ Proof with auto*.
   unfold open_ee.
   apply subst_ee_intro_rec...
 Qed.
+
 
 
 (* *********************************************************************** *)
