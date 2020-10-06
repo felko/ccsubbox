@@ -236,9 +236,9 @@ Inductive type : typ -> Prop :=
       type typ_top
   | type_var : forall X,
       type (typ_fvar X)
-  | type_arrow : forall T1 T2,
+  | type_arrow : forall L T1 T2,
       type T1 ->
-      type T2 ->
+      (forall X : atom, X `notin` L -> type (open_tc T2 (cset_singleton_fvar X))) ->
       type (typ_arrow T1 T2)
   | type_all : forall L T1 T2,
       type T1 ->
@@ -440,9 +440,8 @@ Inductive cv : typ -> env -> captureset -> Prop :=
     set can be subsumed by another. *)
 Inductive subcapt : env -> captureset -> captureset -> Prop :=
   (** the universal capture set captures all. *)
-  | subcapt_universal : forall E C1 C2,
-      cset_universal_prop C2 ->
-      subcapt E C1 C2
+  | subcapt_universal : forall E C1,
+      subcapt E C1 cset_universal
   (** If x : T is bound in the environment, then a capture set referencing {x}
       can be resolved as if it were cv(T). *)
   | subcapt_var : forall E C1 C2 X T,

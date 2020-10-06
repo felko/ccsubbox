@@ -146,7 +146,8 @@ Ltac gather_atoms :=
   let D := gather_atoms_with (fun x : exp => fv_ee x) in
   let E := gather_atoms_with (fun x : typ => fv_tt x) in
   let F := gather_atoms_with (fun x : env => dom x) in
-  constr:(A `union` B `union` C `union` D `union` E `union` F).
+  let G := gather_atoms_with (fun x : captureset => cset_fvar x) in
+  constr:(A `union` B `union` C `union` D `union` E `union` F `union` G).
 
 (** The second step in defining "[pick fresh]" is to define the tactic
     itself.  It is based on the [(pick fresh ... for ...)] tactic
@@ -222,6 +223,14 @@ Proof with eauto*.
     destruct (j === n)... destruct (i === n)...
 Qed.
 
+(** NEW: Opening with a type and capture variable commute... *)
+Lemma open_tt_rec_capt_aux : forall T j C i S,
+  open_tc_rec j C T = open_tt_rec i S (open_tc_rec j C T) ->
+  T = open_tt_rec i S T.
+Proof with eauto*.
+  induction T; intros j C i S H; simpl in *; inversion H; f_equal...
+Qed.
+
 (** Opening a locally closed term is the identity.  This lemma depends
     on the immediately preceding lemma. *)
 
@@ -231,6 +240,11 @@ Lemma open_tt_rec_type : forall T U k,
 Proof with auto*.
   intros T U k Htyp. revert k.
   induction Htyp; intros k; simpl; f_equal...
+  (** NEW: Just dealing with the case when we open a capture set in the -> constructor. *)
+  Case "typ_arrow".
+    unfold open_tc in *.
+    pick fresh X.
+    apply (open_tt_rec_capt_aux T2 0 (cset_singleton_fvar X))...
   Case "typ_all".
     unfold open_tt in *.
     pick fresh X.
@@ -349,13 +363,6 @@ Proof.
     f_equal; eauto using open_tt_rec_type_aux.
 Qed.
 
-Lemma open_tc_rec_capt_aux : forall t j C i P,
-  open_tc_rec j C t = open_tt_rec i P (open_tc_rec j C t) ->
-  t = open_tt_rec i P t.
-Proof with eauto*.
-  induction t; intros j C i P H; simpl in *; inversion H; f_equal...
-Qed.
-
 Lemma open_te_rec_capt_aux : forall e j C i P,
   open_ec_rec j C e = open_te_rec i P (open_ec_rec j C e) ->
   e = open_te_rec i P e.
@@ -364,9 +371,9 @@ Proof with eauto*.
   intros j C i P H;
   simpl in *; inversion H; f_equal...
   (** Three cases introduced by the new capture variables. *)
-  * apply open_tc_rec_capt_aux with (j := j) (C := C); auto.
-  * apply open_tc_rec_capt_aux with (j := j) (C := C); auto.
-  * apply open_tc_rec_capt_aux with (j := j) (C := C); auto.
+  * apply open_tt_rec_capt_aux with (j := j) (C := C); auto.
+  * apply open_tt_rec_capt_aux with (j := j) (C := C); auto.
+  * apply open_tt_rec_capt_aux with (j := j) (C := C); auto.
 Qed.
 
 Lemma open_te_rec_expr : forall e U k,
@@ -443,6 +450,171 @@ Proof with auto*.
   apply subst_te_intro_rec...
 Qed.
 
+(* ********************************************************************** *)
+(** ** Properties of capture substitution in types *)
+
+(** A warmup, to get started with. *)
+Lemma open_captureset_bvar_singleton : forall i c,
+  open_captureset_bvar i (cset_singleton_bvar i) c = c.
+Proof with eauto*.
+  intros i c.
+  unfold open_captureset_bvar.
+  case_eq (cset_references_bvar_dec i c)...
+  unfold cset_references_bvar_dec. destruct c. simpl. intro.
+  simpl. f_equal...
+  unfold cset_bvar. intro. unfold cset_singleton_bvar.
+  f_equal...
+  * fsetdec.
+  * assert (NatSet.F.In i t0).
+      { apply NatSetFacts.mem_iff... }
+    fnsetdec.
+Qed.
+
+(** Why fnsetdec doesn't do this for us, I really don't know... *)
+Lemma elim_empty_nat_set : forall C,
+  NatSet.F.union {}N C = C.
+Proof.
+  intros. fnsetdec.
+Qed.
+
+(** NEW: Opening by a subset is the identity, if the subset contains the index one is opening by. *)
+Lemma open_captureset_subset_with_index : forall i C c,
+  cset_subset_prop C c ->
+  cset_references_bvar i C ->
+  c = open_captureset_bvar i C c.
+Proof.
+  intros i C c. unfold cset_subset_prop.
+  intro. destruct H. destruct H0. intro.
+  unfold open_captureset_bvar.
+  unfold cset_fvar in *. unfold cset_bvar in *.
+  (* Two cases : i in C and i not in C *)
+  case_eq (cset_references_bvar_dec i c); intro.
+  * (* Two cases --> C is universal or it's not *)
+    case_eq C; intros.
+    ** apply H1. apply H4.
+    ** case_eq (c); intros.
+        *** intuition.
+        *** f_equal; rewrite H4, H5 in H; rewrite H4, H5 in H0...
+            (* for the fvars/atoms *)
+            **** fsetdec.
+            (* for the bvars/nats *)
+            **** unfold cset_references_bvar in H2. rewrite H4 in H2. simpl in H2. fnsetdec.
+  * intuition.
+Qed.
+
+(** NEW: Commuting local closure, when opening by disjoint capture sets with no bound variables,
+    which are not universal.
+
+    c[j -> D] = c[j -> D][i -> C] implies that i \notin c and in particular c[i -> C] = c,
+    so long as D references no free variables (and isn't the universal set).
+
+    This lemma could probably be cleaned up but I've seen enough of it.
+*)
+Lemma open_captureset_bvar_aux : forall j Df i C c,
+  i <> j ->
+  AtomSet.F.Empty (AtomSet.F.inter (cset_fvar C) Df) ->
+  open_captureset_bvar j (cset_set Df {}N) c = open_captureset_bvar i C (open_captureset_bvar j (cset_set Df {}N) c) ->
+  c = open_captureset_bvar i C c.
+Proof with eauto*.
+  (** There has to be a better way to do this... *)
+  intros j Df i C c Neq. unfold empty_cset_bvar_references. intros HCommon H. pose (D := (cset_set Df {}N)).
+  case_eq (cset_references_bvar_dec i c); intros.
+  * (* i \in c *)
+    case_eq (cset_references_bvar_dec j c); intros.
+    (** j in c *)
+    ** (* Three cases.
+          i \in C --> if C subset c, then open_captureset_bvar i {i} c is trivial.
+                  --> if c \ C = {x}, then x in C but not in c, a contradiction.
+          i \notin C --> then i \in c[j->c] but not in c[j->c][i->d], a contradiction. *)
+       case_eq (cset_references_bvar_dec i C); intro.
+       (* i \in C *)
+       *** (* We apply the helper lemma above for when C subset c, *)
+           case_eq (cset_subset_dec C c); intro H3; try apply cset_subset_iff in H3; try apply cset_not_subset_iff in H3.
+           **** apply open_captureset_subset_with_index. apply H3. apply cset_references_bvar_eq. apply H2.
+           (** Now we have c \ C = {x}, then x in C but not in c, a contradiction. Note x isn't in D by
+               definition.... *)
+           ****
+       (* i \notin C *)
+       *** unfold open_captureset_bvar; rewrite H0.
+           assert (NatSet.F.In i (cset_bvar (open_captureset_bvar j D c))).
+           { unfold open_captureset_bvar. rewrite H1.
+             destruct c; unfold D; unfold cset_references_bvar_dec in *; rewrite <-NatSetFacts.mem_iff in *; unfold cset_bvar in *.
+             * revert H1. fnsetdec.
+             * rewrite elim_empty_nat_set. fnsetdec. }
+           assert (~ NatSet.F.In i (cset_bvar (open_captureset_bvar i C (open_captureset_bvar j D c)))).
+           { unfold cset_bvar. unfold open_captureset_bvar at 1.
+            case_eq (cset_references_bvar_dec i (open_captureset_bvar j D c)); intro.
+            destruct C. fnsetdec. destruct (open_captureset_bvar j D c).
+            * fnsetdec.
+            * unfold cset_references_bvar_dec in H2. rewrite <-NatSetFacts.not_mem_iff in H2. fnsetdec.
+            * unfold cset_references_bvar_dec in H4. rewrite <-NatSetFacts.not_mem_iff in H4. unfold cset_bvar in H4. auto. }
+          unfold D in *. rewrite H in H3. contradiction.
+    (** j notin c *)
+    ** unfold open_captureset_bvar; rewrite H0.
+       assert (c = open_captureset_bvar j D c).
+       { unfold open_captureset_bvar. rewrite H1. auto. }
+       unfold D in *.
+       rewrite <-H2 in H.
+       unfold open_captureset_bvar in H.
+       rewrite H0 in H. apply H.
+  * (* i notin c *) intuition.
+Admitted.
+  
+Lemma open_tc_rec_type_aux : forall T j Df i C,
+  i <> j ->
+  AtomSet.F.Empty (AtomSet.F.inter (cset_fvar C) Df) ->
+  open_tc_rec j (cset_set Df {}N) T = open_tc_rec i C (open_tc_rec j (cset_set Df {}N) T) ->
+  T = open_tc_rec i C T.
+Proof with eauto*.
+  (*induction T; intros j V i U Neq H; simpl in *; inversion H; f_equal...
+  Case "typ_bvar".
+    destruct (j === n)... destruct (i === n)...*)
+  induction T; intros j Df i C Neq; unfold empty_cset_bvar_references; intros HCommon H;
+    simpl in *; inversion H; f_equal...
+  apply open_captureset_bvar_aux with (j := j) (C := C)(Df := Df)...
+Qed.
+
+(** NEW: Opening with a type and capture variable commute... *)
+Lemma open_tc_rec_capt_aux : forall T j S i C,
+  open_tt_rec j S T = open_tc_rec i C (open_tt_rec j S T) ->
+  T = open_tc_rec i C T.
+Proof with eauto*.
+  induction T; intros j C i S H; simpl in *; inversion H; f_equal...
+Qed.
+
+Lemma open_tc_rec_type : forall T C k,
+  type T ->
+  T = open_tc_rec k C T.
+Proof with auto*.
+  intros T C k Htyp. revert k.
+  induction Htyp; intros k; simpl; f_equal...
+  (* Case typ_arrow *)
+  * (* Here, we are opening (\ T1 -> T2), assuming that this is locally closed.
+       Hence T1 is locally closed, so by the induction hypothesis it goes away.
+       T2 isn't locally closed, but the only open capture variable in it is bound by \0. *)
+    pick fresh X.
+    unfold open_tc in *.
+    unfold cset_singleton_fvar in H0.
+    assert (X `notin` L) by fsetdec.
+    apply open_tc_rec_type_aux with (i := S k) (j := 0) (Df := (AtomSet.F.singleton X)) (C := C) (T := T2)...
+    fsetdec.
+  (* Case typ_all *)
+  * pick fresh X.
+    unfold open_tt in *.
+    apply open_tc_rec_capt_aux with (j := 0) (S := X)...
+  (* Case typ_capt *)
+  * unfold open_captureset_bvar.
+    case_eq (cset_references_bvar_dec k C0); intros.
+    ** unfold empty_cset_bvar_references in H.
+       assert (cset_references_bvar_dec k C0 = false).
+        { unfold cset_references_bvar_dec. apply NatSetFacts.not_mem_iff.
+          nnotin_solve. }
+       assert (true = false).
+        { rewrite <-H0. rewrite H1. auto. }
+       assert (true <> false) by discriminate.
+       contradiction.
+    ** auto.
+Admitted.
 
 (* ********************************************************************** *)
 (** ** Properties of expression substitution in expressions *)

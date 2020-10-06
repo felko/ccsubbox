@@ -121,6 +121,7 @@ Import AtomSet.F.
 
 Module AtomSetDecide := FSetDecide.Decide AtomSet.F.
 Module AtomSetNotin  := FSetNotin.Notin   AtomSet.F.
+Module AtomSetFacts  := FSetFacts.Facts   AtomSet.F.
 
 
 (* *********************************************************************** *)
