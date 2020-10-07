@@ -147,7 +147,7 @@ Definition empty_cset_fvar_references (c : captureset) : Prop :=
 
 (** Capture set unions are what you'd expect. *)
 Definition cset_union (c1 c2 : captureset) : captureset :=
-  match c1 , c1 with
+  match c1 , c2 with
   | _ , cset_universal => cset_universal
   | cset_universal , _ => cset_universal
   | cset_set A1 N1 , cset_set A2 N2 => cset_set (AtomSet.F.union A1 A2) (NatSet.F.union N1 N2)
