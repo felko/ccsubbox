@@ -138,13 +138,13 @@ Qed.
 
 
 (** More predicates *)
-Definition empty_cset_bvar_references (c : captureset) :=
+Definition empty_cset_bvar_references (c : captureset) : Prop :=
   NatSet.F.Empty (cset_bvar c).
-Definition empty_cset_fvar_references (c : captureset) :=
+Definition empty_cset_fvar_references (c : captureset) : Prop :=
   AtomSet.F.Empty (cset_fvar c).
 
 (** Opening a capture set with a bound variable d[k -> c] *)
-Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) :=
+Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) : captureset :=
   if cset_references_bvar_dec k d then
     match c with
     | cset_universal => cset_universal
@@ -158,7 +158,7 @@ Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) :=
     d.
 
 (** Substituting a capture set with a free variable d[a -> c] *)
-Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset) :=
+Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset) : captureset :=
   if cset_references_fvar_dec a d then
     match c with
     | cset_universal => cset_universal
@@ -172,7 +172,7 @@ Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset
     d.
 
 (** Capture set unions are what you'd expect. *)
-Definition cset_union (c1 c2 : captureset) :=
+Definition cset_union (c1 c2 : captureset) : captureset :=
   match c1 with
   | cset_universal => cset_universal
   | cset_set A1 N1 =>
@@ -183,14 +183,14 @@ Definition cset_union (c1 c2 : captureset) :=
   end.
 
 (** Empty capture sets / universal capture sets *)
-Definition cset_empty (c : captureset) :=
+Definition cset_empty (c : captureset) : Prop :=
   match c with
   | cset_universal => False
   | cset_set A N => empty_cset_bvar_references c /\ empty_cset_fvar_references c
   end.
 
 (** Predicates around subsets, and decidability for destruction *)
-Definition cset_subset_prop (c1 c2 : captureset) :=
+Definition cset_subset_prop (c1 c2 : captureset) : Prop :=
     AtomSet.F.Subset (cset_fvar c1) (cset_fvar c2) /\ NatSet.F.Subset (cset_bvar c1) (cset_bvar c2) /\
       (c1 = cset_universal -> c2 = cset_universal).
 Definition cset_subset_dec (c1 c2 : captureset) :=
