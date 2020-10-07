@@ -7,6 +7,7 @@ Require Import Tactics.
 Require Import OrderedTypeEx.
 Require Import OrderedType.
 Require Import FSetFacts.
+Require Import Atom.
 
 (** Helpers, defining a set of natural numbers. *)
 Module Type NATSET.
@@ -143,43 +144,13 @@ Definition empty_cset_bvar_references (c : captureset) : Prop :=
 Definition empty_cset_fvar_references (c : captureset) : Prop :=
   AtomSet.F.Empty (cset_fvar c).
 
-(** Opening a capture set with a bound variable d[k -> c] *)
-Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) : captureset :=
-  if cset_references_bvar_dec k d then
-    match c with
-    | cset_universal => cset_universal
-    | cset_set AC NC =>
-      match d with 
-      | cset_universal => cset_universal
-      | cset_set AD ND => cset_set (AtomSet.F.union AC AD) (NatSet.F.union NC (NatSet.F.remove k ND))
-      end
-    end
-  else
-    d.
-
-(** Substituting a capture set with a free variable d[a -> c] *)
-Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset) : captureset :=
-  if cset_references_fvar_dec a d then
-    match c with
-    | cset_universal => cset_universal
-    | cset_set AC NC =>
-      match d with 
-      | cset_universal => cset_universal
-      | cset_set AD ND => cset_set (AtomSet.F.union AC (AtomSet.F.remove a AD)) (NatSet.F.union NC ND)
-      end
-    end
-  else
-    d.
 
 (** Capture set unions are what you'd expect. *)
 Definition cset_union (c1 c2 : captureset) : captureset :=
-  match c1 with
-  | cset_universal => cset_universal
-  | cset_set A1 N1 =>
-    match c2 with
-    | cset_universal => cset_universal
-    | cset_set A2 N2 => cset_set (AtomSet.F.union A1 A2) (NatSet.F.union N1 N2)
-    end
+  match c1 , c1 with
+  | _ , cset_universal => cset_universal
+  | cset_universal , _ => cset_universal
+  | cset_set A1 N1 , cset_set A2 N2 => cset_set (AtomSet.F.union A1 A2) (NatSet.F.union N1 N2)
   end.
 
 (** Empty capture sets / universal capture sets *)
@@ -189,19 +160,46 @@ Definition cset_empty (c : captureset) : Prop :=
   | cset_set A N => empty_cset_bvar_references c /\ empty_cset_fvar_references c
   end.
 
+Definition cset_remove_bvar (k : nat) (c : captureset) : captureset :=
+  match c with
+  | cset_universal => cset_universal
+  | cset_set AC NC => cset_set AC (NatSet.F.remove k NC)
+  end.
+
+Definition cset_remove_fvar (a : atom) (c : captureset) : captureset :=
+  match c with
+  | cset_universal => cset_universal
+  | cset_set AC NC => cset_set (AtomSet.F.remove a AC) NC
+  end.
+
+(** Opening a capture set with a bound variable d[k -> c] *)
+Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) : captureset :=
+  if cset_references_bvar_dec k d then 
+    cset_union c (cset_remove_bvar k d)
+  else 
+    d.
+
+(** Substituting a capture set with a free variable d[a -> c] *)
+Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset) : captureset :=
+  if cset_references_fvar_dec a d then
+    cset_union c (cset_remove_fvar a d)
+  else
+    d.
+
+(* TODO rename to cset_subset *)
 (** Predicates around subsets, and decidability for destruction *)
-Definition cset_subset_prop (c1 c2 : captureset) : Prop :=
-    AtomSet.F.Subset (cset_fvar c1) (cset_fvar c2) /\ NatSet.F.Subset (cset_bvar c1) (cset_bvar c2) /\
-      (c1 = cset_universal -> c2 = cset_universal).
-Definition cset_subset_dec (c1 c2 : captureset) :=
-    AtomSet.F.subset (cset_fvar c1) (cset_fvar c2) && NatSet.F.subset (cset_bvar c1) (cset_bvar c2) &&
-      (match c1 with
-        | cset_set _ _ => true
-        | cset_universal => match c2 with
-                              | cset_universal => true
-                              | cset_set _ _ => false
-                            end
-      end).
+Inductive cset_subset_prop : captureset -> captureset -> Prop :=
+| cset_subset_univ : forall c, cset_subset_prop c cset_universal
+| cset_subset_elem : forall ac nc ad nd,  
+  AtomSet.F.Subset ac ad -> NatSet.F.Subset nc nd -> cset_subset_prop (cset_set ac nc) (cset_set ad nd)
+.
+      
+Definition cset_subset_dec (c d : captureset) :=
+  match c , d with
+  | _ , cset_universal => true
+  | cset_universal , _ => false
+  | cset_set AC NC , cset_set AD ND => AtomSet.F.subset AC AD && NatSet.F.subset NC ND  
+  end.
 
 (** A helper, to eliminate terms like <complex computation> && false *)
 Local Lemma reduce_false (b : bool) : b && false = false.
@@ -218,26 +216,22 @@ Qed.
 
 (** Two relations relating the subset relation to the subset computation. *)
 Lemma cset_subset_iff (c1 c2 : captureset) : cset_subset_prop c1 c2 <-> cset_subset_dec c1 c2 = true.
-Proof with auto*.
-  unfold cset_subset_prop. unfold cset_subset_dec.
+Proof.
   split.
   (* --> *)
-  * intro.
-    destruct_conjs.
-    rewrite NatSetFacts.subset_iff in *.
-    rewrite AtomSetFacts.subset_iff in *.
-    rewrite H. rewrite H0. simpl.
-    destruct c1; destruct c2...
-    exfalso.
-    revert H1. intuition...
+  * intro. inversion H ; unfold cset_subset_dec.
+    - subst. destruct c1 ; eauto.
+    - subst. 
+      rewrite NatSetFacts.subset_iff in *. rewrite AtomSetFacts.subset_iff in *. 
+      rewrite H0. rewrite H1. auto.
   (* <-- *)
-  * intro.
-    case_eq (AtomSet.F.subset (cset_fvar c1) (cset_fvar c2));
-      case_eq (NatSet.F.subset (cset_bvar c1) (cset_bvar c2));
-      case_eq c1; case_eq c2; intros;
-      rewrite NatSetFacts.subset_iff in *; rewrite AtomSetFacts.subset_iff in *; rewrite H0 in H;
-      rewrite H1 in H; rewrite H2 in H; rewrite H3 in H; simpl in *; revert H; destr_bool; intuition;
-      try revert H; try rewrite reduce_false; try destr_bool; try rewrite AtomSetFacts.subset_iff.
+  * intro. unfold cset_subset_dec in H.
+    destruct c1 eqn:H1 ; destruct c2 eqn:H2.
+    - apply cset_subset_univ.
+    - discriminate H.
+    - apply cset_subset_univ.
+    - apply cset_subset_elem ; rewrite andb_true_iff in H ; destruct H ;
+      rewrite <- NatSetFacts.subset_iff in * ; rewrite <- AtomSetFacts.subset_iff in * ; auto.
 Qed.
 
 Lemma cset_subset_not_iff (c1 c2 : captureset) : ~ cset_subset_prop c1 c2 <-> cset_subset_dec c1 c2 = false.
