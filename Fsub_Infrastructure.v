@@ -460,14 +460,12 @@ Proof with eauto*.
   intros i c.
   unfold open_captureset_bvar.
   case_eq (cset_references_bvar_dec i c)...
-  unfold cset_references_bvar_dec. destruct c; simpl; intro...
+  destruct c; simpl; intro...
   (* If i isn't in C, this is trivial.  Now we assume i is in C,
      and C isn't the univeral set, as that's also trivial. *)
   f_equal.
   * fsetdec.
-  * assert (NatSet.F.In i t0).
-      { apply NatSetFacts.mem_iff... }
-    fnsetdec.
+  * rewrite <- NatSetFacts.mem_iff in H. fnsetdec.
 Qed.
 
 (** Why fnsetdec doesn't do this for us, I really don't know... *)
@@ -484,23 +482,21 @@ Lemma open_captureset_subset_with_index : forall i C c,
   c = open_captureset_bvar i C c.
 Proof with eauto*.
   intros i C c S.
-  unfold open_captureset_bvar.
-  unfold cset_fvar in *. unfold cset_bvar in *.
+  unfold open_captureset_bvar.  
   (* Two cases : i in C and i not in C *)
   case_eq (cset_references_bvar_dec i c); intro.
   (* Two more cases : C is universal or not. *)
   * case_eq C; intros.
-    ** unfold cset_union. rewrite H0 in S. inversion S. destruct (cset_remove_bvar i c); destruct c...
+    ** rewrite H0 in S. inversion S. destruct (cset_remove_bvar i c); destruct c...
     (* Two cases : c is universal or it's not *)
     ** case_eq (c); intros; rewrite H0 in S; rewrite H2 in S; inversion S.
-        (** The cases where c is universal are trivial. *)
-        *** intuition.
-        (** The cases where c isn't universal are a bit more work. *)
-        *** unfold cset_union. unfold cset_remove_bvar.
-            f_equal...
-            **** fsetdec.
-            **** unfold cset_references_bvar in H1. unfold cset_bvars in H1.
-                  fnsetdec.
+      (** The cases where c is universal are trivial. *)
+      *** intuition.
+      (** The cases where c isn't universal are a bit more work. *)
+      *** unfold cset_union. unfold cset_remove_bvar. unfold cset_references_bvar in H1. unfold cset_bvars in H1.
+        f_equal.
+        **** fsetdec.
+        **** fnsetdec.
   * rewrite cset_not_references_bvar_eq in H. intuition.
 Qed.
 
@@ -515,6 +511,15 @@ Proof.
   reflexivity.
 Qed.
 
+
+Lemma cset_references_bvar_iff : forall i t1 t2,
+  cset_references_bvar i (cset_set t1 t2) <-> NatSet.F.In i t2.
+Proof.
+  intros. simpl. reflexivity.
+Qed.
+
+Hint Resolve cset_references_bvar_iff : core.
+
 Lemma cset_open_idempotent : forall i C c,
   c = open_captureset_bvar i C c <->
   ~ (cset_references_bvar i c) \/ (cset_subset_prop C c /\ cset_references_bvar i C).
@@ -523,22 +528,20 @@ Proof.
   split.
   (* -> *)
   - intros H. destruct (cset_references_bvar_dec i c) eqn:Hic.
-    * unfold open_captureset_bvar in H. rewrite Hic in H. unfold cset_remove_bvar in H.
-      destruct c ; simpl ; eauto.
+    * unfold open_captureset_bvar in H. rewrite Hic in H. 
+      destruct c ; eauto.
       simpl in Hic.
-      destruct C. simpl in *.
+      destruct C.
       ** discriminate H.
-      ** simpl in H. inversion H. right. split. 
+      ** inversion H. right. split. 
         *** eapply cset_subset_elem ; try fsetdec ; try fnsetdec.
-        *** unfold cset_references_bvar. simpl. inversion H. rewrite H2 in Hic. 
+        *** inversion H. rewrite H2 in Hic. 
             rewrite <- NatSetFacts.mem_iff in *. 
             fnsetdec.
     * left. apply cset_not_references_bvar_eq. auto.
   - intros H. destruct H.
-    * apply cset_open_unused_bvar. apply H.
-    * apply open_captureset_subset_with_index. 
-      ** apply H.
-      ** destruct H. apply H0.
+    * auto using cset_open_unused_bvar.
+    * destruct H ; auto using open_captureset_subset_with_index.
 Qed.
   
 
@@ -547,10 +550,6 @@ Qed.
 
     c[j -> D] = c[j -> D][i -> C] implies that i \notin c and in particular c[i -> C] = c,
     so long as D references no free variables (and isn't the universal set).
-
-    This lemma could probably be cleaned up but I've seen enough of it.
-
-    Jonathan: it could still be cleaned up. :)
 *)
 Lemma open_captureset_bvar_aux : forall j D Df i C c,
   i <> j ->
@@ -568,28 +567,24 @@ Proof with eauto*.
   destruct (cset_references_bvar_dec i c) eqn:Hic.
   (* i is in c *)
   - destruct (cset_references_bvar_dec j c) eqn:Hjc ; unfold open_captureset_bvar in *; rewrite Hjc in *...
-    * destruct H. 
-      (* ~ cset_references_bvar i (cset_union D (cset_remove_bvar j c))  *)
-      ** rewrite DDef in H. unfold cset_union in H. unfold cset_remove_bvar in H. destruct c ; auto.
-         unfold cset_references_bvar in *. unfold cset_bvars in *. left. fnsetdec.
-      (* cset_subset_prop C (cset_union D (cset_remove_bvar j c)) /\ cset_references_bvar i C *)
-      ** destruct H.
-         destruct C eqn:HC.
-         *** unfold cset_references_bvar in H0. unfold cset_bvars in H0. contradiction.
-         *** destruct c eqn:Hc.
-             **** right. split. apply cset_subset_univ. apply H0.
-             **** right. split.
-                 + inversion H. 
-                   ++ rewrite DDef in H3. unfold cset_union in H3. discriminate H3.
-                   ++ rewrite DDef in H3. unfold cset_union in H3. injection H3. intros. subst.
-                      rewrite elim_empty_nat_set in *.
-                      apply cset_subset_elem.
-                      +++ unfold cset_disjoint_fvars in Disj. fsetdec.
-                      +++ fnsetdec.
-                 + apply H0. 
+    destruct H. 
+    * rewrite DDef in H. unfold cset_union in H. unfold cset_remove_bvar in H. destruct c ; auto.
+      unfold cset_references_bvar in *. unfold cset_bvars in *. left. fnsetdec.      
+    * destruct H. destruct C eqn:HC.
+      ** contradiction. 
+      ** destruct c eqn:Hc ; eauto.
+         right. split...
+         inversion H ; rewrite DDef in H3 ; unfold cset_union in H3. 
+         + discriminate H3.
+         + injection H3. intros. subst.
+           rewrite elim_empty_nat_set in *.
+           unfold cset_disjoint_fvars in Disj.
+           apply cset_subset_elem.
+           ++ fsetdec.
+           ++ fnsetdec.
+  (* i is not in c *)     
   - left. apply cset_not_references_bvar_eq. apply Hic.
 Qed.
-
   
 Lemma open_tc_rec_type_aux : forall T j Df i C,
   i <> j ->

@@ -103,6 +103,8 @@ Definition cset_vars (pf : atoms -> Prop)  (pb : nats -> Prop) (c : captureset) 
   | cset_universal => False
   end.
 
+Hint Transparent cset_vars.
+
 (* Could be implemented in terms of cset_vars but that leaves us with a dangeling /\ True *)
 Definition cset_fvars (p : atoms -> Prop) (c : captureset) : Prop :=
   match c with
@@ -110,11 +112,15 @@ Definition cset_fvars (p : atoms -> Prop) (c : captureset) : Prop :=
   | cset_universal => False
   end.
 
+Hint Transparent cset_fvars.
+
 Definition cset_bvars (p : nats -> Prop) (c : captureset) : Prop :=
   match c with
   | cset_set A N => p N
   | cset_universal => False
   end.
+
+Hint Transparent cset_bvars : core.
 
 (** Singletons *)
 Definition cset_singleton_fvar (a : atom) :=
@@ -127,9 +133,14 @@ Definition cset_singleton_bvar (k : nat) :=
     Don't use these predicates for determining if a capture set
     captures a variable, as one needs to also test cset_universal. *)
 Definition cset_references_bvar (k : nat) (c : captureset) :=
-  cset_bvars (NatSet.F.In k) c.  
+  cset_bvars (NatSet.F.In k) c.
+
+Hint Transparent cset_references_bvar.
+
 Definition cset_references_fvar (a : atom) (c : captureset) :=
   cset_fvars (AtomSet.F.In a) c.
+
+Hint Transparent cset_references_fvar.
 
 Definition cset_references_bvar_dec (k : nat) (c : captureset) :=
   match c with
@@ -205,11 +216,15 @@ Definition cset_remove_bvar (k : nat) (c : captureset) : captureset :=
   | cset_set AC NC => cset_set AC (NatSet.F.remove k NC)
   end.
 
+Hint Transparent cset_remove_bvar : core.
+
 Definition cset_remove_fvar (a : atom) (c : captureset) : captureset :=
   match c with
   | cset_universal => cset_universal
   | cset_set AC NC => cset_set (AtomSet.F.remove a AC) NC
   end.
+
+Hint Transparent cset_remove_fvar : core.
 
 (** Opening a capture set with a bound variable d[k -> c] *)
 Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) : captureset :=
@@ -218,12 +233,16 @@ Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) : ca
   else 
     d.
 
+Hint Transparent open_captureset_bvar : core.
+
 (** Substituting a capture set with a free variable d[a -> c] *)
 Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset) : captureset :=
   if cset_references_fvar_dec a d then
     cset_union c (cset_remove_fvar a d)
   else
     d.
+
+Hint Transparent substitute_captureset_fvar : core.
 
 (* TODO rename to cset_subset *)
 (** Predicates around subsets, and decidability for destruction *)
@@ -232,6 +251,8 @@ Inductive cset_subset_prop : captureset -> captureset -> Prop :=
 | cset_subset_elem : forall ac nc ad nd,  
   AtomSet.F.Subset ac ad -> NatSet.F.Subset nc nd -> cset_subset_prop (cset_set ac nc) (cset_set ad nd)
 .
+
+Hint Constructors cset_subset_prop.
       
 Definition cset_subset_dec (c d : captureset) :=
   match c , d with
