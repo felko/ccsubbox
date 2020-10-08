@@ -293,6 +293,11 @@ Proof with auto*.
   apply subst_tt_open_tt_rec...
 Qed.
 
+Lemma subst_tt_open_tc : forall X P T C,
+  subst_tt X P (open_tc T C) = open_tc (subst_tt X P T) C.
+Proof.
+Admitted.
+
 (** The next lemma is a direct corollary of the immediately preceding
     lemma---here, we're opening the term with a variable.  In
     practice, this lemma seems to be needed as a left-to-right rewrite
@@ -829,11 +834,12 @@ Proof with auto.
     destruct (X == Z)...
   - Case "type_arrow".
     pick fresh Y and apply type_arrow...
-    admit.
+    (* rewrite subst_tt_open_tt_var... *)
+    rewrite <- subst_tt_open_tc...    
   - Case "type_all".
     pick fresh Y and apply type_all...
     rewrite subst_tt_open_tt_var...
-Admitted.
+Qed.
 
 (** The following lemma depends on [subst_tt_type] and
     [subst_te_open_ee_var]. *)
