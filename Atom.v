@@ -122,7 +122,7 @@ Import AtomSet.F.
 Module AtomSetDecide := FSetDecide.Decide AtomSet.F.
 Module AtomSetNotin  := FSetNotin.Notin   AtomSet.F.
 Module AtomSetFacts  := FSetFacts.Facts   AtomSet.F.
-
+Module AtomSetProperties := FSetProperties.Properties AtomSet.F.
 
 (* *********************************************************************** *)
 (** ** Tactics for working with finite sets of atoms *)

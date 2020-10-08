@@ -499,10 +499,48 @@ Proof with eauto*.
         *** unfold cset_union. unfold cset_remove_bvar.
             f_equal...
             **** fsetdec.
-            **** unfold cset_references_bvar in H1. unfold cset_bvar in H1.
+            **** unfold cset_references_bvar in H1. unfold cset_bvars in H1.
                   fnsetdec.
   * rewrite cset_not_references_bvar_eq in H. intuition.
 Qed.
+
+Lemma cset_open_unused_bvar : forall i C c,
+  ~ (cset_references_bvar i c) ->
+  c = open_captureset_bvar i C c.
+Proof.
+  intros i C c H.
+  unfold open_captureset_bvar.
+  rewrite <- cset_not_references_bvar_eq in H.
+  rewrite H.
+  reflexivity.
+Qed.
+
+Lemma cset_open_idempotent : forall i C c,
+  c = open_captureset_bvar i C c <->
+  ~ (cset_references_bvar i c) \/ (cset_subset_prop C c /\ cset_references_bvar i C).
+Proof.
+  intros i C c.
+  split.
+  (* -> *)
+  - intros H. destruct (cset_references_bvar_dec i c) eqn:Hic.
+    * unfold open_captureset_bvar in H. rewrite Hic in H. unfold cset_remove_bvar in H.
+      destruct c ; simpl ; eauto.
+      simpl in Hic.
+      destruct C. simpl in *.
+      ** discriminate H.
+      ** simpl in H. inversion H. right. split. 
+        *** eapply cset_subset_elem ; try fsetdec ; try fnsetdec.
+        *** unfold cset_references_bvar. simpl. inversion H. rewrite H2 in Hic. 
+            rewrite <- NatSetFacts.mem_iff in *. 
+            fnsetdec.
+    * left. apply cset_not_references_bvar_eq. auto.
+  - intros H. destruct H.
+    * apply cset_open_unused_bvar. apply H.
+    * apply open_captureset_subset_with_index. 
+      ** apply H.
+      ** destruct H. apply H0.
+Qed.
+  
 
 (** NEW: Commuting local closure, when opening by disjoint capture sets with no bound variables,
     which are not universal.
@@ -511,65 +549,47 @@ Qed.
     so long as D references no free variables (and isn't the universal set).
 
     This lemma could probably be cleaned up but I've seen enough of it.
+
+    Jonathan: it could still be cleaned up. :)
 *)
-Lemma open_captureset_bvar_aux : forall j Df i C c,
+Lemma open_captureset_bvar_aux : forall j D Df i C c,
   i <> j ->
-  AtomSet.F.Empty (AtomSet.F.inter (cset_fvar C) Df) ->
-  open_captureset_bvar j (cset_set Df {}N) c = open_captureset_bvar i C (open_captureset_bvar j (cset_set Df {}N) c) ->
+  D = cset_set Df {}N ->
+  cset_disjoint_fvars C D ->
+  open_captureset_bvar j D c = open_captureset_bvar i C (open_captureset_bvar j D c) ->
   c = open_captureset_bvar i C c.
 Proof with eauto*.
-  (** There has to be a better way to do this... *)
-  intros j Df i C c Neq. unfold empty_cset_bvar_references. intros HCommon H. pose (D := (cset_set Df {}N)).
-  case_eq (cset_references_bvar_dec i c); intros.
-  * (* i \in c *)
-    case_eq (cset_references_bvar_dec j c); intros.
-    (** j in c *)
-    ** (* Three cases.
-          i \in C --> if C subset c, then open_captureset_bvar i {i} c is trivial.
-                  --> if c \ C = {x}, then x in C but not in c, a contradiction.
-          i \notin C --> then i \in c[j->c] but not in c[j->c][i->d], a contradiction. *)
-       case_eq (cset_references_bvar_dec i C); intro.
-       (* i \in C *)
-       *** (* We apply the helper lemma above for when C subset c, *)
-           case_eq (cset_subset_dec C c); intro H3; try apply cset_subset_iff in H3; try apply cset_not_subset_iff in H3.
-           **** apply open_captureset_subset_with_index. apply H3. apply cset_references_bvar_eq. apply H2.
-           (** Now we have c \ C = {x}, then x in C but not in c, a contradiction. Note x isn't in D by
-               definition.... *)
-           **** admit.
-       (* i \notin C *)
-       *** unfold open_captureset_bvar; rewrite H0.
-           (* By definition, we can prove that i \in c[j -> D] *)
-           assert (NatSet.F.In i (cset_bvar (open_captureset_bvar j D c))).
-           { unfold open_captureset_bvar. rewrite H1.
-             destruct c; unfold D; unfold cset_references_bvar_dec in *; rewrite <-NatSetFacts.mem_iff in *; unfold cset_bvar in *.
-             * revert H1. fnsetdec.
-             * case_eq (cset_union (cset_set Df {}N) (cset_remove_bvar j (cset_set t t0))); intro.
-                ** revert H3. unfold cset_union. unfold cset_remove_bvar. discriminate.
-                ** intro. unfold cset_union. unfold cset_remove_bvar. intro H3. inversion H3.
-                    rewrite elim_empty_nat_set. fnsetdec. }
-           (* By our assumptions, as i \notin C, we can prove that i \notin c[j -> D][i -> C] *)
-           assert (~ NatSet.F.In i (cset_bvar (open_captureset_bvar i C (open_captureset_bvar j D c)))).
-           { unfold cset_bvar. unfold open_captureset_bvar at 1.
-             rewrite NatSetFacts.mem_iff in H3. unfold cset_references_bvar_dec. rewrite H3.
-             (* Here we just unfold all the definitions and apply a hammer. *)
-             unfold open_captureset_bvar in *; unfold cset_union in *; unfold cset_remove_bvar in *; unfold cset_bvar in *;
-              destruct C; destruct c; 
-              try rewrite H0 in *; try rewrite H1 in *; try rewrite H2 in *; destruct D; try fnsetdec.
-             (* One case left, unfold bvar_dec in *.*)
-             unfold cset_references_bvar_dec in *. unfold cset_bvar in *. rewrite <-NatSetFacts.mem_iff in *.
-             rewrite <-NatSetFacts.not_mem_iff in *. fnsetdec. }
-          (** This case is contradictory. *)
-          unfold D in *. rewrite H in H3. contradiction.
-    (** j notin c *)
-    ** unfold open_captureset_bvar; rewrite H0.
-       assert (c = open_captureset_bvar j D c).
-       { unfold open_captureset_bvar. rewrite H1. auto. }
-       unfold D in *.
-       rewrite <-H2 in H.
-       unfold open_captureset_bvar in H.
-       rewrite H0 in H. apply H.
-  * (* i notin c *) intuition.
-Admitted.
+  intros j D Df i C c Neq DDef Disj H.
+
+  rewrite (cset_open_idempotent i C (open_captureset_bvar j D c)) in H.
+
+  rewrite cset_open_idempotent. 
+
+  destruct (cset_references_bvar_dec i c) eqn:Hic.
+  (* i is in c *)
+  - destruct (cset_references_bvar_dec j c) eqn:Hjc ; unfold open_captureset_bvar in *; rewrite Hjc in *...
+    * destruct H. 
+      (* ~ cset_references_bvar i (cset_union D (cset_remove_bvar j c))  *)
+      ** rewrite DDef in H. unfold cset_union in H. unfold cset_remove_bvar in H. destruct c ; auto.
+         unfold cset_references_bvar in *. unfold cset_bvars in *. left. fnsetdec.
+      (* cset_subset_prop C (cset_union D (cset_remove_bvar j c)) /\ cset_references_bvar i C *)
+      ** destruct H.
+         destruct C eqn:HC.
+         *** unfold cset_references_bvar in H0. unfold cset_bvars in H0. contradiction.
+         *** destruct c eqn:Hc.
+             **** right. split. apply cset_subset_univ. apply H0.
+             **** right. split.
+                 + inversion H. 
+                   ++ rewrite DDef in H3. unfold cset_union in H3. discriminate H3.
+                   ++ rewrite DDef in H3. unfold cset_union in H3. injection H3. intros. subst.
+                      rewrite elim_empty_nat_set in *.
+                      apply cset_subset_elem.
+                      +++ unfold cset_disjoint_fvars in Disj. fsetdec.
+                      +++ fnsetdec.
+                 + apply H0. 
+  - left. apply cset_not_references_bvar_eq. apply Hic.
+Qed.
+
   
 Lemma open_tc_rec_type_aux : forall T j Df i C,
   i <> j ->
@@ -582,7 +602,8 @@ Proof with eauto*.
     destruct (j === n)... destruct (i === n)...*)
   induction T; intros j Df i C Neq; unfold empty_cset_bvar_references; intros HCommon H;
     simpl in *; inversion H; f_equal...
-  apply open_captureset_bvar_aux with (j := j) (C := C)(Df := Df)...
+  apply open_captureset_bvar_aux with (j := j) (C := C) (D := cset_set Df {}N) (Df := Df)...
+  unfold cset_disjoint_fvars. destruct C...
 Qed.
 
 (** NEW: Opening with a type and capture variable commute... *)
@@ -616,9 +637,9 @@ Proof with auto*.
   (* Case typ_capt *)
   * unfold open_captureset_bvar.
     case_eq (cset_references_bvar_dec k C0); intros.
-    ** unfold empty_cset_bvar_references in H.
+    ** unfold empty_cset_bvar_references in H. unfold cset_bvars in H.
        assert (cset_references_bvar_dec k C0 = false).
-        { unfold cset_references_bvar_dec. apply NatSetFacts.not_mem_iff.
+        { unfold cset_references_bvar_dec. destruct C0 ; auto. apply NatSetFacts.not_mem_iff.
           nnotin_solve. }
        assert (true = false).
         { rewrite <-H0. rewrite H1. auto. }

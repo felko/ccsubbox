@@ -42,6 +42,7 @@ Notation "{}N" :=
 Module NatSetDecide := FSetDecide.Decide NatSet.F.
 Module NatSetNotin  := FSetNotin.Notin   NatSet.F.
 Module NatSetFacts  := FSetFacts.Facts NatSet.F.
+Module NatSetProperties := FSetProperties.Properties NatSet.F.
 
 (* *********************************************************************** *)
 (** ** Tactics for working with finite sets of nats *)
@@ -79,15 +80,40 @@ Notation "{*}C" :=
   universal_cset : metatheory_scope.
 
 (** Accessors *)
+(* Jonathan: this looks dangerous. It actually might complicate proofs to assume the universal capture set
+             has an empty fvar set.
+             I am trying to reduce the usage of cset_fvar  *)
+
 Definition cset_fvar (c : captureset) : atoms :=
   match c with
   | cset_universal => {}
   | cset_set A N => A
   end.
+
 Definition cset_bvar (c : captureset) : nats :=
   match c with
   | cset_universal => {}N
   | cset_set A N => N
+  end.
+
+(** Lifts predicates on sets of captures to non-universal capture sets **)
+Definition cset_vars (pf : atoms -> Prop)  (pb : nats -> Prop) (c : captureset) : Prop :=
+  match c with
+  | cset_set A N => pf A /\ pb N
+  | cset_universal => False
+  end.
+
+(* Could be implemented in terms of cset_vars but that leaves us with a dangeling /\ True *)
+Definition cset_fvars (p : atoms -> Prop) (c : captureset) : Prop :=
+  match c with
+  | cset_set A N => p A
+  | cset_universal => False
+  end.
+
+Definition cset_bvars (p : nats -> Prop) (c : captureset) : Prop :=
+  match c with
+  | cset_set A N => p N
+  | cset_universal => False
   end.
 
 (** Singletons *)
@@ -101,49 +127,62 @@ Definition cset_singleton_bvar (k : nat) :=
     Don't use these predicates for determining if a capture set
     captures a variable, as one needs to also test cset_universal. *)
 Definition cset_references_bvar (k : nat) (c : captureset) :=
-  NatSet.F.In k (cset_bvar c).
+  cset_bvars (NatSet.F.In k) c.  
 Definition cset_references_fvar (a : atom) (c : captureset) :=
-  AtomSet.F.In a (cset_fvar c).
+  cset_fvars (AtomSet.F.In a) c.
+
 Definition cset_references_bvar_dec (k : nat) (c : captureset) :=
-  NatSet.F.mem k (cset_bvar c).
+  match c with
+  | cset_universal => false
+  | cset_set A N => NatSet.F.mem k N
+  end.
+
 Definition cset_references_fvar_dec (a : atom) (c : captureset) :=
-  AtomSet.F.mem a (cset_fvar c).
+  match c with
+  | cset_universal => false
+  | cset_set A N => AtomSet.F.mem a A
+  end.
 
 Lemma cset_references_bvar_eq (k : nat) (c : captureset) :
   cset_references_bvar_dec k c = true <-> cset_references_bvar k c.
 Proof.
-  unfold cset_references_bvar_dec. unfold cset_references_bvar.
-  rewrite <-NatSetFacts.mem_iff. intuition.
+  destruct c ; simpl ; intuition.
 Qed.
 
 Lemma cset_references_fvar_eq (k : atom) (c : captureset) :
   cset_references_fvar_dec k c = true <-> cset_references_fvar k c.
 Proof.
-  unfold cset_references_fvar_dec. unfold cset_references_bvar.
-  rewrite <-AtomSetFacts.mem_iff. intuition.
+  destruct c ; simpl ; intuition.
 Qed.
 
 Lemma cset_not_references_bvar_eq (k : nat) (c : captureset) :
   cset_references_bvar_dec k c = false <-> ~ cset_references_bvar k c.
 Proof.
-  unfold cset_references_bvar_dec. unfold cset_references_bvar.
-  rewrite <-NatSetFacts.not_mem_iff. intuition.
+  destruct c ; simpl.
+  - intuition.
+  - rewrite <- NatSetFacts.not_mem_iff. intuition.
 Qed.
 
 Lemma cset_not_references_fvar_eq (k : atom) (c : captureset) :
   cset_references_fvar_dec k c = false <-> ~ cset_references_fvar k c.
 Proof.
-  unfold cset_references_fvar_dec. unfold cset_references_bvar.
-  rewrite <-AtomSetFacts.not_mem_iff. intuition.
+  destruct c ; simpl.
+  - intuition.
+  - rewrite <- AtomSetFacts.not_mem_iff. intuition.
 Qed.
 
 
 (** More predicates *)
 Definition empty_cset_bvar_references (c : captureset) : Prop :=
-  NatSet.F.Empty (cset_bvar c).
+  cset_bvars NatSet.F.Empty c.
 Definition empty_cset_fvar_references (c : captureset) : Prop :=
-  AtomSet.F.Empty (cset_fvar c).
+  cset_fvars AtomSet.F.Empty c.
 
+Definition cset_disjoint_fvars (c1 c2 :captureset) : Prop :=
+  match c1 , c2 with
+  | cset_set A1 N1 , cset_set A2 N2 => AtomSet.F.Empty (AtomSet.F.inter A1 A2)
+  | _ , _ => True
+  end.
 
 (** Capture set unions are what you'd expect. *)
 Definition cset_union (c1 c2 : captureset) : captureset :=
