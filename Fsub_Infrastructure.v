@@ -293,10 +293,30 @@ Proof with auto*.
   apply subst_tt_open_tt_rec...
 Qed.
 
-Lemma subst_tt_open_tc : forall X P T C,
-  subst_tt X P (open_tc T C) = open_tc (subst_tt X P T) C.
-Proof.
+(* T[k !-> C][X !-> P] = T[X !-> P][k !-> C] 
+   TODO finish proving this lemma. 
+ *)
+Lemma subst_tt_open_tc_rec : forall (X:atom) P T C k,
+  subst_tt X P (open_tc_rec k C T) = open_tc_rec k C (subst_tt X P T).
+Proof with auto*.
+  intros X P T C.
+  induction T ; intros k; simpl; f_equal...
+  destruct (a == X)...
+  induction P ; simpl...
+  (* case typ_arrow *)
+  - rewrite IHP1. rewrite IHP2. f_equal. admit. admit.
+  (* case typ_capt *)
+  - rewrite IHP. f_equal. admit. admit.
 Admitted.
+
+(* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
+Lemma subst_tt_open_tc : forall (X:atom) P T C,
+  subst_tt X P (open_tc T C) = open_tc (subst_tt X P T) C.
+Proof with auto*.
+  intros X P T C.
+  unfold open_tc.
+  apply subst_tt_open_tc_rec...
+Qed.
 
 (** The next lemma is a direct corollary of the immediately preceding
     lemma---here, we're opening the term with a variable.  In
@@ -543,6 +563,7 @@ Proof.
         *** eapply cset_subset_elem ; csetdec.
         *** inversion H. rewrite H2 in Hic. csetdec.
     * left. apply cset_not_references_bvar_eq. auto.
+  (* <-  *)
   - intros H. destruct H.
     * auto using cset_open_unused_bvar.
     * destruct H ; auto using open_captureset_subset_with_index.
@@ -638,10 +659,7 @@ Proof with auto*.
        assert (cset_references_bvar_dec k C0 = false).
         { unfold cset_references_bvar_dec. destruct C0 ; auto. apply NatSetFacts.not_mem_iff.
           nnotin_solve. }
-       assert (true = false).
-        { rewrite <-H0. rewrite H1. auto. }
-       assert (true <> false) by discriminate.
-       contradiction.
+       csethyp. discriminate H0.
     ** auto.
 Qed.
 

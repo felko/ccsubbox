@@ -111,7 +111,7 @@ Fixpoint open_tt_rec (K : nat) (U : typ) (T : typ)  {struct T} : typ :=
   | typ_fvar X => typ_fvar X
   | typ_arrow T1 T2 => typ_arrow (open_tt_rec K U T1) (open_tt_rec K U T2)
   | typ_all T1 T2 => typ_all (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
-  (** No change here: capture sets don't affect type variables *)
+  (** No change here: capture sets are not affected by type substitution *)
   | typ_capt C T => typ_capt C (open_tt_rec K U T)
   end.
 
@@ -140,11 +140,14 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (e : exp)  {struct e} : exp :=
       and within a type. *)
   end.
 
+(* Jonathan: shouldn't that be "open_ct_rec" following the naming convention ? 
+   it is substituting a captureset in a type.
+ *)
 Fixpoint open_tc_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
   match T with
   | typ_top => typ_top
-  | typ_bvar i => (typ_bvar i)
-  | typ_fvar x => (typ_fvar x)
+  | typ_bvar i => typ_bvar i
+  | typ_fvar x => typ_fvar x
   (** A function type A -> B introduces a binding for a capture variable.
       Note that we don't allow capture variables to show up in their own type constraints. *)
   | typ_arrow T1 T2 => typ_arrow (open_tc_rec k c T1) (open_tc_rec (S k) c T2)
@@ -153,6 +156,7 @@ Fixpoint open_tc_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
   | typ_capt C T => typ_capt (open_captureset_bvar k c C) (open_tc_rec k c T)
   end.
 
+(* Same here *)
 Fixpoint open_ec_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
   match e with
   | exp_bvar i => (exp_bvar i)
