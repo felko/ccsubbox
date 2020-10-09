@@ -261,8 +261,9 @@ Inductive expr : exp -> Prop :=
       type T ->
       (* Jonathan: this looks wrong to me.
          Shouldn't it be opened with the capture set {x}?
+         Edward: Yeah, I forgot to change it in expr.
       *)
-      (forall x : atom, x `notin` L -> expr (open_ec (open_ee e1 x) {}C)) ->
+      (forall x : atom, x `notin` L -> expr (open_ec (open_ee e1 x) (cset_singleton_fvar x))) ->
       expr (exp_abs T e1)
   | expr_app : forall e1 e2,
       expr e1 ->
