@@ -397,6 +397,14 @@ Proof with auto*.
   ].
 Qed.
 
+Lemma open_te_expr : forall e U,
+  expr e ->
+  e = open_te e U.
+Proof with auto*.
+  intros e U Ee.
+  apply open_te_rec_expr...
+Qed.
+
 Lemma subst_te_fresh : forall X U e,
   X `notin` fv_te e ->
   e = subst_te X U e.
@@ -868,10 +876,64 @@ Proof with auto.
 Qed.
 
 
+(* Lemma open_ee_rec_expr : forall u e k,
+  expr e ->
+  e = open_ee_rec k u e.
+Proof with auto*.
+  intros u e k Hexpr. revert k.
+  induction Hexpr; intro k; simpl; f_equal; auto*;
+  try solve [
+    (** NEW: Something to deal with capture sets. *)
+    unfold open_ee in *; unfold open_ec in *;
+    pick fresh x;
+    eapply open_ee_rec_expr_aux with (j := 0) (v := exp_fvar x);
+    auto*;
+    eapply open_ee_rec_capt_aux with (j := 0) (C := {}C);
+    auto*
+  | unfold open_te in *;
+    pick fresh X;
+    eapply open_ee_rec_type_aux with (j := 0) (V := typ_fvar X);
+    auto*
+  ].
+Qed. *)
+
 Lemma open_ec_rec_expr : forall e c k,
   expr e ->
   e = open_ec_rec k c e.
-Proof.
+Proof with auto*.
+  intros e c k Ee. revert k.
+  induction Ee ; intro k ; simpl ; f_equal ; auto using open_tc_rec_type...
+  - pick fresh Z.
+    assert (open_ec (open_ee e1 Z) {}C = open_ec_rec k c (open_ec (open_ee e1 Z) {}C)). {
+      apply H1. fsetdec.
+    }
+
+    
+    unfold open_ee in H2.
+    rewrite <- open_ee_rec_expr in H2...
+    
+    admit.
+  - pick fresh Z.
+    assert (open_te e1 Z = open_ec_rec k c (open_te e1 Z)). {
+      apply H1. fsetdec.
+    }
+    rewrite <- open_te_expr with (U := Z) in H2...    
+    assert (expr (open_te e1 Z)). {
+      apply H0. fsetdec.
+    }
+    rewrite <- open_te_expr in H3.
+    admit. (* I am stuck here for now *)
+    auto.
+
+      (* ry solve [
+        econstructor;
+        try instantiate (1 := L `union` singleton z);
+        intros;
+        try rewrite subst_ee_open_ee_var;
+        try rewrite subst_ee_open_te_var;
+        try rewrite <- subst_te_open_ec;
+        auto
+      ]. *)
 Admitted.
 
 Lemma open_ec_expr : forall e c,
@@ -899,6 +961,25 @@ Proof with auto*.
   apply subst_te_open_ec_rec...
 Qed.
 
+Lemma subst_ee_open_ec_rec : forall e x u C k,
+  expr u ->
+  subst_ee x u (open_ec_rec k C e) =
+    open_ec_rec k C (subst_ee x u e).
+Proof with auto*.
+  intros e x u C k Eu. revert k.
+  induction e ; intros k ; simpl ; f_equal...
+  - destruct (a == x); subst... apply open_ec_rec_expr...
+Qed.
+
+Lemma subst_ee_open_ec : forall e x u C,
+  expr u ->
+  subst_ee x u (open_ec e C) =
+    open_ec (subst_ee x u e) C.
+Proof with auto*.
+  intros e x u C Eu.
+  apply subst_ee_open_ec_rec...
+Qed.
+
 (** The following lemma depends on [subst_tt_type] and
     [subst_te_open_ee_var]. *)
 
@@ -923,7 +1004,10 @@ Proof with eauto using subst_tt_type.
 Qed.
 
 (** The following lemma depends on [subst_ee_open_ee_var] and
-    [subst_ee_open_te_var]. *)
+    [subst_ee_open_te_var]. 
+
+    This lemma can be cleaned up quite a bit -- just making it go through for now.
+*)
 
 Lemma subst_ee_expr : forall z e1 e2,
   expr e1 ->
@@ -938,15 +1022,17 @@ Proof with auto.
     intros;
     try rewrite subst_ee_open_ee_var;
     try rewrite subst_ee_open_te_var;
+    try rewrite <- subst_te_open_ec;
     auto
   ].
-  Case "expr_var".
-    destruct (x == z)...
-Admitted.
-
-
-
-
+  - destruct (x == z)...
+  - econstructor. apply H. 
+    try instantiate (1 := L `union` singleton z).
+    intros. 
+    rewrite subst_ee_open_ee_var.
+    rewrite <- subst_ee_open_ec.
+    apply H1. fsetdec. auto. fsetdec. auto.
+Qed.
 
 
 
