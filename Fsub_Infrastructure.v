@@ -642,22 +642,20 @@ Qed.
 (* 
    TODO maybe we need to strengthen the lemma again for other use cases?
  *)
-Lemma subst_tt_open_tc_rec : forall (X Y:atom) P T k,
-  Y <> X ->
+Lemma subst_tt_open_tc_rec : forall (X : atom) P T C k,
   type P ->
-  subst_tt X P (open_tc_rec k (cset_singleton_fvar Y) T)  = 
-  open_tc_rec k (cset_singleton_fvar Y) (subst_tt X P T).
+  subst_tt X P (open_tc_rec k C T) = open_tc_rec k C (subst_tt X P T).
 Proof with auto*.
-  intros X Y P T.
+  intros X P T C.
   induction T ; intros ; simpl; f_equal...
   destruct (a == X)...
   generalize dependent k.
   induction P...
-  - intro. apply open_tc_rec_type with (T := typ_arrow P1 P2). apply H0.
-  - intro. apply open_tc_rec_type with (T := typ_all P1 P2). apply H0.
-  - intro ; inversion H0 ; simpl ; f_equal... 
-    unfold empty_cset_bvar_references in H4.
-    unfold cset_bvars in H4.
+  - intro. apply open_tc_rec_type with (T := typ_arrow P1 P2). apply H.
+  - intro. apply open_tc_rec_type with (T := typ_all P1 P2). apply H.
+  - intro ; inversion H ; simpl ; f_equal... 
+    unfold empty_cset_bvar_references in H3.
+    unfold cset_bvars in H3.
     destruct c...
     unfold open_captureset_bvar.
     unfold cset_singleton_fvar.
@@ -668,10 +666,9 @@ Proof with auto*.
 Qed.
 
 (* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
-Lemma subst_tt_open_tc : forall (X Y:atom) P T,
-  Y <> X ->
+Lemma subst_tt_open_tc : forall (X : atom) P T C,
   type P ->
-  subst_tt X P (open_tc T (cset_singleton_fvar Y)) = open_tc (subst_tt X P T) (cset_singleton_fvar Y).
+  subst_tt X P (open_tc T C) = open_tc (subst_tt X P T) C.
 Proof with auto*.
   intros X P T C.
   unfold open_tc.
