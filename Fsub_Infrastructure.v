@@ -639,41 +639,22 @@ Proof with auto*.
     ** auto.
 Qed.
 
-Lemma open_tc_type_inversion : forall (C : captureset) T,
-  type (open_tc T C) -> 
-  type T.
-Proof.
-Admitted.
-
-Lemma open_tt_type_inversion : forall (Z : atom) T,
-  type (open_tt T Z) -> 
-  type T.
-Proof.
-Admitted.
-
 (* 
    TODO maybe we need to strengthen the lemma again for other use cases?
  *)
 Lemma subst_tt_open_tc_rec : forall (X Y:atom) P T k,
   Y <> X ->
   type P ->
-  subst_tt X P (open_tc_rec k (cset_singleton_fvar Y) T) = open_tc_rec k (cset_singleton_fvar Y) (subst_tt X P T).
+  subst_tt X P (open_tc_rec k (cset_singleton_fvar Y) T)  = 
+  open_tc_rec k (cset_singleton_fvar Y) (subst_tt X P T).
 Proof with auto*.
   intros X Y P T.
   induction T ; intros ; simpl; f_equal...
   destruct (a == X)...
   generalize dependent k.
-  (* The induction on P requires us to prove `type P1` for the components!
-     But `type P` is necessary to show that `k` can't occur in any capture set in P *)
   induction P...
-  - intro ; inversion H0 ; simpl ; f_equal... apply IHP2.
-    pick fresh Z.
-    assert (type (open_tc P2 (cset_singleton_fvar Z))). { apply H4. fsetdec. }
-    eapply open_tc_type_inversion. apply H5.
-  - intro ; inversion H0 ; simpl ; f_equal... apply IHP2.
-    pick fresh Z.
-    assert (type (open_tt P2 Z)). { apply H4. fsetdec. }
-    eapply open_tt_type_inversion. apply H5.
+  - intro. apply open_tc_rec_type with (T := typ_arrow P1 P2). apply H0.
+  - intro. apply open_tc_rec_type with (T := typ_all P1 P2). apply H0.
   - intro ; inversion H0 ; simpl ; f_equal... 
     unfold empty_cset_bvar_references in H4.
     unfold cset_bvars in H4.
@@ -903,6 +884,7 @@ Proof with eauto using subst_tt_type.
   - instantiate (1 := L `union` singleton Z). intros. rewrite subst_te_open_ee_var. 
     (* requires a new lemma:
         (subst_te Z P (open_ec e c)) = (open_ec (subst_te Z P e) c)
+        (open_ec e c) /\ expr e -> e
    *)
     admit.
 
