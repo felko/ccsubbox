@@ -293,27 +293,6 @@ Proof with auto*.
   apply subst_tt_open_tt_rec...
 Qed.
 
-(* T[k !-> C][X !-> P] = T[X !-> P][k !-> C] 
-   TODO finish proving this lemma. 
- *)
-Lemma subst_tt_open_tc_rec : forall (X:atom) P T C k,
-  subst_tt X P (open_tc_rec k C T) = open_tc_rec k C (subst_tt X P T).
-Proof with auto*.
-  intros X P T C.
-  induction T ; simpl; f_equal...
-  destruct (a == X)...
-  induction P ; intros k; simpl ; f_equal...
-  admit.
-Admitted.
-
-(* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
-Lemma subst_tt_open_tc : forall (X:atom) P T C,
-  subst_tt X P (open_tc T C) = open_tc (subst_tt X P T) C.
-Proof with auto*.
-  intros X P T C.
-  unfold open_tc.
-  apply subst_tt_open_tc_rec...
-Qed.
 
 (** The next lemma is a direct corollary of the immediately preceding
     lemma---here, we're opening the term with a variable.  In
@@ -658,6 +637,62 @@ Proof with auto*.
           nnotin_solve. }
        csethyp. discriminate H0.
     ** auto.
+Qed.
+
+Lemma open_tc_type_inversion : forall C T,
+  type (open_tc T C) -> 
+  type T.
+Proof.
+Admitted.
+
+Lemma open_tt_type_inversion : forall T P,
+  type (open_tt T P) -> 
+  type T.
+Proof.
+Admitted.
+
+(* 
+   TODO maybe we need to strengthen the lemma again for other use cases?
+ *)
+Lemma subst_tt_open_tc_rec : forall (X Y:atom) P T k,
+  Y <> X ->
+  type P ->
+  subst_tt X P (open_tc_rec k (cset_singleton_fvar Y) T) = open_tc_rec k (cset_singleton_fvar Y) (subst_tt X P T).
+Proof with auto*.
+  intros X Y P T.
+  induction T ; intros ; simpl; f_equal...
+  destruct (a == X)...
+  generalize dependent k.
+  induction P...
+  - intro ; inversion H0 ; simpl ; f_equal... apply IHP2.
+    pick fresh Z.
+    assert (type (open_tc P2 (cset_singleton_fvar Z))). { apply H4. fsetdec. }
+    eapply open_tc_type_inversion. apply H5.
+  - intro ; inversion H0 ; simpl ; f_equal... apply IHP2.
+    pick fresh Z.
+    assert (type (open_tt P2 Z)). { apply H4. fsetdec. }
+    eapply open_tt_type_inversion. apply H5.
+  - intro ; inversion H0 ; simpl ; f_equal... 
+    unfold empty_cset_bvar_references in H4.
+    unfold cset_bvars in H4.
+    destruct c...
+    unfold open_captureset_bvar.
+    unfold cset_singleton_fvar.
+    destruct (cset_references_bvar_dec k (cset_set t t0)) eqn:Hb.    
+    * rewrite cset_references_bvar_eq in Hb. unfold cset_references_bvar in Hb. unfold cset_bvars in Hb.
+      exfalso. fnsetdec.
+    * reflexivity.
+Qed.
+
+(* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
+Lemma subst_tt_open_tc : forall (X Y:atom) P T,
+  Y <> X ->
+  type P ->
+  subst_tt X P (open_tc T (cset_singleton_fvar Y)) = open_tc (subst_tt X P T) (cset_singleton_fvar Y).
+Proof with auto*.
+  intros X P T C.
+  unfold open_tc.
+  apply subst_tt_open_tc_rec...
 Qed.
 
 (* ********************************************************************** *)
