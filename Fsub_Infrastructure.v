@@ -867,6 +867,38 @@ Proof with auto.
     rewrite subst_tt_open_tt_var...
 Qed.
 
+
+Lemma open_ec_rec_expr : forall e c k,
+  expr e ->
+  e = open_ec_rec k c e.
+Proof.
+Admitted.
+
+Lemma open_ec_expr : forall e c,
+  expr e ->
+  e = open_ec e c.
+Proof.
+   intros. apply open_ec_rec_expr. auto.
+Qed.
+
+Lemma subst_te_open_ec_rec : forall e C Z P k,
+  type P ->
+  subst_te Z P (open_ec_rec k C e) =
+    open_ec_rec k C (subst_te Z P e).
+Proof.
+  intros e C Z P k Ptpe. revert k.
+  induction e ; intros k; simpl ; f_equal; auto using subst_tt_open_tc_rec.
+Qed.
+
+Lemma subst_te_open_ec : forall e C Z P,
+  type P ->
+  subst_te Z P (open_ec e C) = open_ec (subst_te Z P e) C.
+Proof with auto*.
+  intros.
+  unfold open_te.
+  apply subst_te_open_ec_rec...
+Qed.
+
 (** The following lemma depends on [subst_tt_type] and
     [subst_te_open_ee_var]. *)
 
@@ -876,18 +908,19 @@ Lemma subst_te_expr : forall Z P e,
   expr (subst_te Z P e).
 Proof with eauto using subst_tt_type.
   intros Z P e He Hp.
-  induction He; simpl ; econstructor ; eauto using subst_tt_type.
+  induction He; simpl ; econstructor...
   (* case exp_abs *)
-  - instantiate (1 := L `union` singleton Z). intros. rewrite subst_te_open_ee_var. 
-    (* requires a new lemma:
-        (subst_te Z P (open_ec e c)) = (open_ec (subst_te Z P e) c)
-        (open_ec e c) /\ expr e -> e
-   *)
-    admit.
-
+  - instantiate (1 := L `union` singleton Z). intros. 
+   rewrite subst_te_open_ee_var. 
+   rewrite <- subst_te_open_ec.
+   apply H1.
+   fsetdec.
+   auto.
+   
   (* case exp_tabs *)
-  - instantiate (1 := L `union` singleton Z). intros. rewrite subst_te_open_te_var. apply H1. fsetdec. fsetdec. auto.
-Admitted.
+  - instantiate (1 := L `union` singleton Z). intros. 
+    rewrite subst_te_open_te_var. apply H1. fsetdec. fsetdec. auto.
+Qed.
 
 (** The following lemma depends on [subst_ee_open_ee_var] and
     [subst_ee_open_te_var]. *)
