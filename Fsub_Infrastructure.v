@@ -523,7 +523,9 @@ Proof.
   intros. simpl. reflexivity.
 Qed.
 
-Hint Resolve cset_references_bvar_iff : core.
+
+Hint Resolve cset_references_bvar_iff : cset_scope.
+
 
 Lemma cset_open_idempotent : forall i C c,
   c = open_captureset_bvar i C c <->
@@ -533,16 +535,13 @@ Proof.
   split.
   (* -> *)
   - intros H. destruct (cset_references_bvar_dec i c) eqn:Hic.
-    * unfold open_captureset_bvar in H. rewrite Hic in H. 
-      destruct c ; eauto.
+    * csethyp. destruct c ; auto.
       simpl in Hic.
       destruct C.
       ** discriminate H.
       ** inversion H. right. split. 
-        *** eapply cset_subset_elem ; try fsetdec ; try fnsetdec.
-        *** inversion H. rewrite H2 in Hic. 
-            rewrite <- NatSetFacts.mem_iff in *. 
-            fnsetdec.
+        *** eapply cset_subset_elem ; csetdec.
+        *** inversion H. rewrite H2 in Hic. csetdec.
     * left. apply cset_not_references_bvar_eq. auto.
   - intros H. destruct H.
     * auto using cset_open_unused_bvar.
@@ -571,22 +570,20 @@ Proof with eauto*.
 
   destruct (cset_references_bvar_dec i c) eqn:Hic.
   (* i is in c *)
-  - destruct (cset_references_bvar_dec j c) eqn:Hjc ; unfold open_captureset_bvar in *; rewrite Hjc in *...
+  - destruct (cset_references_bvar_dec j c) eqn:Hjc ; csethyp...
     destruct H. 
-    * rewrite DDef in H. unfold cset_union in H. unfold cset_remove_bvar in H. destruct c ; auto.
-      unfold cset_references_bvar in *. unfold cset_bvars in *. left. fnsetdec.      
+    * rewrite DDef in H. destruct c ; csethyp ; auto.
+      left. fnsetdec.      
     * destruct H. destruct C eqn:HC.
       ** contradiction. 
       ** destruct c eqn:Hc ; eauto.
          right. split...
-         inversion H ; rewrite DDef in H3 ; unfold cset_union in H3. 
+         inversion H ; rewrite DDef in H3 ; csethyp. 
          + discriminate H3.
          + injection H3. intros. subst.
            rewrite elim_empty_nat_set in *.
            unfold cset_disjoint_fvars in Disj.
-           apply cset_subset_elem.
-           ++ fsetdec.
-           ++ fnsetdec.
+           apply cset_subset_elem ; csetdec.
   (* i is not in c *)     
   - left. apply cset_not_references_bvar_eq. apply Hic.
 Qed.
@@ -834,7 +831,6 @@ Proof with auto.
     destruct (X == Z)...
   - Case "type_arrow".
     pick fresh Y and apply type_arrow...
-    (* rewrite subst_tt_open_tt_var... *)
     rewrite <- subst_tt_open_tc...    
   - Case "type_all".
     pick fresh Y and apply type_all...

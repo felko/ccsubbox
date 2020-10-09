@@ -65,6 +65,8 @@ Ltac nnotin_simpl := NatSetNotin.notin_simpl_hyps.
 
 Ltac nnotin_solve := NatSetNotin.notin_solve.
 
+Declare Scope cset_scope.
+
 (** A captureset -- a pair of free variables and bound variables. *)
 Inductive captureset : Type :=
   | cset_universal : captureset
@@ -120,7 +122,7 @@ Definition cset_bvars (p : nats -> Prop) (c : captureset) : Prop :=
   | cset_universal => False
   end.
 
-Hint Transparent cset_bvars : core.
+Hint Transparent cset_bvars : cset_scope.
 
 (** Singletons *)
 Definition cset_singleton_fvar (a : atom) :=
@@ -216,7 +218,7 @@ Definition cset_remove_bvar (k : nat) (c : captureset) : captureset :=
   | cset_set AC NC => cset_set AC (NatSet.F.remove k NC)
   end.
 
-Hint Transparent cset_remove_bvar : core.
+Hint Transparent cset_remove_bvar : cset_scope.
 
 Definition cset_remove_fvar (a : atom) (c : captureset) : captureset :=
   match c with
@@ -224,7 +226,7 @@ Definition cset_remove_fvar (a : atom) (c : captureset) : captureset :=
   | cset_set AC NC => cset_set (AtomSet.F.remove a AC) NC
   end.
 
-Hint Transparent cset_remove_fvar : core.
+Hint Transparent cset_remove_fvar : cset_scope.
 
 (** Opening a capture set with a bound variable d[k -> c] *)
 Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) : captureset :=
@@ -233,7 +235,7 @@ Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) : ca
   else 
     d.
 
-Hint Transparent open_captureset_bvar : core.
+Hint Transparent open_captureset_bvar : cset_scope.
 
 (** Substituting a capture set with a free variable d[a -> c] *)
 Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset) : captureset :=
@@ -242,7 +244,7 @@ Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset
   else
     d.
 
-Hint Transparent substitute_captureset_fvar : core.
+Hint Transparent substitute_captureset_fvar : cset_scope.
 
 (* TODO rename to cset_subset *)
 (** Predicates around subsets, and decidability for destruction *)
@@ -253,7 +255,7 @@ Inductive cset_subset_prop : captureset -> captureset -> Prop :=
 .
 
 Hint Constructors cset_subset_prop.
-      
+
 Definition cset_subset_dec (c d : captureset) :=
   match c , d with
   | _ , cset_universal => true
@@ -300,3 +302,28 @@ Proof with auto*.
   * intro H. rewrite eliminate_false. contradict H. apply cset_subset_iff...
   * intro H. rewrite eliminate_false in H. contradict H. apply cset_subset_iff...
 Qed.
+
+(* Some simple tactics to work with capture sets *)
+
+(* Uses hypothesis about capture set inclusion to rewrite hyps and goal *)
+Ltac simpl_in_cset :=
+  match goal with
+    H: cset_references_bvar_dec ?I ?C = ?B
+    |- _ => rewrite H in *
+  end.
+
+(* Rewrites hypothesis by unfolding cset definitions and using hypothesis about
+   inclusion. *)
+Ltac csethyp := try autounfold with cset_scope in *; try simpl_in_cset.
+
+(* Uses facts about the underlying sets to simplify hypothesis and solve the goal *)
+Ltac csetdec := repeat (
+  try csethyp ;
+  (try rewrite <- NatSetFacts.mem_iff in * ; try fnsetdec) ||
+  (try rewrite <- AtomSetFacts.mem_iff in * ; try fsetdec)
+).
+
+Hint Unfold 
+  cset_union cset_remove_bvar cset_remove_fvar open_captureset_bvar substitute_captureset_fvar 
+  open_captureset_bvar cset_references_bvar cset_bvars cset_subset_dec
+: cset_scope.
