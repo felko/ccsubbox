@@ -300,13 +300,10 @@ Lemma subst_tt_open_tc_rec : forall (X:atom) P T C k,
   subst_tt X P (open_tc_rec k C T) = open_tc_rec k C (subst_tt X P T).
 Proof with auto*.
   intros X P T C.
-  induction T ; intros k; simpl; f_equal...
+  induction T ; simpl; f_equal...
   destruct (a == X)...
-  induction P ; simpl...
-  (* case typ_arrow *)
-  - rewrite IHP1. rewrite IHP2. f_equal. admit. admit.
-  (* case typ_capt *)
-  - rewrite IHP. f_equal. admit. admit.
+  induction P ; intros k; simpl ; f_equal...
+  admit.
 Admitted.
 
 (* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
