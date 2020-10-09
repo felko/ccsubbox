@@ -259,6 +259,9 @@ Inductive expr : exp -> Prop :=
       expr (exp_fvar x)
   | expr_abs : forall L T e1,
       type T ->
+      (* Jonathan: this looks wrong to me.
+         Shouldn't it be opened with the capture set {x}?
+      *)
       (forall x : atom, x `notin` L -> expr (open_ec (open_ee e1 x) {}C)) ->
       expr (exp_abs T e1)
   | expr_app : forall e1 e2,
