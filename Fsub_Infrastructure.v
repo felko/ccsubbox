@@ -901,39 +901,6 @@ Lemma open_ec_rec_expr : forall e c k,
   expr e ->
   e = open_ec_rec k c e.
 Proof with auto*.
-  intros e c k Ee. revert k.
-  induction Ee ; intro k ; simpl ; f_equal ; auto using open_tc_rec_type...
-  - pick fresh Z.
-    assert (open_ec (open_ee e1 Z) {}C = open_ec_rec k c (open_ec (open_ee e1 Z) {}C)). {
-      apply H1. fsetdec.
-    }
-
-    
-    unfold open_ee in H2.
-    rewrite <- open_ee_rec_expr in H2...
-    
-    admit.
-  - pick fresh Z.
-    assert (open_te e1 Z = open_ec_rec k c (open_te e1 Z)). {
-      apply H1. fsetdec.
-    }
-    rewrite <- open_te_expr with (U := Z) in H2...    
-    assert (expr (open_te e1 Z)). {
-      apply H0. fsetdec.
-    }
-    rewrite <- open_te_expr in H3.
-    admit. (* I am stuck here for now *)
-    auto.
-
-      (* ry solve [
-        econstructor;
-        try instantiate (1 := L `union` singleton z);
-        intros;
-        try rewrite subst_ee_open_ee_var;
-        try rewrite subst_ee_open_te_var;
-        try rewrite <- subst_te_open_ec;
-        auto
-      ]. *)
 Admitted.
 
 Lemma open_ec_expr : forall e c,
