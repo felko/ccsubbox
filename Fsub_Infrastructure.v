@@ -639,14 +639,14 @@ Proof with auto*.
     ** auto.
 Qed.
 
-Lemma open_tc_type_inversion : forall C T,
+Lemma open_tc_type_inversion : forall (C : captureset) T,
   type (open_tc T C) -> 
   type T.
 Proof.
 Admitted.
 
-Lemma open_tt_type_inversion : forall T P,
-  type (open_tt T P) -> 
+Lemma open_tt_type_inversion : forall (Z : atom) T,
+  type (open_tt T Z) -> 
   type T.
 Proof.
 Admitted.
@@ -663,6 +663,8 @@ Proof with auto*.
   induction T ; intros ; simpl; f_equal...
   destruct (a == X)...
   generalize dependent k.
+  (* The induction on P requires us to prove `type P1` for the components!
+     But `type P` is necessary to show that `k` can't occur in any capture set in P *)
   induction P...
   - intro ; inversion H0 ; simpl ; f_equal... apply IHP2.
     pick fresh Z.
@@ -896,15 +898,16 @@ Lemma subst_te_expr : forall Z P e,
   expr (subst_te Z P e).
 Proof with eauto using subst_tt_type.
   intros Z P e He Hp.
-  induction He; simpl; auto using subst_tt_type;
-  try solve [
-    econstructor;
-    try instantiate (1 := L `union` singleton Z);
-    intros;
-    try rewrite subst_te_open_ee_var;
-    try rewrite subst_te_open_te_var;
-    eauto using subst_tt_type
-  ].
+  induction He; simpl ; econstructor ; eauto using subst_tt_type.
+  (* case exp_abs *)
+  - instantiate (1 := L `union` singleton Z). intros. rewrite subst_te_open_ee_var. 
+    (* requires a new lemma:
+        (subst_te Z P (open_ec e c)) = (open_ec (subst_te Z P e) c)
+   *)
+    admit.
+
+  (* case exp_tabs *)
+  - instantiate (1 := L `union` singleton Z). intros. rewrite subst_te_open_te_var. apply H1. fsetdec. fsetdec. auto.
 Admitted.
 
 (** The following lemma depends on [subst_ee_open_ee_var] and
