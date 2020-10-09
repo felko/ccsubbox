@@ -661,7 +661,7 @@ Proof with auto*.
     unfold cset_singleton_fvar.
     destruct (cset_references_bvar_dec k (cset_set t t0)) eqn:Hb.    
     * rewrite cset_references_bvar_eq in Hb. unfold cset_references_bvar in Hb. unfold cset_bvars in Hb.
-      exfalso. fnsetdec.
+      contradict Hb. nnotin_solve.
     * reflexivity.
 Qed.
 
