@@ -22,15 +22,79 @@ Require Export Fsub_Lemmas.
 (* ********************************************************************** *)
 (** ** Reflexivity (1) *)
 
+(*
+  opening capture sets in types preserves well-formedness. *)
+Lemma open_tc_wf_typ : forall E T C,
+  wf_typ E T -> wf_typ E (open_tc T C).
+Proof with auto.
+  intros E T C H.
+  closed_type.
+Qed.
+
+
+(* capture set substitution does not affect subtyping 
+
+  depends on opening in the context
+    binds X (bind_sub U) E -> binds X (bind_sub (open_tc U C)) E
+ *)
+Lemma open_tc_sub : forall E S T C,
+  wf_env E ->
+  sub E S T -> sub E (open_tc S C) (open_tc T C).
+Proof with auto using open_tc_wf_typ.
+  intros E S T C Eok H.
+  inversion H ; simpl ; closed_type ; subst...
+Qed.
+
+
+(* TODO move to CaptureSets. *)
+Lemma cset_subset_reflexivity (c : captureset) : cset_subset_prop c c.
+Proof with auto.
+  rewrite cset_subset_iff. 
+  unfold cset_subset_dec.
+  destruct c...
+  assert (AtomSet.F.subset t t = true). { rewrite <- AtomSetFacts.subset_iff. fsetdec. }
+  assert (NatSet.F.subset t0 t0 = true). { rewrite <- NatSetFacts.subset_iff. fnsetdec. }
+  intuition.
+Qed.
+
+Lemma subcapt_reflexivity : forall E C,
+  wf_env E ->
+  subcapt E C C.
+Proof with auto.
+  intros E C Ok.
+  induction C...
+  apply subcapt_split...
+  apply cset_subset_reflexivity.
+Qed.
+
 Lemma sub_reflexivity : forall E T,
   wf_env E ->
   wf_typ E T ->
   sub E T T.
-Proof with eauto.
+Proof with auto.
   intros E T Ok Wf.
-  induction Wf...
-  pick fresh Y and apply sub_all...
-Qed.
+  induction Wf ; try constructor...
+  (* eauto and econstructor is still broken... hence we need to proof this manually *)
+  - eapply wf_typ_var.
+    apply H.
+  - pick fresh Y.
+    assert (Y `notin` L) as YL. { fsetdec. }
+    specialize (H Y YL).
+    specialize (H0 Y YL Ok).
+    specialize (IHWf Ok).
+    replace (open_tc T2 (cset_singleton_fvar Y)) with T2 in H0.
+    apply H0.
+    apply open_tc_rec_type.
+    admit.    
+  - apply sub_all with (L := L)...
+    intros.
+    specialize (H X H1).
+    specialize (H0 X H1).
+    specialize (IHWf Ok).
+    apply H0.
+    admit.
+  - apply subcapt_reflexivity...
+Admitted.
 
 
 (* ********************************************************************** *)

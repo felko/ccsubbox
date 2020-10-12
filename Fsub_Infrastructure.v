@@ -650,6 +650,23 @@ Proof with auto*.
     ** auto.
 Qed.
 
+
+Lemma open_ec_rec_type : forall e j i t C,
+  (* type t -> *)
+  open_te_rec j t e = open_ec_rec i C (open_te_rec j t e) ->
+  e = open_ec_rec i C e.
+Proof with auto*.
+  induction e ; intros j i t2 c H; simpl in *; inversion H; f_equal...
+  - apply (open_tc_rec_type_aux _ _ _ _ _ H1).
+  - apply IHe with (j := j) (t := t2)...
+  - apply IHe1 with (j := j) (t := t2)...
+  - apply IHe2 with (j := j) (t := t2)...
+  - apply (open_tc_rec_type_aux _ _ _ _ _ H1).
+  - apply IHe with (j := S j) (t := t2)...
+  - apply IHe with (j := j) (t := t2)...
+  - apply (open_tc_rec_type_aux _ _ _ _ _ H2).
+Qed.
+
 (* 
    TODO maybe we need to strengthen the lemma again for other use cases?
  *)
@@ -898,9 +915,10 @@ Qed.
 Lemma open_ec_rec_expr : forall e c k,
   expr e ->
   e = open_ec_rec k c e.
-Proof with auto*.
+Proof with auto using open_tc_rec_type.
   intros e c k Ee. revert k.
   induction Ee ; intro k ; simpl ; f_equal ; auto using open_tc_rec_type...
+  (* case exp_abs *)
   - pick fresh x.
     unfold open_ee in H1. unfold open_ec in H1. unfold cset_singleton_fvar in H1.
     specialize H1 with (x := x) (k := (S k)).
@@ -908,17 +926,12 @@ Proof with auto*.
     apply open_ec_rec_capt_aux with (Df := AtomSet.F.singleton x) (j := 0)...
     fsetdec.
 
+  (* case exp_tabs *)
   - pick fresh Z.
-    assert (open_te e1 Z = open_ec_rec k c (open_te e1 Z)). {
-      apply H1. fsetdec.
-    }
-    rewrite <- open_te_expr with (U := Z) in H2...    
-    assert (expr (open_te e1 Z)). {
-      apply H0. fsetdec.
-    }
-    rewrite <- open_te_expr in H3.
-    admit. (* I am stuck here for now *)
-Admitted.
+    specialize H1 with (X := Z) (k := k).
+    apply open_ec_rec_type with (j := 0) (t := Z).
+    apply H1. fsetdec.
+Qed.
 
 
 (* *********************************************************************** *)
@@ -1064,3 +1077,22 @@ Hint Resolve subst_tt_type subst_te_expr subst_ee_expr : core.
 
 Hint Extern 1 (binds _ (?F (subst_tt ?X ?U ?T)) _) =>
   unsimpl (subst_tb X U (F T)) : core.
+
+  
+(** Tactic that matches the goal for `open_tc ?T ?C` and tries 
+    to prove that `type ?T`. *)
+
+    Ltac closed_type :=
+      repeat (match goal with
+        | [ |- context[open_tc ?T ?C] ] => 
+          replace (open_tc T C) with T ; 
+          auto ; 
+          try apply open_tc_rec_type ;
+          auto
+        | [ |- context[open_tt ?T ?C] ] => 
+          replace (open_tt T C) with T ; 
+          auto ; 
+          try apply open_tt_rec_type ;
+          auto
+      end).
+    

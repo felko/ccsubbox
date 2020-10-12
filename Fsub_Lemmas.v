@@ -32,8 +32,9 @@ Require Export Fsub_Infrastructure.
 
 Lemma type_from_wf_typ : forall E T,
   wf_typ E T -> type T.
-Proof.
-  intros E T H; induction H; eauto.
+Proof with eauto.
+  intros E T H; induction H...
+  destruct H0...
 Qed.
 
 (** The remaining properties are analogous to the properties that we
@@ -49,10 +50,10 @@ Proof with simpl_env; eauto.
   generalize dependent G.
   induction Hwf_typ; intros G Hok Heq; subst...
   Case "type_all".
-    pick fresh Y and apply wf_typ_all...
+    (* pick fresh Y and apply wf_typ_all...
     rewrite <- concat_assoc.
-    apply H0...
-Qed.
+    apply H0... *)
+Admitted.
 
 Lemma wf_typ_weaken_head : forall T E F,
   wf_typ E T ->
@@ -72,14 +73,14 @@ Proof with simpl_env; eauto.
   intros V U T E F X Hwf_typ Hok.
   remember (F ++ [(X, bind_sub V)] ++ E).
   generalize dependent F.
-  induction Hwf_typ; intros F Hok Heq; subst...
+  (* induction Hwf_typ; intros F Hok Heq; subst...
   Case "wf_typ_var".
     binds_cases H...
   Case "typ_all".
     pick fresh Y and apply wf_typ_all...
     rewrite <- concat_assoc.
-    apply H0...
-Qed.
+    apply H0... *)
+Admitted.
 
 Lemma wf_typ_strengthening : forall E F x U T,
  wf_typ (F ++ [(x, bind_typ U)] ++ E) T ->
@@ -88,14 +89,15 @@ Proof with simpl_env; eauto.
   intros E F x U T H.
   remember (F ++ [(x, bind_typ U)] ++ E).
   generalize dependent F.
+(*   
   induction H; intros F Heq; subst...
   Case "wf_typ_var".
     binds_cases H...
   Case "wf_typ_all".
     pick fresh Y and apply wf_typ_all...
     rewrite <- concat_assoc.
-    apply H1...
-Qed.
+    apply H1... *)
+Admitted.
 
 Lemma wf_typ_subst_tb : forall F Q E Z P T,
   wf_typ (F ++ [(Z, bind_sub Q)] ++ E) T ->
@@ -112,12 +114,12 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ.
     SCase "X <> Z".
       binds_cases H...
       apply (wf_typ_var (subst_tt Z P U))...
-  Case "wf_typ_all".
+  (* Case "wf_typ_all".
     pick fresh Y and apply wf_typ_all...
     rewrite subst_tt_open_tt_var...
     rewrite_env (map (subst_tb Z P) ([(Y, bind_sub T1)] ++ F) ++ E).
-    apply H0...
-Qed.
+    apply H0... *)
+Admitted.
 
 Lemma wf_typ_open : forall E U T1 T2,
   ok E ->
@@ -221,21 +223,49 @@ Proof.
  induction T; simpl; intros k Fr; notin_simpl; try apply notin_union; eauto.
 Qed.
 
+Lemma notin_fv_tc_open : forall (X : atom) T C,
+  X `notin` fv_tt (open_tc T C) ->
+  X `notin` fv_tt T.
+Proof with auto.
+  intros X T C. unfold open_tc.
+  generalize 0.
+  induction T ; simpl ; intros k Fr ; try apply notin_union; eauto.
+  - specialize (IHT1 k). specialize (IHT2 (S k))...
+  - specialize (IHT1 k). specialize (IHT2 (S k))...
+  - specialize (IHT1 k). specialize (IHT2 k)...
+  - specialize (IHT1 k). specialize (IHT2 k)...
+  - specialize (IHT k). admit.
+  - specialize (IHT k)...
+Admitted.
+
+(* Maybe we need to generalize this to E Ep and Em? *)
 Lemma notin_fv_wf : forall E (X : atom) T,
   wf_typ E T ->
   X `notin` dom E ->
   X `notin` fv_tt T.
 Proof with auto.
   intros E X T Wf_typ.
-  induction Wf_typ; intros Fr; simpl...
-  Case "wf_typ_var".
-    assert (X0 `in` (dom E))...
+  induction Wf_typ; intros Fr; simpl ; try apply notin_union...
+  - assert (X0 `in` (dom E))...
     eapply binds_In; eauto.
-  Case "wf_typ_all".
-    apply notin_union...
-    pick fresh Y.
-    apply (notin_fv_tt_open Y)...
-Qed.
+  - pick fresh Y.
+    specialize (IHWf_typ Fr).
+    assert (Y `notin` L). { fsetdec. }
+    specialize (H0 Y H1 Fr). 
+    apply notin_fv_tc_open with (C := (cset_singleton_fvar Y))...
+  - pick fresh Y.
+    specialize (IHWf_typ Fr).
+    assert (Y `notin` L). { fsetdec. }
+    specialize (H0 Y H1).
+    apply notin_fv_tt_open with (Y := Y)...
+  - destruct H.
+    unfold allbound in H0. 
+    unfold cset_fvars in H0. 
+    destruct C... 
+    unfold cset_fvar. 
+    admit.
+    (* X _could_ be in Ep... *)
+Admitted.
 
 Lemma map_subst_tb_id : forall G Z P,
   wf_env G ->
@@ -263,7 +293,7 @@ Proof with simpl_env; auto*.
   Case "sub_trans_tvar".
     eauto*.
   Case "sub_all".
-    repeat split...
+    (* repeat split...
     SCase "Second of original three conjuncts".
       pick fresh Y and apply wf_typ_all...
       destruct (H1 Y)...
@@ -271,15 +301,15 @@ Proof with simpl_env; auto*.
       apply (wf_typ_narrowing T1)...
     SCase "Third of original three conjuncts".
       pick fresh Y and apply wf_typ_all...
-      destruct (H1 Y)...
-Qed.
+      destruct (H1 Y)... *)
+Admitted.
 
 Lemma typing_regular : forall E e T,
   typing E e T ->
   wf_env E /\ expr e /\ wf_typ E T.
 Proof with simpl_env; auto*.
   intros E e T H; induction H...
-  Case "typing_var".
+  (* Case "typing_var".
     repeat split...
     eauto using wf_typ_from_binds_typ.
   Case "typing_abs".
@@ -321,8 +351,8 @@ Proof with simpl_env; auto*.
       eapply wf_typ_open; eauto.
   Case "typing_sub".
     repeat split...
-    destruct (sub_regular _ _ _ H0)...
-Qed.
+    destruct (sub_regular _ _ _ H0)... *)
+Admitted.
 
 Lemma value_regular : forall e,
   value e ->
@@ -337,11 +367,11 @@ Lemma red_regular : forall e e',
 Proof with auto*.
   intros e e' H.
   induction H; assert(J := value_regular); split...
-  Case "red_abs".
+  (* Case "red_abs".
     inversion H. pick fresh y. rewrite (subst_ee_intro y)...
   Case "red_tabs".
-    inversion H. pick fresh Y. rewrite (subst_te_intro Y)...
-Qed.
+    inversion H. pick fresh Y. rewrite (subst_te_intro Y)... *)
+Admitted.
 
 
 (* *********************************************************************** *)
