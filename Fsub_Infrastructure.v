@@ -792,13 +792,12 @@ Lemma subst_ee_open_ee_rec : forall e1 e2 x u c1 c2 k,
   subst_ee x u c1 (open_ee_rec k e2 c2 e1) =
     open_ee_rec k (subst_ee x u c1 e2) (substitute_captureset_fvar x c1 c2) (subst_ee x u c1 e1).
 Proof with auto*.
-  intros e1 e2 x u c1 c2 k WP. revert k.
+  intros e1 e2 x u c1 c2 k Wu Wc. revert k.
   induction e1; intros k; simpl; f_equal...
   Case "exp_bvar".
     destruct (k === n); subst...
   Case "exp_fvar".
-
-    (* destruct (a == x); subst... apply open_ee_rec_expr... *)
+    destruct (a == x); subst... apply open_ee_rec_expr...
 Admitted.
 
 Lemma subst_ee_open_ee : forall e1 e2 x u c1 c2,
@@ -812,151 +811,90 @@ Proof with auto*.
   apply subst_ee_open_ee_rec...
 Qed.
 
-Lemma subst_ee_open_ee_var : forall (x y:atom) u e,
+Lemma subst_ee_open_ee_var : forall (x y:atom) u c e,
   y <> x ->
   expr u ->
-  open_ee (subst_ee x u e) y = subst_ee x u (open_ee e y).
+  empty_cset_bvars c ->
+  open_ee (subst_ee x u c e) y (cset_singleton_fvar y) = subst_ee x u c (open_ee e y (cset_singleton_fvar y)).
 Proof with auto*.
-  intros x y u e Neq Wu.
+  intros x y u c e Neq Wu Wc.
   unfold open_ee.
   rewrite subst_ee_open_ee_rec...
   simpl.
   destruct (y == x)...
-Qed.
+Admitted.
 
-Lemma subst_te_open_ee_rec : forall e1 e2 Z P k,
-  subst_te Z P (open_ee_rec k e2 e1) =
-    open_ee_rec k (subst_te Z P e2) (subst_te Z P e1).
+Lemma subst_te_open_ee_rec : forall e1 e2 c Z P k,
+  subst_te Z P (open_ee_rec k e2 c e1) =
+    open_ee_rec k (subst_te Z P e2) c (subst_te Z P e1).
 Proof with auto*.
-  induction e1; intros e2 Z P k; simpl; f_equal...
+  induction e1; intros e2 c Z P k; simpl; f_equal...
   Case "exp_bvar".
     destruct (k === n)...
-Qed.
+Admitted.
 
-Lemma subst_te_open_ee : forall e1 e2 Z P,
-  subst_te Z P (open_ee e1 e2) = open_ee (subst_te Z P e1) (subst_te Z P e2).
+Lemma subst_te_open_ee : forall e1 e2 c Z P,
+  subst_te Z P (open_ee e1 e2 c) = open_ee (subst_te Z P e1) (subst_te Z P e2) c.
 Proof with auto*.
   intros.
   unfold open_ee.
   apply subst_te_open_ee_rec...
 Qed.
 
-Lemma subst_te_open_ee_var : forall Z (x:atom) P e,
-  open_ee (subst_te Z P e) x = subst_te Z P (open_ee e x).
+Lemma subst_te_open_ee_var : forall Z (x:atom) P e c,
+  open_ee (subst_te Z P e) x c = subst_te Z P (open_ee e x c).
 Proof with auto*.
   intros.
   rewrite subst_te_open_ee...
 Qed.
 
-Lemma subst_ee_open_te_rec : forall e P z u k,
+Lemma subst_ee_open_te_rec : forall e P z u c k,
   expr u ->
-  subst_ee z u (open_te_rec k P e) = open_te_rec k P (subst_ee z u e).
+  empty_cset_bvars c ->
+  subst_ee z u c (open_te_rec k P e) = open_te_rec k P (subst_ee z u c e).
 Proof with auto*.
-  induction e; intros P z u k H; simpl; f_equal...
+  induction e; intros P z u c k H Hc; simpl; f_equal...
   Case "exp_fvar".
     destruct (a == z)... apply open_te_rec_expr...
-Qed.
+Admitted.
 
-Lemma subst_ee_open_te : forall e P z u,
+Lemma subst_ee_open_te : forall e P z u c,
   expr u ->
-  subst_ee z u (open_te e P) = open_te (subst_ee z u e) P.
+  empty_cset_bvars c ->
+  subst_ee z u c (open_te e P) = open_te (subst_ee z u c e) P.
 Proof with auto*.
   intros.
   unfold open_te.
   apply subst_ee_open_te_rec...
 Qed.
 
-Lemma subst_ee_open_te_var : forall z (X:atom) u e,
+Lemma subst_ee_open_te_var : forall z (X:atom) u c e,
   expr u ->
-  open_te (subst_ee z u e) X = subst_ee z u (open_te e X).
+  empty_cset_bvars c ->
+  open_te (subst_ee z u c e) X = subst_ee z u c (open_te e X).
 Proof with auto*.
-  intros z X u e H.
+  intros z X u c e Wu Wc.
   rewrite subst_ee_open_te...
 Qed.
 
-Lemma subst_ee_intro_rec : forall x e u k,
+Lemma subst_ee_intro_rec : forall x e u c k,
   x `notin` fv_ee e ->
-  open_ee_rec k u e = subst_ee x u (open_ee_rec k (exp_fvar x) e).
+  open_ee_rec k u c e = subst_ee x u c (open_ee_rec k (exp_fvar x) (cset_singleton_fvar x) e).
 Proof with auto*.
-  induction e; intros u k Fr; simpl in *; f_equal...
+  induction e; intros u c k Fr; simpl in *; f_equal...
   Case "exp_bvar".
     destruct (k === n)... simpl. destruct (x == x)...
   Case "exp_fvar".
     destruct (a == x)... contradict Fr; fsetdec.
-Qed.
+Admitted.
 
-Lemma subst_ee_intro : forall x e u,
+Lemma subst_ee_intro : forall x e u c,
   x `notin` fv_ee e ->
-  open_ee e u = subst_ee x u (open_ee e x).
+  open_ee e u c = subst_ee x u c (open_ee e x (cset_singleton_fvar x)).
 Proof with auto*.
   intros.
   unfold open_ee.
   apply subst_ee_intro_rec...
-Qed.
-
-(** Opening a locally closed expression by a capture variable is the identity. *)
-(*
-Lemma open_ct_rec_type_aux : forall T j Df i C,
-  i <> j ->
-  AtomSet.F.Empty (AtomSet.F.inter (cset_fvar C) Df) ->
-  open_ct_rec j (cset_set Df {}N) T = open_ct_rec i C (open_ct_rec j (cset_set Df {}N) T) ->
-  T = open_ct_rec i C T.
-Proof with eauto*.
-  (*induction T; intros j V i U Neq H; simpl in *; inversion H; f_equal...
-  Case "typ_bvar".
-    destruct (j === n)... destruct (i === n)...*)
-  induction T; intros j Df i C Neq; unfold empty_cset_bvars; intros HCommon H;
-    simpl in *; inversion H; f_equal...
-  apply open_captureset_bvar_aux with (j := j) (C := C) (D := cset_set Df {}N) (Df := Df)...
-  unfold cset_disjoint_fvars. destruct C...
-Qed.
-
-(** NEW: Opening with a type and capture variable commute... *)
-Lemma open_ct_rec_capt_aux : forall T j S i C,
-  open_tt_rec j S T = open_ct_rec i C (open_tt_rec j S T) ->
-  T = open_ct_rec i C T.
-Proof with eauto*.
-  induction T; intros j C i S H; simpl in *; inversion H; f_equal...
-Qed.
-*)
-Lemma open_ce_rec_capt_aux : forall e j Df i C,
-  i <> j ->
-  AtomSet.F.Empty (AtomSet.F.inter (cset_fvar C) Df) ->
-  open_ce_rec j (cset_set Df {}N) e = open_ce_rec i C (open_ce_rec j (cset_set Df {}N) e) ->
-  e = open_ce_rec i C e.
-Proof with eauto*.
-  induction e; intros j Df i C Neq; unfold empty_cset_bvars; intros HCommon H;
-    simpl in *; inversion H; f_equal; try apply open_ct_rec_capt_aux with (Df := Df) (j := j)...
-Qed.
-
-Lemma open_ce_rec_expr_aux : forall e j f i C,
-  open_ee_rec j f e = open_ce_rec i C (open_ee_rec j f e) ->
-  e = open_ce_rec i C e.
-Proof with eauto*.
-  induction e; intros j f i C H; simpl in *; inversion H; f_equal...
-Qed.
-
-(** NEW: The new lemma for opening a locally closed type by a capture set
-    Hint: it's the identity function. *)
-Lemma open_ce_rec_expr : forall e c k,
-  expr e ->
-  e = open_ce_rec k c e.
-Proof with auto using open_ct_rec_type.
-  intros e c k Ee. revert k.
-  induction Ee ; intro k ; simpl ; f_equal ; auto using open_ct_rec_type...
-  (* case exp_abs *)
-  - pick fresh x.
-    unfold open_ee in H1. unfold open_ce in H1. unfold cset_singleton_fvar in H1.
-    specialize H1 with (x := x) (k := (S k)).
-    apply open_ce_rec_expr_aux with (f := x) (j := 0) (e := e1).
-    apply open_ce_rec_capt_aux with (Df := AtomSet.F.singleton x) (j := 0)...
-    fsetdec.
-
-  (* case exp_tabs *)
-  - pick fresh Z.
-    specialize H1 with (X := Z) (k := k).
-    apply open_ce_rec_type with (j := 0) (t := Z).
-    apply H1. fsetdec.
 Qed.
 
 
@@ -985,49 +923,6 @@ Proof with auto.
     rewrite subst_tt_open_tt_var...
 Qed.
 
-Lemma open_ce_expr : forall e c,
-  expr e ->
-  e = open_ce e c.
-Proof.
-   intros. apply open_ce_rec_expr. auto.
-Qed.
-
-Lemma subst_te_open_ce_rec : forall e C Z P k,
-  type P ->
-  subst_te Z P (open_ce_rec k C e) =
-    open_ce_rec k C (subst_te Z P e).
-Proof.
-  intros e C Z P k Ptpe. revert k.
-  induction e ; intros k; simpl ; f_equal; auto using subst_tt_open_ct_rec.
-Qed.
-
-Lemma subst_te_open_ce : forall e C Z P,
-  type P ->
-  subst_te Z P (open_ce e C) = open_ce (subst_te Z P e) C.
-Proof with auto*.
-  intros.
-  unfold open_te.
-  apply subst_te_open_ce_rec...
-Qed.
-
-Lemma subst_ee_open_ce_rec : forall e x u C k,
-  expr u ->
-  subst_ee x u (open_ce_rec k C e) =
-    open_ce_rec k C (subst_ee x u e).
-Proof with auto*.
-  intros e x u C k Eu. revert k.
-  induction e ; intros k ; simpl ; f_equal...
-  - destruct (a == x); subst... apply open_ce_rec_expr...
-Qed.
-
-Lemma subst_ee_open_ce : forall e x u C,
-  expr u ->
-  subst_ee x u (open_ce e C) =
-    open_ce (subst_ee x u e) C.
-Proof with auto*.
-  intros e x u C Eu.
-  apply subst_ee_open_ce_rec...
-Qed.
 
 (** The following lemma depends on [subst_tt_type] and
     [subst_te_open_ee_var]. *)
@@ -1041,11 +936,9 @@ Proof with eauto using subst_tt_type.
   induction He; simpl ; econstructor...
   (* case exp_abs *)
   - instantiate (1 := L `union` singleton Z). intros. 
-   rewrite subst_te_open_ee_var. 
-   rewrite <- subst_te_open_ce.
+   rewrite subst_te_open_ee_var.    
    apply H1.
    fsetdec.
-   auto.
    
   (* case exp_tabs *)
   - instantiate (1 := L `union` singleton Z). intros. 
@@ -1058,12 +951,13 @@ Qed.
     This lemma can be cleaned up quite a bit -- just making it go through for now.
 *)
 
-Lemma subst_ee_expr : forall z e1 e2,
+Lemma subst_ee_expr : forall z e1 e2 c,
   expr e1 ->
   expr e2 ->
-  expr (subst_ee z e2 e1).
+  empty_cset_bvars c ->
+  expr (subst_ee z e2 c e1).
 Proof with auto.
-  intros z e1 e2 He1 He2.
+  intros z e1 e2 c He1 He2.
   induction He1; simpl; auto;
   try solve [
     econstructor;
@@ -1075,13 +969,14 @@ Proof with auto.
     auto
   ].
   - destruct (x == z)...
-  - econstructor. apply H. 
+  - econstructor. 
+    (* apply H. 
     try instantiate (1 := L `union` singleton z).
     intros. 
     rewrite subst_ee_open_ee_var.
     rewrite <- subst_ee_open_ce.
-    apply H1. fsetdec. auto. fsetdec. auto.
-Qed.
+    apply H1. fsetdec. auto. fsetdec. auto. *)
+Admitted.
 
 
 
