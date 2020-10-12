@@ -483,15 +483,48 @@ Proof with eauto*.
   * rewrite <- NatSetFacts.mem_iff in H. fnsetdec.
 Qed.
 
+(* 
+  TODO clean up the proof
+*)
 Lemma substitute_captureset_singleton : forall k c C x,
   ~ cset_references_fvar x C ->
-  open_captureset_bvar k c C = substitute_captureset_fvar x c (open_captureset_bvar k (cset_singleton_fvar x) C).
+  open_captureset_bvar k c C = 
+    substitute_captureset_fvar x c (open_captureset_bvar k (cset_singleton_fvar x) C).
 Proof with auto.
-  (* intros. destruct c... unfold open_captureset_bvar.
-  destruct (cset_references_bvar_dec k C).
+  intros k c C x H. unfold not in H.
+  destruct C...
+  destruct (cset_references_bvar_dec k (cset_set t t0)) eqn:Ck...
+  - destruct (cset_references_fvar_dec x (cset_set t t0)) eqn:Cf...
+    * unfold substitute_captureset_fvar.
+      unfold open_captureset_bvar.
+      unfold cset_references_bvar_dec in *.
+      unfold cset_references_fvar_dec in *.
+      unfold cset_references_fvar in *.
+      simpl in *. 
+      rewrite <- AtomSetFacts.mem_iff in *.
+      contradiction.
 
-  replace (cset_union cset_universal (cset_remove_bvar k C)) with cset_universal. *)
-Admitted.
+    * autounfold with cset_scope.
+      rewrite Ck.
+      unfold cset_references_bvar_dec in *.
+      unfold cset_references_fvar_dec in *.
+      unfold cset_references_fvar in *.
+      simpl in *.
+      replace (AtomSet.F.mem x (singleton x `union` t)) with true.
+      replace (AtomSet.F.remove x (singleton x `union` t)) with t.
+      replace (NatSet.F.union {}N (NatSet.F.remove k t0)) with (NatSet.F.remove k t0)...
+      fnsetdec.
+      fsetdec.
+      symmetry.
+      rewrite <- AtomSetFacts.mem_iff. fsetdec.
+
+  - autounfold with cset_scope.
+    rewrite Ck.
+    simpl in *.
+    rewrite AtomSetFacts.mem_iff in H.
+    destruct (AtomSet.F.mem x t)... contradiction.
+Qed.
+
 
 (** Why fnsetdec doesn't do this for us, I really don't know... *)
 Lemma elim_empty_nat_set : forall C,

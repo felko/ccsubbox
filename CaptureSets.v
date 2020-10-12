@@ -313,6 +313,9 @@ Hint Transparent
 : cset_scope.
 
 Hint Unfold 
-  cset_union cset_remove_bvar cset_remove_fvar open_captureset_bvar substitute_captureset_fvar 
-  open_captureset_bvar cset_references_bvar cset_bvars cset_subset_dec
+  cset_union cset_subset_dec
+  cset_bvars cset_fvars
+  cset_remove_bvar cset_remove_fvar 
+  open_captureset_bvar substitute_captureset_fvar 
+  cset_references_bvar cset_references_fvar
 : cset_scope.
