@@ -51,9 +51,9 @@ Fixpoint fv_et (T : typ) {struct T} : atoms :=
   | typ_top => {}
   | typ_bvar J => {}
   | typ_fvar X => {}
-  | typ_arrow T1 T2 => (fv_tt T1) `union` (fv_tt T2)
-  | typ_all T1 T2 => (fv_tt T1) `union` (fv_tt T2)
-  | typ_capt C T => (cset_fvar C) `union` (fv_tt T)
+  | typ_arrow T1 T2 => (fv_et T1) `union` (fv_et T2)
+  | typ_all T1 T2 => (fv_et T1) `union` (fv_et T2)
+  | typ_capt C T => (cset_fvar C) `union` (fv_et T)
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
@@ -70,10 +70,10 @@ Fixpoint fv_ee (e : exp) {struct e} : atoms :=
   match e with
   | exp_bvar i => {}
   | exp_fvar x => singleton x
-  | exp_abs V e1 => (fv_et V) `union` (fv_te e1)
+  | exp_abs V e1 => (fv_et V) `union` (fv_ee e1)
   | exp_app e1 e2 => (fv_ee e1) `union` (fv_ee e2)
-  | exp_tabs V e1 => (fv_et V) `union` (fv_te e1)
-  | exp_tapp e1 V => (fv_et V) `union` (fv_te e1)
+  | exp_tabs V e1 => (fv_et V) `union` (fv_ee e1)
+  | exp_tapp e1 V => (fv_et V) `union` (fv_ee e1)
   end.
 
 
@@ -775,15 +775,38 @@ Proof with auto*.
   - apply open_ct_rec_type...
 Qed.
 
+Lemma subst_captureset_fresh : forall x c C,
+  x `notin` (cset_fvar c)  ->
+  c = substitute_captureset_fvar x C c.
+Proof with auto*.
+  intros x c C H.
+  unfold substitute_captureset_fvar.
+  destruct (cset_references_fvar_dec x c) eqn:Hd...
+
+  (* TODO factor into a tactic *)
+  rewrite cset_references_fvar_eq in Hd. 
+  unfold cset_references_fvar in *. 
+  unfold cset_fvars in *. 
+  unfold cset_fvar in *.
+  destruct c...
+Qed.
+  
+Lemma subst_ct_fresh : forall (x: atom) c t,
+  x `notin` fv_et t ->
+  t = subst_ct x c t.
+Proof with eauto using subst_captureset_fresh.
+  intros x c t. induction t; intro H ; simpl in *; f_equal...
+Qed.
+
 Lemma subst_ee_fresh : forall (x: atom) u c e,
   x `notin` fv_ee e ->
   e = subst_ee x u c e.
-Proof with auto*.
-  intros x u c e; induction e; simpl; intro H; f_equal...
-  Case "exp_fvar".
+Proof with auto using subst_ct_fresh.
+  intros x u c e; induction e; simpl ; intro H ; f_equal...
+  - Case "exp_fvar".
     destruct (a==x)...
     contradict H; fsetdec.
-Admitted.
+Qed.
 
 Lemma subst_ee_open_ee_rec : forall e1 e2 x u c1 c2 k,
   expr u ->
