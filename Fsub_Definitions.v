@@ -373,30 +373,42 @@ Notation "[ x ]" := (x :: nil).
     not an expression-variable; [(dom E)] does not distinguish between
     the two kinds of bindings. *)
 
-Inductive wf_typ : env -> env -> env -> typ -> Prop :=
+(* A wellformed cset has no open debruijn indices and all bound fvars are in E *)
+Definition allbound (E : atoms) (X : atoms) : Prop := AtomSet.F.Subset X E.
+
+Definition wf_cset (E Ep : env) (C : captureset) : Prop := 
+  (empty_cset_bvar_references C) /\ (cset_fvars (allbound (AtomSet.F.union (dom E) (dom Ep))) C).
+  
+(* Wellformedness of types where locally bound variables are only 
+   allowed in positive positions. *)
+Inductive wf_covariant_typ : env -> env -> env -> typ -> Prop :=
   | wf_typ_top : forall E Ep Em,
-      wf_typ E Ep Em typ_top
+      wf_covariant_typ E Ep Em typ_top
   | wf_typ_var : forall U E Ep Em (X : atom),
       binds X (bind_sub U) E ->
-      wf_typ E Ep Em (typ_fvar X)
+      wf_covariant_typ E Ep Em (typ_fvar X)
   | wf_typ_arrow : forall L E Ep Em T1 T2,
-      wf_typ E Em Ep T1 ->
+    wf_covariant_typ E Em Ep T1 ->
       (** NEW: we need to be able to open capture sets.  Capture
           variables can only be opened in covariant positions. *)
       (forall X : atom, X `notin` L ->
-        wf_typ E ([(X, bind_typ T1)] ++ Ep) Em (open_tc T2 (cset_singleton_fvar X))) ->
-      wf_typ E Ep Em (typ_arrow T1 T2)
+        wf_covariant_typ E ([(X, bind_typ T1)] ++ Ep) Em (open_tc T2 (cset_singleton_fvar X))) ->
+       wf_covariant_typ E Ep Em (typ_arrow T1 T2)
   | wf_typ_all : forall L E Ep Em T1 T2,
-      wf_typ E Em Ep T1 ->
+      wf_covariant_typ E Em Ep T1 ->
       (forall X : atom, X `notin` L ->
-        wf_typ ([(X, bind_sub T1)] ++ E) Ep Em (open_tt T2 X)) ->
-      wf_typ E Ep Em (typ_all T1 T2)
+      wf_covariant_typ ([(X, bind_sub T1)] ++ E) Ep Em (open_tt T2 X)) ->
+      wf_covariant_typ E Ep Em (typ_all T1 T2)
   (** NEW: capture sets check if their variables are defined in covariant positions. *)
   | wf_typ_capt : forall E Ep Em C T,
-    wf_typ E Ep Em T ->
-    (forall X : atom, cset_references_fvar X C -> exists U, binds X (bind_typ U) E \/ binds X (bind_typ U) Ep) ->
-    wf_typ E Ep Em (typ_capt C T)
+    wf_covariant_typ E Ep Em T ->
+    wf_cset E Ep C ->
+    wf_covariant_typ E Ep Em (typ_capt C T)
 .
+
+Definition wf_typ (E : env): typ -> Prop := 
+    wf_covariant_typ E empty empty.
+
 
 (** An environment E is well-formed, denoted [(wf_env E)], if each
     atom is bound at most at once and if each binding is to a
@@ -412,12 +424,12 @@ Inductive wf_env : env -> Prop :=
       wf_env empty
   | wf_env_sub : forall (E : env) (X : atom) (T : typ),
       wf_env E ->
-      wf_typ E empty empty T ->
+      wf_typ E T ->
       X `notin` dom E ->
       wf_env ([(X, bind_sub T)] ++ E)
   | wf_env_typ : forall (E : env) (x : atom) (T : typ),
       wf_env E ->
-      wf_typ E empty empty T ->
+      wf_typ E T ->
       x `notin` dom E ->
       wf_env ([(x, bind_typ T)] ++ E).
 
@@ -474,16 +486,15 @@ Inductive subcapt : env -> captureset -> captureset -> Prop :=
     [sub_all] case). *)
 
 Inductive sub : env -> typ -> typ -> Prop :=
-  | sub_top : forall E S C1,
+  | sub_top : forall E S,
       wf_env E ->
-      wf_typ E empty empty S ->
+      wf_typ E S ->
       (** NEW: S can't capture anything *)
-      cv S E C1 ->
-      cset_empty C1 ->
+      cv S E empty_cset ->
       sub E S typ_top
   | sub_refl_tvar : forall E X,
       wf_env E ->
-      wf_typ E empty empty (typ_fvar X) ->
+      wf_typ E (typ_fvar X) ->
       sub E (typ_fvar X) (typ_fvar X)
   | sub_trans_tvar : forall U E T X,
       binds X (bind_sub U) E ->
