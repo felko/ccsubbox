@@ -738,27 +738,17 @@ Qed.
 
 (** This section follows the structure of the previous two sections. *)
 
-(* 
-TODO rephrase this lemma to cater to open_ee_rec_expr
-*)
-Lemma open_ee_rec_expr_aux : forall e j v u c i,
+Lemma open_ee_rec_expr_aux : forall e j v u C D i,
   i <> j ->
-  open_ee_rec j v c e = open_ee_rec i u c (open_ee_rec j v c e) ->
-  e = open_ee_rec i u c e.
-Proof with eauto*.
-  induction e; intros j v u c i Neq H; simpl in *; inversion H; f_equal...
+  empty_cset_bvars D ->
+  cset_disjoint_fvars C D ->
+  open_ee_rec j v D e = open_ee_rec i u C (open_ee_rec j v D e) ->
+  e = open_ee_rec i u C e.
+Proof with eauto using open_ct_rec_capt.
+  induction e; intros j v u C D i Neq Closed Disj H; simpl in *; inversion H; f_equal...
   Case "exp_bvar".
-    destruct (j===n)... destruct (i===n)...
-
-  (* We can only show `t = open_ct_rec i c t` if we restrict `c` in the lemma.
-
-    *)
-
-  (* eapply open_ct_rec_capt... apply H1.
-  eapply open_ct_rec_capt. apply H1.
-  eapply open_ct_rec_capt. apply H2. *)
-  
-Admitted.
+    destruct (j===n)... destruct (i===n)... subst. destruct Neq...
+Qed.
 
 Lemma open_ee_rec_type_aux : forall e j V u c i,
   open_te_rec j V e = open_ee_rec i u c (open_te_rec j V e) ->
@@ -782,7 +772,7 @@ Proof with auto*.
   intros u c e k Hexpr. revert k.
   induction Hexpr; intro k; simpl; f_equal; auto*.
   - pick fresh x. apply open_ct_rec_type...
-  - admit.
+  - eapply open_ee_rec_expr_aux... admit.
   - apply open_ct_rec_type...
   - pick fresh x. eapply open_ee_rec_type_aux with (V := typ_fvar x). apply H1...
   - apply open_ct_rec_type...
