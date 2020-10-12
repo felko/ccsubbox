@@ -450,6 +450,8 @@ Inductive cv : typ -> env -> captureset -> Prop :=
   | cv_typ_all : forall T1 T2 E,
     cv (typ_all T1 T2) E {}C
   (** Maybe: a capture-environment irrelevance term? *)
+  | cv_top : forall E,
+      cv typ_top E {}C
 .
 
 
