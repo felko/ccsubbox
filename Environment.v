@@ -23,7 +23,7 @@ Require Export ListFacts.
 Require Import Atom.
 
 Import AtomSet.F.
-Hint Unfold E.eq.
+Hint Unfold E.eq : core.
 
 
 (* ********************************************************************** *)
@@ -326,9 +326,9 @@ Tactic Notation "rewrite_env" constr(E) "in" hyp(H) :=
 
 (** ** Hints *)
 
-Hint Constructors ok.
+Hint Constructors ok : core.
 
-Hint Extern 1 (~ In _ _) => simpl_env in *; fsetdec.
+Hint Extern 1 (~ In _ _) => simpl_env in *; fsetdec : core.
 
 
 (* ********************************************************************** *)
@@ -495,11 +495,11 @@ End BindsProperties.
 
 (** ** Hints *)
 
-Hint Immediate ok_remove_mid ok_remove_mid_cons.
+Hint Immediate ok_remove_mid ok_remove_mid_cons : core.
 
 Hint Resolve
   ok_push ok_singleton ok_map ok_map_app_l
-  binds_singleton binds_head binds_tail.
+  binds_singleton binds_head binds_tail : core.
 
 (** ** [binds_get] *)
 
@@ -652,6 +652,6 @@ End AdditionalBindsProperties.
 (* *********************************************************************** *)
 (** * #<a name="auto3"></a># Automation and tactics (III) *)
 
-Hint Resolve binds_map binds_concat_ok binds_weaken binds_weaken_at_head.
+Hint Resolve binds_map binds_concat_ok binds_weaken binds_weaken_at_head : core.
 
-Hint Immediate binds_remove_mid binds_remove_mid_cons.
+Hint Immediate binds_remove_mid binds_remove_mid_cons : core.

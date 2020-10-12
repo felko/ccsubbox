@@ -8,6 +8,8 @@ Require Export AdditionalTactics.
 Require Export Atom.
 Require Export Environment.
 
+Declare Scope metatheory_scope.
+Declare Scope set_scope.
 
 (* ********************************************************************** *)
 (** * Notations *)
@@ -90,6 +92,6 @@ Tactic Notation
     goals that arise in programming language metatheory proofs, in
     particular those arising from cofinite quantification. *)
 
-Hint Resolve notin_empty notin_singleton notin_union.
-Hint Extern 4 (_ `notin` _) => simpl_env; notin_solve.
-Hint Extern 4 (_ <> _ :> atom) => simpl_env; notin_solve.
+Hint Resolve notin_empty notin_singleton notin_union : core.
+Hint Extern 4 (_ `notin` _) => simpl_env; notin_solve : core.
+Hint Extern 4 (_ <> _ :> atom) => simpl_env; notin_solve : core.

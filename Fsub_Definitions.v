@@ -630,6 +630,7 @@ Inductive red : exp -> exp -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type expr wf_typ wf_env value red.
-Hint Resolve sub_top sub_refl_tvar sub_arrow.
-Hint Resolve typing_var typing_app typing_tapp typing_sub.
+Hint Constructors type expr wf_covariant_typ wf_env value red cv sub subcapt typing : core.
+Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
+Hint Resolve typing_var typing_app typing_tapp typing_sub : core.
+Hint Unfold wf_typ wf_cset : core.

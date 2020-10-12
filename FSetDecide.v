@@ -8,6 +8,8 @@
     class of propositions involving finite sets.  *)
 
 Require Import FSets.
+Require Export Decidable.
+Require Export Setoid.
 
 Module Decide (Import M : S).
 
@@ -104,8 +106,6 @@ the above form:
       not affect the namespace if you import the enclosing
       module [Decide]. *)
   Module FSetLogicalFacts.
-    Require Export Decidable.
-    Require Export Setoid.
 
     (** ** Lemmas and Tactics About Decidable Propositions
         XXX: The lemma [dec_iff] should have been included in

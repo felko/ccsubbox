@@ -151,7 +151,7 @@ Qed.
     [ok_from_wf_env] serves as a bridge that allows us to use the
     environments library. *)
 
-Hint Resolve ok_from_wf_env.
+Hint Resolve ok_from_wf_env : core.
 
 Lemma wf_typ_from_binds_typ : forall x U E,
   wf_env E ->
@@ -374,14 +374,16 @@ Hint Extern 1 (wf_env ?E) =>
   match goal with
   | H: sub _ _ _ |- _ => apply (proj1 (sub_regular _ _ _ H))
   | H: typing _ _ _ |- _ => apply (proj1 (typing_regular _ _ _ H))
-  end.
+  end
+: core.
 
 Hint Extern 1 (wf_typ ?E ?T) =>
   match goal with
   | H: typing E _ T |- _ => apply (proj2 (proj2 (typing_regular _ _ _ H)))
   | H: sub E T _ |- _ => apply (proj1 (proj2 (sub_regular _ _ _ H)))
   | H: sub E _ T |- _ => apply (proj2 (proj2 (sub_regular _ _ _ H)))
-  end.
+  end
+: core.
 
 Hint Extern 1 (type ?T) =>
   let go E := apply (type_from_wf_typ E); auto in
@@ -389,11 +391,14 @@ Hint Extern 1 (type ?T) =>
   | H: typing ?E _ T |- _ => go E
   | H: sub ?E T _ |- _ => go E
   | H: sub ?E _ T |- _ => go E
-  end.
+  | H: wf_typ ?E T |- _ => go E
+  end
+: core.
 
 Hint Extern 1 (expr ?e) =>
   match goal with
   | H: typing _ ?e _ |- _ => apply (proj1 (proj2 (typing_regular _ _ _ H)))
   | H: red ?e _ |- _ => apply (proj1 (red_regular _ _ H))
   | H: red _ ?e |- _ => apply (proj2 (red_regular _ _ H))
-  end.
+  end
+: core.

@@ -266,7 +266,7 @@ Proof with auto*.
   induction T; simpl; intro H; f_equal...
   Case "typ_fvar".
     destruct (a == Z)...
-    absurd_hyp H; fsetdec.
+    contradict H; fsetdec.
 Qed.
 
 (** Substitution commutes with opening under certain conditions.  This
@@ -328,7 +328,7 @@ Proof with auto*.
   Case "typ_bvar".
     destruct (k === n)... simpl. destruct (X == X)...
   Case "typ_fvar".
-    destruct (a == X)... absurd_hyp Fr; fsetdec.
+    destruct (a == X)... contradict Fr; fsetdec.
 Qed.
 
 (** The next lemma is a direct corollary of the immediately preceding
@@ -488,7 +488,7 @@ Proof with auto*.
   intros x u e; induction e; simpl; intro H; f_equal...
   Case "exp_fvar".
     destruct (a==x)...
-    absurd_hyp H; fsetdec.
+    contradict H; fsetdec.
 Qed.
 
 Lemma subst_ee_open_ee_rec : forall e1 e2 x u k,
@@ -584,7 +584,7 @@ Proof with auto*.
   Case "exp_bvar".
     destruct (k === n)... simpl. destruct (x == x)...
   Case "exp_fvar".
-    destruct (a == x)... absurd_hyp Fr; fsetdec.
+    destruct (a == x)... contradict Fr; fsetdec.
 Qed.
 
 Lemma subst_ee_intro : forall x e u,
@@ -735,14 +735,14 @@ Qed.
     substitution.  This is part of our strategy for automatically
     discharging local-closure proof obligations. *)
 
-Hint Resolve subst_tt_type subst_te_expr subst_ee_expr.
+Hint Resolve subst_tt_type subst_te_expr subst_ee_expr : core.
 
 (** We also add as hints the lemmas concerning [body_e]. *)
 
-Hint Resolve expr_let_from_body body_from_expr_let.
-Hint Resolve expr_case_from_body.
-Hint Resolve body_inl_from_expr_case body_inr_from_expr_case.
-Hint Resolve open_ee_body_e.
+Hint Resolve expr_let_from_body body_from_expr_let : core.
+Hint Resolve expr_case_from_body : core.
+Hint Resolve body_inl_from_expr_case body_inr_from_expr_case : core.
+Hint Resolve open_ee_body_e : core.
 
 (** When reasoning about the [binds] relation and [map], we
     occasionally encounter situations where the binding is
@@ -750,4 +750,5 @@ Hint Resolve open_ee_body_e.
     thus enabling [Hint]s from the [Environment] library. *)
 
 Hint Extern 1 (binds _ (?F (subst_tt ?X ?U ?T)) _) =>
-  unsimpl (subst_tb X U (F T)).
+  unsimpl (subst_tb X U (F T))
+: core.
