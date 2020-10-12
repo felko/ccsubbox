@@ -738,6 +738,9 @@ Qed.
 
 (** This section follows the structure of the previous two sections. *)
 
+(* 
+TODO rephrase this lemma to cater to open_ee_rec_expr
+*)
 Lemma open_ee_rec_expr_aux : forall e j v u c i,
   i <> j ->
   open_ee_rec j v c e = open_ee_rec i u c (open_ee_rec j v c e) ->
@@ -760,9 +763,9 @@ Admitted.
 Lemma open_ee_rec_type_aux : forall e j V u c i,
   open_te_rec j V e = open_ee_rec i u c (open_te_rec j V e) ->
   e = open_ee_rec i u c e.
-Proof.
-  induction e; intros j V u c i H; simpl; inversion H; f_equal; eauto.
-Admitted.
+Proof with eauto using open_ct_rec_type_aux.
+  induction e; intros j V u c i H; simpl; inversion H; f_equal...
+Qed.
 
 (* DEPRECATED only use open_ee *)
 (* Lemma open_ee_rec_capt_aux : forall e j C u i,
@@ -777,20 +780,12 @@ Lemma open_ee_rec_expr : forall u c e k,
   e = open_ee_rec k u c e.
 Proof with auto*.
   intros u c e k Hexpr. revert k.
-  induction Hexpr; intro k; simpl; f_equal; auto*;
-  try solve [
-    (** NEW: Something to deal with capture sets. *)
-    unfold open_ee in *; unfold open_ce in *;
-    pick fresh x;
-    eapply open_ee_rec_expr_aux with (j := 0) (v := exp_fvar x);
-    auto*;
-    eapply open_ee_rec_capt_aux with (j := 0) (C := cset_singleton_fvar x);
-    auto*
-  | unfold open_te in *;
-    pick fresh X;
-    eapply open_ee_rec_type_aux with (j := 0) (V := typ_fvar X);
-    auto*
-  ].
+  induction Hexpr; intro k; simpl; f_equal; auto*.
+  - pick fresh x. apply open_ct_rec_type...
+  - admit.
+  - apply open_ct_rec_type...
+  - pick fresh x. eapply open_ee_rec_type_aux with (V := typ_fvar x). apply H1...
+  - apply open_ct_rec_type...
 Admitted.
 
 Lemma subst_ee_fresh : forall (x: atom) u c e,
