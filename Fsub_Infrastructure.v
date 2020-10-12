@@ -564,15 +564,22 @@ Qed.
 
     c[j -> D] = c[j -> D][i -> C] implies that i \notin c and in particular c[i -> C] = c,
     so long as D references no free variables (and isn't the universal set).
+
+    Can that lemma be strengthened to
+
+      i <> j ->
+      open_ct_rec i c1 t = open_ct_rec j c2 (open_ct_rec i c1 t) ->
+      t = open_ct_rec j c2 t.
+    ?
 *)
-Lemma open_captureset_bvar_aux : forall j D Df i C c,
+Lemma open_captureset_bvar_aux : forall j D i C c,
   i <> j ->
-  D = cset_set Df {}N ->
+  empty_cset_bvars D ->
   cset_disjoint_fvars C D ->
   open_captureset_bvar j D c = open_captureset_bvar i C (open_captureset_bvar j D c) ->
   c = open_captureset_bvar i C c.
 Proof with eauto*.
-  intros j D Df i C c Neq DDef Disj H.
+  intros j D i C c Neq Closed Disj H.
 
   rewrite (cset_open_idempotent i C (open_captureset_bvar j D c)) in H.
 
@@ -582,18 +589,13 @@ Proof with eauto*.
   (* i is in c *)
   - destruct (cset_references_bvar_dec j c) eqn:Hjc ; csethyp...
     destruct H. 
-    * rewrite DDef in H. destruct c ; csethyp ; auto.
+    * destruct D ; destruct c ; csethyp ; auto.
       left. fnsetdec.      
     * destruct H. destruct C eqn:HC.
       ** contradiction. 
-      ** destruct c eqn:Hc ; eauto.
+      ** unfold empty_cset_bvars in Closed. unfold cset_bvars in *. destruct D ; destruct c eqn:Hc ; eauto.
          right. split...
-         inversion H ; rewrite DDef in H3 ; csethyp. 
-         + discriminate H3.
-         + injection H3. intros. subst.
-           rewrite elim_empty_nat_set in *.
-           unfold cset_disjoint_fvars in Disj.
-           apply cset_subset_elem ; csetdec.
+         inversion H ; csethyp ; simpl in *. constructor. fsetdec. fnsetdec.          
   (* i is not in c *)     
   - left. apply cset_not_references_bvar_eq. apply Hic.
 Qed.
@@ -605,14 +607,37 @@ Lemma open_ct_rec_capt_aux : forall T j Df i C,
   open_ct_rec j (cset_set Df {}N) T = open_ct_rec i C (open_ct_rec j (cset_set Df {}N) T) ->
   T = open_ct_rec i C T.
 Proof with eauto*.
-  (*induction T; intros j V i U Neq H; simpl in *; inversion H; f_equal...
-  Case "typ_bvar".
-    destruct (j === n)... destruct (i === n)...*)
   induction T; intros j Df i C Neq; unfold empty_cset_bvars; intros HCommon H;
     simpl in *; inversion H; f_equal...
-  apply open_captureset_bvar_aux with (j := j) (C := C) (D := cset_set Df {}N) (Df := Df)...
-  unfold cset_disjoint_fvars. destruct C...
+  apply open_captureset_bvar_aux with (j := j) (D := cset_set Df {}N) ; simpl in *; try fnsetdec...
+  unfold cset_disjoint_fvars in *. destruct C...
 Qed.
+
+Lemma open_ct_rec_capt : forall T j D i C,
+  i <> j ->
+  empty_cset_bvars D ->
+  cset_disjoint_fvars C D ->
+  open_ct_rec j D T = open_ct_rec i C (open_ct_rec j D T) ->
+  T = open_ct_rec i C T.
+Proof with eauto using open_captureset_bvar_aux.
+  induction T; intros j D i C Neq Closed; intros HCommon H; simpl in *; inversion H; f_equal...
+Qed.
+
+(* Lemma open_ct_rec_capt : forall t i j c1 c2,
+  i <> j ->
+  open_ct_rec i c1 t = open_ct_rec j c2 (open_ct_rec i c1 t) ->
+  t = open_ct_rec j c2 t.
+Proof with eauto*.
+  induction t; intros i j c1 c2 Neq H; simpl in *...
+  - inversion H. f_equal...
+  - inversion H. f_equal...
+  - inversion H. f_equal...
+    rewrite cset_open_idempotent.
+
+    (* it remains to be shown that c = open_captureset_bvar j c2 c *)
+
+   
+Admitted. *)
 
 (** NEW: Opening with a type and capture variable commute... *)
 Lemma open_ct_rec_type_aux : forall T j S i C,
@@ -721,6 +746,15 @@ Proof with eauto*.
   induction e; intros j v u c i Neq H; simpl in *; inversion H; f_equal...
   Case "exp_bvar".
     destruct (j===n)... destruct (i===n)...
+
+  (* We can only show `t = open_ct_rec i c t` if we restrict `c` in the lemma.
+
+    *)
+
+  (* eapply open_ct_rec_capt... apply H1.
+  eapply open_ct_rec_capt. apply H1.
+  eapply open_ct_rec_capt. apply H2. *)
+  
 Admitted.
 
 Lemma open_ee_rec_type_aux : forall e j V u c i,
