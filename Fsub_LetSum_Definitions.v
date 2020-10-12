@@ -18,7 +18,6 @@
 
 Require Export Metatheory.
 
-
 (* ********************************************************************** *)
 (** * #<a name="syntax"></a># Syntax (pre-terms) *)
 

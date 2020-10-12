@@ -24,8 +24,8 @@ Require Export Fsub_Lemmas.
 
 (*
   opening capture sets in types preserves well-formedness. *)
-Lemma open_tc_wf_typ : forall E T C,
-  wf_typ E T -> wf_typ E (open_tc T C).
+Lemma open_ct_wf_typ : forall E T C,
+  wf_typ E T -> wf_typ E (open_ct T C).
 Proof with auto.
   intros E T C H.
   closed_type.
@@ -35,12 +35,12 @@ Qed.
 (* capture set substitution does not affect subtyping 
 
   depends on opening in the context
-    binds X (bind_sub U) E -> binds X (bind_sub (open_tc U C)) E
+    binds X (bind_sub U) E -> binds X (bind_sub (open_ct U C)) E
  *)
-Lemma open_tc_sub : forall E S T C,
+Lemma open_ct_sub : forall E S T C,
   wf_env E ->
-  sub E S T -> sub E (open_tc S C) (open_tc T C).
-Proof with auto using open_tc_wf_typ.
+  sub E S T -> sub E (open_ct S C) (open_ct T C).
+Proof with auto using open_ct_wf_typ.
   intros E S T C Eok H.
   inversion H ; simpl ; closed_type ; subst...
 Qed.
@@ -82,9 +82,9 @@ Proof with auto.
     specialize (H Y YL).
     specialize (H0 Y YL Ok).
     specialize (IHWf Ok).
-    replace (open_tc T2 (cset_singleton_fvar Y)) with T2 in H0.
+    replace (open_ct T2 (cset_singleton_fvar Y)) with T2 in H0.
     apply H0.
-    apply open_tc_rec_type.
+    apply open_ct_rec_type.
     admit.    
   - apply sub_all with (L := L)...
     intros.

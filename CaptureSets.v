@@ -177,9 +177,9 @@ Qed.
 
 
 (** More predicates *)
-Definition empty_cset_bvar_references (c : captureset) : Prop :=
+Definition empty_cset_bvars (c : captureset) : Prop :=
   cset_bvars NatSet.F.Empty c.
-Definition empty_cset_fvar_references (c : captureset) : Prop :=
+Definition empty_cset_fvars (c : captureset) : Prop :=
   cset_fvars AtomSet.F.Empty c.
 
 Definition cset_disjoint_fvars (c1 c2 :captureset) : Prop :=
@@ -200,7 +200,7 @@ Definition cset_union (c1 c2 : captureset) : captureset :=
 Definition cset_empty (c : captureset) : Prop :=
   match c with
   | cset_universal => False
-  | cset_set A N => empty_cset_bvar_references c /\ empty_cset_fvar_references c
+  | cset_set A N => empty_cset_bvars c /\ empty_cset_fvars c
   end.
 
 Definition cset_remove_bvar (k : nat) (c : captureset) : captureset :=

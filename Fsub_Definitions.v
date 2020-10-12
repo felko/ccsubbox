@@ -143,30 +143,30 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (e : exp)  {struct e} : exp :=
 (* Jonathan: shouldn't that be "open_ct_rec" following the naming convention ? 
    it is substituting a captureset in a type.
  *)
-Fixpoint open_tc_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
+Fixpoint open_ct_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
   match T with
   | typ_top => typ_top
   | typ_bvar i => typ_bvar i
   | typ_fvar x => typ_fvar x
   (** A function type A -> B introduces a binding for a capture variable.
       Note that we don't allow capture variables to show up in their own type constraints. *)
-  | typ_arrow T1 T2 => typ_arrow (open_tc_rec k c T1) (open_tc_rec (S k) c T2)
-  | typ_all T1 T2 => typ_all (open_tc_rec k c T1) (open_tc_rec k c T2)
+  | typ_arrow T1 T2 => typ_arrow (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
+  | typ_all T1 T2 => typ_all (open_ct_rec k c T1) (open_ct_rec k c T2)
   (** We actually need to perform the substitution here. *)
-  | typ_capt C T => typ_capt (open_captureset_bvar k c C) (open_tc_rec k c T)
+  | typ_capt C T => typ_capt (open_captureset_bvar k c C) (open_ct_rec k c T)
   end.
 
 (* Same here *)
-Fixpoint open_ec_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
+Fixpoint open_ce_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
   match e with
   | exp_bvar i => (exp_bvar i)
   | exp_fvar x => (exp_fvar x)
   (** A function abstraction V -> e introduces a binding for a capture variable.
       Note that we don't allow capture variables to show up in their own type constraints. *)
-  | exp_abs V e1 => exp_abs (open_tc_rec k c V) (open_ec_rec (S k) c e1)
-  | exp_app e1 e2 => exp_app (open_ec_rec k c e1) (open_ec_rec k c e2)
-  | exp_tabs V e1 => exp_tabs (open_tc_rec k c V) (open_ec_rec k c e1)
-  | exp_tapp e1 V => exp_tapp (open_ec_rec k c e1) (open_tc_rec k c V)
+  | exp_abs V e1 => exp_abs (open_ct_rec k c V) (open_ce_rec (S k) c e1)
+  | exp_app e1 e2 => exp_app (open_ce_rec k c e1) (open_ce_rec k c e2)
+  | exp_tabs V e1 => exp_tabs (open_ct_rec k c V) (open_ce_rec k c e1)
+  | exp_tapp e1 V => exp_tapp (open_ce_rec k c e1) (open_ct_rec k c V)
   end.
 
 (** Many common applications of opening replace index zero with an
@@ -181,8 +181,8 @@ Fixpoint open_ec_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
 Definition open_tt T U := open_tt_rec 0 U T.
 Definition open_te e U := open_te_rec 0 U e.
 Definition open_ee e1 e2 := open_ee_rec 0 e2 e1.
-Definition open_ec e c := open_ec_rec 0 c e.
-Definition open_tc T c := open_tc_rec 0 c T.
+Definition open_ce e c := open_ce_rec 0 c e.
+Definition open_ct T c := open_ct_rec 0 c T.
 
 (* ********************************************************************** *)
 (** * #<a name="lc"></a># Local closure *)
@@ -242,7 +242,7 @@ Inductive type : typ -> Prop :=
       type (typ_fvar X)
   | type_arrow : forall L T1 T2,
       type T1 ->
-      (forall X : atom, X `notin` L -> type (open_tc T2 (cset_singleton_fvar X))) ->
+      (forall X : atom, X `notin` L -> type (open_ct T2 (cset_singleton_fvar X))) ->
       type (typ_arrow T1 T2)
   | type_all : forall L T1 T2,
       type T1 ->
@@ -250,7 +250,7 @@ Inductive type : typ -> Prop :=
       type (typ_all T1 T2)
   | type_capt : forall C T,
       type T ->
-      (empty_cset_bvar_references C) ->
+      (empty_cset_bvars C) ->
       type (typ_capt C T)
 .
 
@@ -263,7 +263,7 @@ Inductive expr : exp -> Prop :=
          Shouldn't it be opened with the capture set {x}?
          Edward: Yeah, I forgot to change it in expr.
       *)
-      (forall x : atom, x `notin` L -> expr (open_ec (open_ee e1 x) (cset_singleton_fvar x))) ->
+      (forall x : atom, x `notin` L -> expr (open_ce (open_ee e1 x) (cset_singleton_fvar x))) ->
       expr (exp_abs T e1)
   | expr_app : forall e1 e2,
       expr e1 ->
@@ -377,7 +377,7 @@ Notation "[ x ]" := (x :: nil).
 Definition allbound (E : atoms) (X : atoms) : Prop := AtomSet.F.Subset X E.
 
 Definition wf_cset (E Ep : env) (C : captureset) : Prop := 
-  (empty_cset_bvar_references C) /\ (cset_fvars (allbound (AtomSet.F.union (dom E) (dom Ep))) C).
+  (empty_cset_bvars C) /\ (cset_fvars (allbound (AtomSet.F.union (dom E) (dom Ep))) C).
   
 (* Wellformedness of types where locally bound variables are only 
    allowed in positive positions. *)
@@ -392,7 +392,7 @@ Inductive wf_covariant_typ : env -> env -> env -> typ -> Prop :=
       (** NEW: we need to be able to open capture sets.  Capture
           variables can only be opened in covariant positions. *)
       (forall X : atom, X `notin` L ->
-        wf_covariant_typ E ([(X, bind_typ T1)] ++ Ep) Em (open_tc T2 (cset_singleton_fvar X))) ->
+        wf_covariant_typ E ([(X, bind_typ T1)] ++ Ep) Em (open_ct T2 (cset_singleton_fvar X))) ->
        wf_covariant_typ E Ep Em (typ_arrow T1 T2)
   | wf_typ_all : forall L E Ep Em T1 T2,
       wf_covariant_typ E Em Ep T1 ->
@@ -568,7 +568,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
       typing E e2 T1 ->
       cv T1 E Cv ->
       (** NEW: function application opens the capture set in the type. *)
-      typing E (exp_app e1 e2) (open_tc T2 Cv)
+      typing E (exp_app e1 e2) (open_ct T2 Cv)
   | typing_tabs : forall L E V e1 T1 C,
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
@@ -623,7 +623,7 @@ Inductive red : exp -> exp -> Prop :=
           WIP: Maybe we shouldn't do this dynamic computation of capture sets,
           and explicitly write down which capture set we wish to substitute in. *)
       cv_free v2 C ->
-      red (exp_app (exp_abs T e1) v2) (open_ee (open_ec e1 C) v2)
+      red (exp_app (exp_abs T e1) v2) (open_ee (open_ce e1 C) v2)
   | red_tabs : forall T1 e1 T2,
       expr (exp_tabs T1 e1) ->
       type T2 ->

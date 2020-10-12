@@ -224,10 +224,10 @@ Proof.
 Qed.
 
 Lemma notin_fv_tc_open : forall (X : atom) T C,
-  X `notin` fv_tt (open_tc T C) ->
+  X `notin` fv_tt (open_ct T C) ->
   X `notin` fv_tt T.
 Proof with auto.
-  intros X T C. unfold open_tc.
+  intros X T C. unfold open_ct.
   generalize 0.
   induction T ; simpl ; intros k Fr ; try apply notin_union; eauto.
   - specialize (IHT1 k). specialize (IHT2 (S k))...
