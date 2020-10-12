@@ -757,14 +757,6 @@ Proof with eauto using open_ct_rec_type_aux.
   induction e; intros j V u c i H; simpl; inversion H; f_equal...
 Qed.
 
-(* DEPRECATED only use open_ee *)
-(* Lemma open_ee_rec_capt_aux : forall e j C u i,
-  open_ce_rec j C e = open_ee_rec i u (open_ce_rec j C e) ->
-  e = open_ee_rec i u e.
-Proof.
-  induction e; intros j C u i H; simpl; inversion H; f_equal; eauto. *)
-
-
 Lemma open_ee_rec_expr : forall u c e k,
   expr e ->
   e = open_ee_rec k u c e.
@@ -772,11 +764,16 @@ Proof with auto*.
   intros u c e k Hexpr. revert k.
   induction Hexpr; intro k; simpl; f_equal; auto*.
   - pick fresh x. apply open_ct_rec_type...
-  - eapply open_ee_rec_expr_aux... admit.
+  - pick fresh x. 
+    specialize H1 with (x := x) (k := S k).    
+    apply open_ee_rec_expr_aux with (j := 0) (v := x) (D := (cset_singleton_fvar x))...
+    simpl. fnsetdec.
+    (* that should go into a tactic *)
+    unfold cset_disjoint_fvars. destruct c... simpl. fsetdec.
   - apply open_ct_rec_type...
   - pick fresh x. eapply open_ee_rec_type_aux with (V := typ_fvar x). apply H1...
   - apply open_ct_rec_type...
-Admitted.
+Qed.
 
 Lemma subst_ee_fresh : forall (x: atom) u c e,
   x `notin` fv_ee e ->
