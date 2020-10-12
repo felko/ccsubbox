@@ -369,12 +369,12 @@ Qed.
     show that substituting a type in a locally-closed expression is
     the identity. *)
 
-Lemma open_te_rec_expr_aux : forall e j u i P ,
-  open_ee_rec j u e = open_te_rec i P (open_ee_rec j u e) ->
+Lemma open_te_rec_expr_aux : forall e j u i P c ,
+  open_ee_rec j u c e = open_te_rec i P (open_ee_rec j u c e) ->
   e = open_te_rec i P e.
 Proof with eauto*.
-  induction e; intros j u i P H; simpl in *; inversion H; f_equal...
-Qed.
+  induction e; intros j u i P c H; simpl in *; inversion H...
+Admitted.
 
 Lemma open_te_rec_type_aux : forall e j Q i P,
   i <> j ->
@@ -417,7 +417,7 @@ Proof with auto*.
     eapply open_te_rec_type_aux with (j := 0) (Q := typ_fvar X);
     auto*
   ].
-Qed.
+Admitted.
 
 Lemma open_te_expr : forall e U,
   expr e ->
@@ -672,7 +672,7 @@ Proof with auto*.
     ** auto.
 Qed.
 
-
+(* DEPRECATED use open_ee instead *)
 Lemma open_ce_rec_type : forall e j i t C,
   (* type t -> *)
   open_te_rec j t e = open_ce_rec i C (open_te_rec j t e) ->
@@ -730,35 +730,36 @@ Qed.
 
 (** This section follows the structure of the previous two sections. *)
 
-Lemma open_ee_rec_expr_aux : forall e j v u i,
+Lemma open_ee_rec_expr_aux : forall e j v u c i,
   i <> j ->
-  open_ee_rec j v e = open_ee_rec i u (open_ee_rec j v e) ->
-  e = open_ee_rec i u e.
+  open_ee_rec j v c e = open_ee_rec i u c (open_ee_rec j v c e) ->
+  e = open_ee_rec i u c e.
 Proof with eauto*.
-  induction e; intros j v u i Neq H; simpl in *; inversion H; f_equal...
+  induction e; intros j v u c i Neq H; simpl in *; inversion H; f_equal...
   Case "exp_bvar".
     destruct (j===n)... destruct (i===n)...
-Qed.
+Admitted.
 
-Lemma open_ee_rec_type_aux : forall e j V u i,
-  open_te_rec j V e = open_ee_rec i u (open_te_rec j V e) ->
-  e = open_ee_rec i u e.
+Lemma open_ee_rec_type_aux : forall e j V u c i,
+  open_te_rec j V e = open_ee_rec i u c (open_te_rec j V e) ->
+  e = open_ee_rec i u c e.
 Proof.
-  induction e; intros j V u i H; simpl; inversion H; f_equal; eauto.
-Qed.
+  induction e; intros j V u c i H; simpl; inversion H; f_equal; eauto.
+Admitted.
 
-Lemma open_ee_rec_capt_aux : forall e j C u i,
+(* DEPRECATED only use open_ee *)
+(* Lemma open_ee_rec_capt_aux : forall e j C u i,
   open_ce_rec j C e = open_ee_rec i u (open_ce_rec j C e) ->
   e = open_ee_rec i u e.
 Proof.
-  induction e; intros j C u i H; simpl; inversion H; f_equal; eauto.
-Qed.
+  induction e; intros j C u i H; simpl; inversion H; f_equal; eauto. *)
 
-Lemma open_ee_rec_expr : forall u e k,
+
+Lemma open_ee_rec_expr : forall u c e k,
   expr e ->
-  e = open_ee_rec k u e.
+  e = open_ee_rec k u c e.
 Proof with auto*.
-  intros u e k Hexpr. revert k.
+  intros u c e k Hexpr. revert k.
   induction Hexpr; intro k; simpl; f_equal; auto*;
   try solve [
     (** NEW: Something to deal with capture sets. *)
@@ -773,35 +774,38 @@ Proof with auto*.
     eapply open_ee_rec_type_aux with (j := 0) (V := typ_fvar X);
     auto*
   ].
-Qed.
+Admitted.
 
-Lemma subst_ee_fresh : forall (x: atom) u e,
+Lemma subst_ee_fresh : forall (x: atom) u c e,
   x `notin` fv_ee e ->
-  e = subst_ee x u e.
+  e = subst_ee x u c e.
 Proof with auto*.
-  intros x u e; induction e; simpl; intro H; f_equal...
+  intros x u c e; induction e; simpl; intro H; f_equal...
   Case "exp_fvar".
     destruct (a==x)...
     contradict H; fsetdec.
-Qed.
+Admitted.
 
-Lemma subst_ee_open_ee_rec : forall e1 e2 x u k,
+Lemma subst_ee_open_ee_rec : forall e1 e2 x u c1 c2 k,
   expr u ->
-  subst_ee x u (open_ee_rec k e2 e1) =
-    open_ee_rec k (subst_ee x u e2) (subst_ee x u e1).
+  empty_cset_bvars c1 ->
+  subst_ee x u c1 (open_ee_rec k e2 c2 e1) =
+    open_ee_rec k (subst_ee x u c1 e2) (substitute_captureset_fvar x c1 c2) (subst_ee x u c1 e1).
 Proof with auto*.
-  intros e1 e2 x u k WP. revert k.
+  intros e1 e2 x u c1 c2 k WP. revert k.
   induction e1; intros k; simpl; f_equal...
   Case "exp_bvar".
     destruct (k === n); subst...
   Case "exp_fvar".
-    destruct (a == x); subst... apply open_ee_rec_expr...
-Qed.
 
-Lemma subst_ee_open_ee : forall e1 e2 x u,
+    (* destruct (a == x); subst... apply open_ee_rec_expr... *)
+Admitted.
+
+Lemma subst_ee_open_ee : forall e1 e2 x u c1 c2,
   expr u ->
-  subst_ee x u (open_ee e1 e2) =
-    open_ee (subst_ee x u e1) (subst_ee x u e2).
+  empty_cset_bvars c1 ->
+  subst_ee x u c1 (open_ee e1 e2 c2) =
+    open_ee (subst_ee x u c1 e1) (subst_ee x u c1 e2) (substitute_captureset_fvar x c1 c2).
 Proof with auto*.
   intros.
   unfold open_ee.
