@@ -369,55 +369,38 @@ Qed.
     show that substituting a type in a locally-closed expression is
     the identity. *)
 
+Lemma open_te_rec_capt_aux : forall e j C i P,
+  open_ce_rec j C e = open_te_rec i P (open_ce_rec j C e) ->
+  e = open_te_rec i P e.
+Proof with eauto using open_tt_rec_capt_aux.
+  induction e; intros j C i P H; simpl in *; inversion H; f_equal...
+Qed.
+
 Lemma open_te_rec_expr_aux : forall e j u i P c ,
   open_ee_rec j u c e = open_te_rec i P (open_ee_rec j u c e) ->
   e = open_te_rec i P e.
-Proof with eauto*.
-  induction e; intros j u i P c H; simpl in *; inversion H...
-Admitted.
+Proof with eauto using open_tt_rec_capt_aux.
+  induction e; intros j u i P c H; simpl in *; inversion H; f_equal...
+Qed.
 
 Lemma open_te_rec_type_aux : forall e j Q i P,
   i <> j ->
   open_te_rec j Q e = open_te_rec i P (open_te_rec j Q e) ->
   e = open_te_rec i P e.
-Proof.
-  induction e; intros j Q i P Neq Heq; simpl in *; inversion Heq;
-    f_equal; eauto using open_tt_rec_type_aux.
-Qed.
-
-Lemma open_te_rec_capt_aux : forall e j C i P,
-  open_ce_rec j C e = open_te_rec i P (open_ce_rec j C e) ->
-  e = open_te_rec i P e.
-Proof with eauto*.
-  induction e;
-  intros j C i P H;
-  simpl in *; inversion H; f_equal...
-  (** Three cases introduced by the new capture variables. *)
-  * apply open_tt_rec_capt_aux with (j := j) (C := C); auto.
-  * apply open_tt_rec_capt_aux with (j := j) (C := C); auto.
-  * apply open_tt_rec_capt_aux with (j := j) (C := C); auto.
+Proof with eauto using open_tt_rec_type_aux.
+  induction e; intros j Q i P Neq Heq; simpl in *; inversion Heq; f_equal...
 Qed.
 
 
 Lemma open_te_rec_expr : forall e U k,
   expr e ->
   e = open_te_rec k U e.
-Proof with auto*.
+Proof with auto using open_tt_rec_type.
   intros e U k WF; revert k;
-  induction WF; intros k; simpl; f_equal; auto using open_tt_rec_type;
-  try solve [
-    (** NEW: Dealing with capture variables; need to unwrap the capture sets.*)
-    unfold open_ce in *; unfold open_ee in *;
-    pick fresh x;
-    eapply open_te_rec_expr_aux with (j := 0) (u := exp_fvar x);
-    eapply open_te_rec_capt_aux with (j := 0) (C := cset_singleton_fvar x);
-    auto*
-  | unfold open_te in *;
-    pick fresh X;
-    eapply open_te_rec_type_aux with (j := 0) (Q := typ_fvar X);
-    auto*
-  ].
-Admitted.
+  induction WF; intros k; simpl; f_equal; auto using open_tt_rec_type.
+  - pick fresh x. eapply open_te_rec_expr_aux. apply H1 with (x := x)...
+  - pick fresh x. eapply open_te_rec_type_aux with (j := 0)... apply H1 with (X := x)...
+Qed.
 
 Lemma open_te_expr : forall e U,
   expr e ->
