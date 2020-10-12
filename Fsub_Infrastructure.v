@@ -34,6 +34,7 @@ Require Export Fsub_Definitions.
     straightforward since bound variables are indices, not names, in
     locally nameless representation. *)
 
+(* These are the TYPE variables in types *)
 Fixpoint fv_tt (T : typ) {struct T} : atoms :=
   match T with
   | typ_top => {}
@@ -41,7 +42,17 @@ Fixpoint fv_tt (T : typ) {struct T} : atoms :=
   | typ_fvar X => singleton X
   | typ_arrow T1 T2 => (fv_tt T1) `union` (fv_tt T2)
   | typ_all T1 T2 => (fv_tt T1) `union` (fv_tt T2)
-  (** NEW: Capture set free variables need to also be mentioned. *)
+  | typ_capt C T => fv_tt T
+  end.
+
+(* Only in TERM variables in types should capture sets be mentioned *)
+Fixpoint fv_et (T : typ) {struct T} : atoms :=
+  match T with
+  | typ_top => {}
+  | typ_bvar J => {}
+  | typ_fvar X => {}
+  | typ_arrow T1 T2 => (fv_tt T1) `union` (fv_tt T2)
+  | typ_all T1 T2 => (fv_tt T1) `union` (fv_tt T2)
   | typ_capt C T => (cset_fvar C) `union` (fv_tt T)
   end.
 
@@ -59,10 +70,10 @@ Fixpoint fv_ee (e : exp) {struct e} : atoms :=
   match e with
   | exp_bvar i => {}
   | exp_fvar x => singleton x
-  | exp_abs V e1 => (fv_ee e1)
+  | exp_abs V e1 => (fv_et V) `union` (fv_te e1)
   | exp_app e1 e2 => (fv_ee e1) `union` (fv_ee e2)
-  | exp_tabs V e1 => (fv_ee e1)
-  | exp_tapp e1 V => (fv_ee e1)
+  | exp_tabs V e1 => (fv_et V) `union` (fv_te e1)
+  | exp_tapp e1 V => (fv_et V) `union` (fv_te e1)
   end.
 
 
@@ -102,14 +113,24 @@ Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
   | exp_tapp e1 V => exp_tapp (subst_te Z U e1) (subst_tt Z U V)
   end.
 
-Fixpoint subst_ee (z : atom) (u : exp) (e : exp) {struct e} : exp :=
+Fixpoint subst_ct (z : atom) (c : captureset) (T : typ) {struct T} : typ :=
+  match T with
+  | typ_top => typ_top
+  | typ_bvar J => typ_bvar J
+  | typ_fvar X => typ_fvar X
+  | typ_arrow T1 T2 => typ_arrow (subst_ct z c T1) (subst_ct z c T2)
+  | typ_all T1 T2 => typ_all (subst_ct z c T1) (subst_ct z c T2)
+  | typ_capt C T1 => typ_capt (substitute_captureset_fvar z c C) (subst_ct z c T1)
+  end.
+
+Fixpoint subst_ee (z : atom) (u : exp) (c : captureset) (e : exp) {struct e} : exp :=
   match e with
   | exp_bvar i => exp_bvar i
   | exp_fvar x => if x == z then u else e
-  | exp_abs V e1 => exp_abs V (subst_ee z u e1)
-  | exp_app e1 e2 => exp_app (subst_ee z u e1) (subst_ee z u e2)
-  | exp_tabs V e1 => exp_tabs V (subst_ee z u e1)
-  | exp_tapp e1 V => exp_tapp (subst_ee z u e1) V
+  | exp_abs t e1 => exp_abs (subst_ct z c t) (subst_ee z u c e1)
+  | exp_app e1 e2 => exp_app (subst_ee z u c e1) (subst_ee z u c e2)
+  | exp_tabs t e1 => exp_tabs (subst_ct z c t) (subst_ee z u c e1)
+  | exp_tapp e1 t => exp_tapp (subst_ee z u c e1) (subst_ct z c t)
   end.
 
 Definition subst_tb (Z : atom) (P : typ) (b : binding) : binding :=
