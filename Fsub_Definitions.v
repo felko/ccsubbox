@@ -127,22 +127,6 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
       no change here. *)
   end.
 
-Fixpoint open_ee_rec (k : nat) (f : exp) (e : exp)  {struct e} : exp :=
-  match e with
-  | exp_bvar i => if k === i then f else (exp_bvar i)
-  | exp_fvar x => exp_fvar x
-  | exp_abs V e1 => exp_abs V (open_ee_rec (S k) f e1)
-  | exp_app e1 e2 => exp_app (open_ee_rec k f e1) (open_ee_rec k f e2)
-  | exp_tabs V e1 => exp_tabs V (open_ee_rec k f e1)
-  | exp_tapp e1 V => exp_tapp (open_ee_rec k f e1) V
-  (** Opening an expression with an expression doesn't affect capture sets....
-      but we need to write a handler for opening a capture set within an expression
-      and within a type. *)
-  end.
-
-(* Jonathan: shouldn't that be "open_ct_rec" following the naming convention ? 
-   it is substituting a captureset in a type.
- *)
 Fixpoint open_ct_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
   match T with
   | typ_top => typ_top
@@ -156,18 +140,16 @@ Fixpoint open_ct_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
   | typ_capt C T => typ_capt (open_captureset_bvar k c C) (open_ct_rec k c T)
   end.
 
-(* Same here *)
-Fixpoint open_ce_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
+Fixpoint open_ee_rec (k : nat) (f : exp) (c : captureset) (e : exp)  {struct e} : exp :=
   match e with
-  | exp_bvar i => (exp_bvar i)
-  | exp_fvar x => (exp_fvar x)
-  (** A function abstraction V -> e introduces a binding for a capture variable.
-      Note that we don't allow capture variables to show up in their own type constraints. *)
-  | exp_abs V e1 => exp_abs (open_ct_rec k c V) (open_ce_rec (S k) c e1)
-  | exp_app e1 e2 => exp_app (open_ce_rec k c e1) (open_ce_rec k c e2)
-  | exp_tabs V e1 => exp_tabs (open_ct_rec k c V) (open_ce_rec k c e1)
-  | exp_tapp e1 V => exp_tapp (open_ce_rec k c e1) (open_ct_rec k c V)
+  | exp_bvar i => if k === i then f else (exp_bvar i)
+  | exp_fvar x => exp_fvar x
+  | exp_abs t e1 => exp_abs (open_ct_rec k c t) (open_ee_rec (S k) f c e1)
+  | exp_app e1 e2 => exp_app (open_ee_rec k f c e1) (open_ee_rec k f c e2)
+  | exp_tabs t e1 => exp_tabs (open_ct_rec k c t) (open_ee_rec k f c e1)
+  | exp_tapp e1 t => exp_tapp (open_ee_rec k f c e1) (open_ct_rec k c t)
   end.
+
 
 (** Many common applications of opening replace index zero with an
     expression or variable.  The following definitions provide
@@ -180,8 +162,7 @@ Fixpoint open_ce_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
 
 Definition open_tt T U := open_tt_rec 0 U T.
 Definition open_te e U := open_te_rec 0 U e.
-Definition open_ee e1 e2 := open_ee_rec 0 e2 e1.
-Definition open_ce e c := open_ce_rec 0 c e.
+Definition open_ee e1 e2 c := open_ee_rec 0 e2 c e1.
 Definition open_ct T c := open_ct_rec 0 c T.
 
 (* ********************************************************************** *)
@@ -263,7 +244,7 @@ Inductive expr : exp -> Prop :=
          Shouldn't it be opened with the capture set {x}?
          Edward: Yeah, I forgot to change it in expr.
       *)
-      (forall x : atom, x `notin` L -> expr (open_ce (open_ee e1 x) (cset_singleton_fvar x))) ->
+      (forall x : atom, x `notin` L -> expr (open_ee e1 x (cset_singleton_fvar x))) ->
       expr (exp_abs T e1)
   | expr_app : forall e1 e2,
       expr e1 ->
@@ -522,7 +503,9 @@ Inductive sub : env -> typ -> typ -> Prop :=
 (* ********************************************************************** *)
 (** * #<a name="typing_doc"></a># Typing *)
 
-(** A helper for computing the free variables of a term in an environment *)
+(** A helper for computing the free variables of a term in an environment 
+    Jonathan: Shouldn't we also compute the free variables in types?
+*)
 Inductive cv_free : exp -> captureset -> Prop :=
   | cv_free_bvar : forall n,
                     cv_free (exp_bvar n) {}C
@@ -556,7 +539,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
       typing E (exp_fvar x) (typ_capt (cset_singleton_fvar x) T)
   | typing_abs : forall L E V e1 T1 C,
       (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ V)] ++ E) (open_ee e1 x) T1) ->
+        typing ([(x, bind_typ V)] ++ E) (open_ee e1 x (cset_singleton_fvar x)) T1) ->
       (** NEW: a function always gets the type C A -> B, where C = fv(body). 
           Formally we do U cv(x) | x free in body, but cv(x) = {x} by the above typing judgement. 
 
@@ -623,7 +606,7 @@ Inductive red : exp -> exp -> Prop :=
           WIP: Maybe we shouldn't do this dynamic computation of capture sets,
           and explicitly write down which capture set we wish to substitute in. *)
       cv_free v2 C ->
-      red (exp_app (exp_abs T e1) v2) (open_ee (open_ce e1 C) v2)
+      red (exp_app (exp_abs T e1) v2) (open_ee e1 v2 C)
   | red_tabs : forall T1 e1 T2,
       expr (exp_tabs T1 e1) ->
       type T2 ->
