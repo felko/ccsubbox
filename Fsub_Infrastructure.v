@@ -1067,17 +1067,16 @@ Hint Extern 1 (binds _ (?F (subst_tt ?X ?U ?T)) _) =>
 (** Tactic that matches the goal for `open_ct ?T ?C` and tries 
     to prove that `type ?T`. *)
 
-    Ltac closed_type :=
-      repeat (match goal with
-        | [ |- context[open_ct ?T ?C] ] => 
-          replace (open_ct T C) with T ; 
-          auto ; 
-          try apply open_ct_rec_type ;
-          auto
-        | [ |- context[open_tt ?T ?C] ] => 
-          replace (open_tt T C) with T ; 
-          auto ; 
-          try apply open_tt_rec_type ;
-          auto
-      end).
-    
+Ltac closed_type :=
+  repeat (match goal with
+    | [ |- context[open_ct ?T ?C] ] => 
+      replace (open_ct T C) with T ; 
+      auto ; 
+      try apply open_ct_rec_type ;
+      auto
+    | [ |- context[open_tt ?T ?C] ] => 
+      replace (open_tt T C) with T ; 
+      auto ; 
+      try apply open_tt_rec_type ;
+      auto
+  end).
