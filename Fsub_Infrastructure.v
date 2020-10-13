@@ -528,8 +528,7 @@ Proof with eauto*.
       (** The cases where c is universal are trivial. *)
       *** intuition.
       (** The cases where c isn't universal are a bit more work. *)
-      *** unfold cset_union. unfold cset_remove_bvar. unfold cset_references_bvar in H1. unfold cset_bvars in H1.
-        f_equal.
+      *** csetdec. f_equal...
         **** fsetdec.
         **** fnsetdec.
   * rewrite cset_not_references_bvar_eq in H. intuition.
@@ -610,7 +609,7 @@ Proof with eauto*.
   - destruct (cset_references_bvar_dec j c) eqn:Hjc ; csethyp...
     destruct H. 
     * destruct D ; destruct c ; csethyp ; auto.
-      left. fnsetdec.      
+      left. fnsetdec.
     * destruct H. destruct C eqn:HC.
       ** contradiction. 
       ** unfold empty_cset_bvars in Closed. unfold cset_bvars in *. destruct D ; destruct c eqn:Hc ; eauto.
@@ -642,22 +641,6 @@ Lemma open_ct_rec_capt : forall T j D i C,
 Proof with eauto using open_captureset_bvar_aux.
   induction T; intros j D i C Neq Closed; intros HCommon H; simpl in *; inversion H; f_equal...
 Qed.
-
-(* Lemma open_ct_rec_capt : forall t i j c1 c2,
-  i <> j ->
-  open_ct_rec i c1 t = open_ct_rec j c2 (open_ct_rec i c1 t) ->
-  t = open_ct_rec j c2 t.
-Proof with eauto*.
-  induction t; intros i j c1 c2 Neq H; simpl in *...
-  - inversion H. f_equal...
-  - inversion H. f_equal...
-  - inversion H. f_equal...
-    rewrite cset_open_idempotent.
-
-    (* it remains to be shown that c = open_captureset_bvar j c2 c *)
-
-   
-Admitted. *)
 
 (** NEW: Opening with a type and capture variable commute... *)
 Lemma open_ct_rec_type_aux : forall T j S i C,
@@ -788,11 +771,7 @@ Proof with auto*.
   destruct (cset_references_fvar_dec x c) eqn:Hd...
 
   (* TODO factor into a tactic *)
-  rewrite cset_references_fvar_eq in Hd. 
-  unfold cset_references_fvar in *. 
-  unfold cset_fvars in *. 
-  unfold cset_fvar in *.
-  destruct c...
+  rewrite cset_references_fvar_eq in Hd. csetdec. destruct c...
 Qed.
   
 Lemma subst_ct_fresh : forall (x: atom) c t,
