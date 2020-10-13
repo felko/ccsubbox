@@ -488,29 +488,13 @@ Proof with auto.
   destruct C...
   destruct (cset_references_bvar_dec k (cset_set t t0)) eqn:Ck...
   - destruct (cset_references_fvar_dec x (cset_set t t0)) eqn:Cf...
-    * unfold substitute_captureset_fvar.
-      unfold open_captureset_bvar.
-      unfold cset_references_bvar_dec in *.
-      unfold cset_references_fvar_dec in *.
-      unfold cset_references_fvar in *.
-      simpl in *. 
-      rewrite <- AtomSetFacts.mem_iff in *.
-      contradiction.
-
-    * autounfold with cset_scope.
-      rewrite Ck.
-      unfold cset_references_bvar_dec in *.
-      unfold cset_references_fvar_dec in *.
-      unfold cset_references_fvar in *.
-      simpl in *.
+    * exfalso. csetdec. rewrite cset_references_fvar_eq in Cf. csetdec.
+    * csetdec. simpl in *.
       replace (AtomSet.F.mem x (singleton x `union` t)) with true.
-      replace (AtomSet.F.remove x (singleton x `union` t)) with t.
-      replace (NatSet.F.union {}N (NatSet.F.remove k t0)) with (NatSet.F.remove k t0)...
-      fnsetdec.
-      fsetdec.
+      replace (AtomSet.F.remove x (singleton x `union` t)) with t by fsetdec.
+      replace (NatSet.F.union {}N (NatSet.F.remove k t0)) with (NatSet.F.remove k t0) by fnsetdec...
       symmetry.
       rewrite <- AtomSetFacts.mem_iff. fsetdec.
-
   - autounfold with cset_scope.
     rewrite Ck.
     simpl in *.
