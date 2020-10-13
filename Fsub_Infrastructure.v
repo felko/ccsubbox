@@ -369,13 +369,6 @@ Qed.
     show that substituting a type in a locally-closed expression is
     the identity. *)
 
-Lemma open_te_rec_capt_aux : forall e j C i P,
-  open_ce_rec j C e = open_te_rec i P (open_ce_rec j C e) ->
-  e = open_te_rec i P e.
-Proof with eauto using open_tt_rec_capt_aux.
-  induction e; intros j C i P H; simpl in *; inversion H; f_equal...
-Qed.
-
 Lemma open_te_rec_expr_aux : forall e j u i P c ,
   open_ee_rec j u c e = open_te_rec i P (open_ee_rec j u c e) ->
   e = open_te_rec i P e.
@@ -723,22 +716,6 @@ Proof with auto*.
     ** auto.
 Qed.
 
-(* DEPRECATED use open_ee instead *)
-Lemma open_ce_rec_type : forall e j i t C,
-  (* type t -> *)
-  open_te_rec j t e = open_ce_rec i C (open_te_rec j t e) ->
-  e = open_ce_rec i C e.
-Proof with auto*.
-  induction e ; intros j i t2 c H; simpl in *; inversion H; f_equal...
-  - apply (open_ct_rec_type_aux _ _ _ _ _ H1).
-  - apply IHe with (j := j) (t := t2)...
-  - apply IHe1 with (j := j) (t := t2)...
-  - apply IHe2 with (j := j) (t := t2)...
-  - apply (open_ct_rec_type_aux _ _ _ _ _ H1).
-  - apply IHe with (j := S j) (t := t2)...
-  - apply IHe with (j := j) (t := t2)...
-  - apply (open_ct_rec_type_aux _ _ _ _ _ H2).
-Qed.
 
 (* 
    TODO maybe we need to strengthen the lemma again for other use cases?
@@ -1088,7 +1065,6 @@ Proof with eauto using subst_ct_type.
     intros;
     try rewrite subst_ee_open_ee_var;
     try rewrite subst_ee_open_te_var;
-    try rewrite <- subst_te_open_ce;
     eauto
   ].
   - destruct (x == z)...

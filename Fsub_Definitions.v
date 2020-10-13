@@ -150,18 +150,6 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (c : captureset) (e : exp)  {struct e} 
   | exp_tapp e1 t => exp_tapp (open_ee_rec k f c e1) (open_ct_rec k c t)
   end.
 
-(* DEPRECATED use open_ee instead *)
-Fixpoint open_ce_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
-  match e with
-  | exp_bvar i => (exp_bvar i)
-  | exp_fvar x => (exp_fvar x)
-  (** A function abstraction V -> e introduces a binding for a capture variable.
-      Note that we don't allow capture variables to show up in their own type constraints. *)
-  | exp_abs V e1 => exp_abs (open_ct_rec k c V) (open_ce_rec (S k) c e1)
-  | exp_app e1 e2 => exp_app (open_ce_rec k c e1) (open_ce_rec k c e2)
-  | exp_tabs V e1 => exp_tabs (open_ct_rec k c V) (open_ce_rec k c e1)
-  | exp_tapp e1 V => exp_tapp (open_ce_rec k c e1) (open_ct_rec k c V)
-  end.
 
 (** Many common applications of opening replace index zero with an
     expression or variable.  The following definitions provide
@@ -175,7 +163,6 @@ Fixpoint open_ce_rec (k : nat) (c : captureset) (e : exp)  {struct e} : exp :=
 Definition open_tt T U := open_tt_rec 0 U T.
 Definition open_te e U := open_te_rec 0 U e.
 Definition open_ee e1 e2 c := open_ee_rec 0 e2 c e1.
-Definition open_ce e c := open_ce_rec 0 c e.
 Definition open_ct T c := open_ct_rec 0 c T.
 
 (* ********************************************************************** *)
