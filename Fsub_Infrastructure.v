@@ -791,13 +791,30 @@ Proof with auto using subst_ct_fresh.
     contradict H; fsetdec.
 Qed.
 
+Lemma subst_capt_open_rec : forall x k c1 c2 c,
+  substitute_captureset_fvar x c1 (open_captureset_bvar k c2 c) =
+  open_captureset_bvar k (substitute_captureset_fvar x c1 c2)
+    (substitute_captureset_fvar x c1 c).
+Proof.
+  intros x k c1 c2 c.
+  (* There really should be a nice proof of this lemma.  Probably
+     wants some automation here. *)
+  admit.
+Admitted.
+
 Lemma subst_ct_open_rec : forall x k c1 c2 t,
   subst_ct x c1 (open_ct_rec k c2 t) =
   open_ct_rec k (substitute_captureset_fvar x c1 c2) (subst_ct x c1 t).
 Proof with auto.
   intros x k c1 c2 t. revert c1 c2 k x.
-  induction t ; intros c1 c2 k x...  
-Admitted.
+  induction t ; intros c1 c2 k x;
+    unfold open_ct_rec; unfold subst_ct; fold open_ct_rec; fold subst_ct;
+    f_equal...
+  (* The arrow / abstraction cases go away after we fold and unfold definitions
+      appropriately.  The remaining case that is left is dealing with a capture set. *)
+  - Case "typ_cset".
+    apply subst_capt_open_rec.
+Qed.
 
 Lemma subst_ee_open_ee_rec : forall e1 e2 x u c1 c2 k,
   expr u ->
