@@ -791,29 +791,65 @@ Proof with auto using subst_ct_fresh.
     contradict H; fsetdec.
 Qed.
 
+Ltac cset_split := repeat (
+  try csethyp;
+  match goal with
+  | H : _ |- context R [(cset_references_bvar_dec ?I ?C)] =>
+    idtac "Destructing" I "in" C; let H_destruct := fresh "H_destruct" in case_eq (cset_references_bvar_dec I C); 
+      intro H_destruct; try rewrite H_destruct in *
+  | H : _ |- context R [(cset_references_fvar_dec ?I ?C)] =>
+    idtac "Destructing" I "in" C; let H_destruct := fresh "H_destruct" in case_eq (cset_references_fvar_dec I C);
+      intro H_destruct; try rewrite H_destruct in *
+  end
+).
+
+Ltac cset_cleanup :=
+  try rewrite cset_references_bvar_eq in *;
+  try rewrite cset_references_fvar_eq in *;
+  try rewrite cset_not_references_fvar_eq in *;
+  try rewrite cset_not_references_bvar_eq in *;
+  csetdec;
+  eauto*;
+  try (f_equal; try fsetdec; try fnsetdec).
+
 Lemma subst_capt_open_rec : forall x k c1 c2 c,
+  empty_cset_bvars c1 ->
   substitute_captureset_fvar x c1 (open_captureset_bvar k c2 c) =
   open_captureset_bvar k (substitute_captureset_fvar x c1 c2)
     (substitute_captureset_fvar x c1 c).
-Proof.
-  intros x k c1 c2 c.
+Proof with eauto*.
+  intros x k c1 c2 c c1empt.
   (* There really should be a nice proof of this lemma.  Probably
      wants some automation here. *)
-  admit.
-Admitted.
+  csetdec.
+  destruct c eqn:Hc; destruct c1 eqn:Hc1; destruct c2 eqn:Hc2;
+  cset_split; cset_cleanup.
+  (* This is not a good proof.  But it works... *)
+  all: try solve [
+    (* A bunch of cases that are not useful as they assume k is in c1. *)
+    (unfold empty_cset_bvars in *; unfold cset_bvars in *;
+      exfalso; assert (~ NatSet.F.In k (NatSet.F.union t2 t0)) by nnotin_solve; 
+      contradict H; eauto*)
+    ||
+    (* An artifact that comes up???? *)
+    (unfold empty_cset_bvars in *; unfold cset_bvars in *;
+      fnsetdec)
+  ].
+Qed.
 
 Lemma subst_ct_open_rec : forall x k c1 c2 t,
+  empty_cset_bvars c1 ->
   subst_ct x c1 (open_ct_rec k c2 t) =
   open_ct_rec k (substitute_captureset_fvar x c1 c2) (subst_ct x c1 t).
 Proof with auto.
   intros x k c1 c2 t. revert c1 c2 k x.
-  induction t ; intros c1 c2 k x;
+  induction t ; intros c1 c2 k x c1empt;
     unfold open_ct_rec; unfold subst_ct; fold open_ct_rec; fold subst_ct;
     f_equal...
   (* The arrow / abstraction cases go away after we fold and unfold definitions
       appropriately.  The remaining case that is left is dealing with a capture set. *)
   - Case "typ_cset".
-    apply subst_capt_open_rec.
+    apply subst_capt_open_rec. apply c1empt.
 Qed.
 
 Lemma subst_ee_open_ee_rec : forall e1 e2 x u c1 c2 k,
