@@ -168,7 +168,8 @@ Ltac gather_atoms :=
   let E := gather_atoms_with (fun x : typ => fv_tt x) in
   let F := gather_atoms_with (fun x : env => dom x) in
   let G := gather_atoms_with (fun x : captureset => cset_fvar x) in
-  constr:(A `union` B `union` C `union` D `union` E `union` F `union` G).
+  let H := gather_atoms_with (fun x : typ => fv_et x) in
+  constr:(A `union` B `union` C `union` D `union` E `union` F `union` G `union` H).
 
 (** The second step in defining "[pick fresh]" is to define the tactic
     itself.  It is based on the [(pick fresh ... for ...)] tactic
@@ -1053,6 +1054,51 @@ Qed.
     This lemma can be cleaned up quite a bit -- just making it go through for now.
 *)
 
+Lemma open_capt_subst_aux : forall k x z C' C,
+  ~ cset_references_fvar x C ->
+  ~ cset_references_fvar x C' ->
+  z <> x ->
+  ~ cset_references_bvar k C' ->
+  open_captureset_bvar k (cset_singleton_fvar x) (substitute_captureset_fvar z C' C) =
+  substitute_captureset_fvar z C' (open_captureset_bvar k (cset_singleton_fvar x) C).
+Proof.
+  intros k x z C C' HxfC HxfC' Hxfz HkfC'. 
+  (* There really should be a nice proof of this lemma.  Probably
+     wants some automation here. *)
+  unfold cset_singleton_fvar.
+  csetdec.
+  destruct C eqn:HC; destruct C' eqn:HC';
+  cset_split; cset_cleanup.
+Qed.
+Lemma subst_ct_open_fresh : forall k z C T X,
+  (* X fresh requirement here in z c T *)
+  X `notin` (singleton z `union` fv_tt T `union` fv_et T) /\ ~ cset_references_fvar X C ->
+  (* c is locally closed / no bound variables *)
+  empty_cset_bvars C ->
+  (open_ct_rec k (cset_singleton_fvar X) (subst_ct z C T)) =
+    (subst_ct z C (open_ct_rec k (cset_singleton_fvar X) T)).
+Proof with eauto*.
+  intros k z C T X HXfresh HCfresh. revert k. 
+  induction T; intro k; simpl in *; try reflexivity.
+  * (* Case typ_arrow *)
+    f_equal.
+    + apply IHT1. split. fsetdec. apply HXfresh.
+    + apply IHT2. split. fsetdec. apply HXfresh.
+  * (* Case typ_all *)
+    f_equal.
+    + apply IHT1. split. fsetdec. apply HXfresh.
+    + apply IHT2. split. fsetdec. apply HXfresh.
+  * (* Case typ_capt *)    
+    f_equal.
+    + apply open_capt_subst_aux.
+      (* csetdec; destruct .... should be a tactic at some point .*)
+      csetdec; destruct c...
+      csetdec; destruct C...
+      fsetdec.
+      csetdec; destruct C...
+    + apply IHT. split. fsetdec. apply HXfresh.
+Qed.
+
 Lemma subst_ct_type : forall T z c,
   type T -> 
   empty_cset_bvars c ->
@@ -1060,9 +1106,15 @@ Lemma subst_ct_type : forall T z c,
 Proof with auto.
   intros T z c Tpe Closed.
   induction Tpe; simpl; econstructor...
-  - admit.
+  - instantiate (1 := (L `union` singleton z `union` fv_tt T1 `union` 
+              fv_tt T2 `union` fv_et T1 `union` fv_et T2 `union` cset_fvar c)).
+    intros X HXfresh.
+    assert ((open_ct (subst_ct z c T2) (cset_singleton_fvar X)) =
+            (subst_ct z c (open_ct T2 (cset_singleton_fvar X)))).
+    { apply subst_ct_open_fresh. split. fsetdec. csetdec; destruct c; fsetdec. apply Closed. }
+    rewrite H1. apply H0...
   (* Can we use subst_ct_fresh??? *)
-  - admit.
+  - intro. admit.
   - admit.
 Admitted.
 
