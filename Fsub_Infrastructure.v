@@ -1,6 +1,6 @@
 (** Infrastructure lemmas and tactic definitions for Fsub.
 
-    Authors: Brian Aydemir and Arthur Charguéraud, with help from
+    Authors: Brian Aydemir and Arthur Chargu\u00e9raud, with help from
     Aaron Bohannon, Jeffrey Vaughan, and Dimitrios Vytiniotis.
 
     This file contains a number of definitions, tactics, and lemmas
@@ -1122,13 +1122,16 @@ Proof with auto.
             (subst_ct z c (open_ct T2 (cset_singleton_fvar X)))).
     { apply subst_ct_open_fresh. split. fsetdec. csetdec; destruct c; fsetdec. apply Closed. }
     rewrite H1. apply H0...
-  (* Can we use subst_ct_fresh??? -- no, that requires z to be fresh *)
+  (* Can we use subst_ct_fresh??? -- no, that requires z to be fresh; but we get a simple
+      helper lemma above for the equality. *)
   - intro. instantiate (1 := (L `union` fv_tt T2 `union` fv_et T2 `union` cset_fvar c)). intro Hxfresh. 
     assert ((open_tt (subst_ct z c T2) X) = (subst_ct z c (open_tt T2 X))).
     { apply open_tt_subst_ct_aux. csetdec; destruct c... }
     rewrite H1. apply H0...
-  - admit.
-Admitted.
+  (* TODO: This should probably go in a tactic *)
+  - csetdec. destruct c eqn:Hc; destruct C eqn:HC; cset_split; cset_cleanup.
+    unfold empty_cset_bvars in *. csetdec.
+Qed.
 
 (* TODO clean up the proof here *)
 Lemma subst_ee_expr : forall z e1 e2 c,

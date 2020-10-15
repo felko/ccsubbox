@@ -1,6 +1,6 @@
 (** Administrative lemmas for Fsub.
 
-    Authors: Brian Aydemir and Arthur Charguéraud, with help from
+    Authors: Brian Aydemir and Arthur Chargu\u00e9raud, with help from
     Aaron Bohannon, Jeffrey Vaughan, and Dimitrios Vytiniotis.
 
     This file contains a number of administrative lemmas that we
