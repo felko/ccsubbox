@@ -1108,6 +1108,7 @@ Proof with eauto*.
   destruct (k === n)...
 Qed.
 
+
 Lemma subst_ct_type : forall T z c,
   type T -> 
   empty_cset_bvars c ->
@@ -1115,8 +1116,7 @@ Lemma subst_ct_type : forall T z c,
 Proof with auto.
   intros T z c Tpe Closed.
   induction Tpe; simpl; econstructor...
-  - instantiate (1 := (L `union` singleton z `union` fv_tt T1 `union` 
-              fv_tt T2 `union` fv_et T1 `union` fv_et T2 `union` cset_fvar c)).
+  - let L' := gather_atoms in instantiate (1 := L').
     intros X HXfresh.
     assert ((open_ct (subst_ct z c T2) (cset_singleton_fvar X)) =
             (subst_ct z c (open_ct T2 (cset_singleton_fvar X)))).
@@ -1124,7 +1124,7 @@ Proof with auto.
     rewrite H1. apply H0...
   (* Can we use subst_ct_fresh??? -- no, that requires z to be fresh; but we get a simple
       helper lemma above for the equality. *)
-  - intro. instantiate (1 := (L `union` fv_tt T2 `union` fv_et T2 `union` cset_fvar c)). intro Hxfresh. 
+  - let L' := gather_atoms in instantiate (1 := L'). intro X. intro HXfresh.
     assert ((open_tt (subst_ct z c T2) X) = (subst_ct z c (open_tt T2 X))).
     { apply open_tt_subst_ct_aux. csetdec; destruct c... }
     rewrite H1. apply H0...
