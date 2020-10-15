@@ -1097,6 +1097,15 @@ Proof with eauto*.
       fsetdec.
       csetdec; destruct C...
     + apply IHT. split. fsetdec. apply HXfresh.
+Qed.    
+
+Lemma open_tt_subst_ct_aux : forall k X z C T,
+  ~ cset_references_fvar X C ->
+  open_tt_rec k X (subst_ct z C T) =
+  subst_ct z C (open_tt_rec k X T).
+Proof with eauto*.
+  intros k X z C T HXfresh. revert k. induction T; intro k; simpl in *; f_equal...
+  destruct (k === n)...
 Qed.
 
 Lemma subst_ct_type : forall T z c,
@@ -1113,8 +1122,11 @@ Proof with auto.
             (subst_ct z c (open_ct T2 (cset_singleton_fvar X)))).
     { apply subst_ct_open_fresh. split. fsetdec. csetdec; destruct c; fsetdec. apply Closed. }
     rewrite H1. apply H0...
-  (* Can we use subst_ct_fresh??? *)
-  - intro. admit.
+  (* Can we use subst_ct_fresh??? -- no, that requires z to be fresh *)
+  - intro. instantiate (1 := (L `union` fv_tt T2 `union` fv_et T2 `union` cset_fvar c)). intro Hxfresh. 
+    assert ((open_tt (subst_ct z c T2) X) = (subst_ct z c (open_tt T2 X))).
+    { apply open_tt_subst_ct_aux. csetdec; destruct c... }
+    rewrite H1. apply H0...
   - admit.
 Admitted.
 
