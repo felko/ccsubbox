@@ -40,20 +40,53 @@ Qed.
 (** The remaining properties are analogous to the properties that we
     need to show for the subtyping and typing relations. *)
 
+Lemma wf_covariant_typ_weakening : forall T E F G G1 G2,
+  wf_covariant_typ (G ++ E) G1 G2 T ->
+  ok (G ++ F ++ E) ->
+  wf_covariant_typ (G ++ F ++ E) G1 G2 T.
+Proof with simpl_env; eauto.
+  intros T E F G G1 G2 Hwf_typ Hk.
+  remember (G ++ E).
+  remember G1.
+  remember G2.
+  generalize dependent G.
+  generalize dependent G1.
+  generalize dependent G2.
+  induction Hwf_typ; intros G1 Heq1 G2 Heq2 G Hok Heq; subst; auto.
+  - assert (binds X (bind_sub U) (G ++ F ++ E)).
+    + apply binds_weaken; trivial.
+    + apply wf_typ_var with (U := U); trivial.
+  - pick fresh Y and apply wf_typ_arrow.
+    apply IHHwf_typ with (G3 := G2) (G4 := G1); trivial.
+    apply H0 with (X := Y) (G3 := G1) (G4 := [(Y, bind_typ T1)] ++ G2) (G0 := G); trivial.
+    fsetdec.
+  - pick fresh Y and apply wf_typ_all.
+    apply IHHwf_typ with (G3 := G2) (G4 := G1); trivial.
+    apply H0 with (X := Y) (G3 := G1) (G4 := G2) (G0 := [(Y, bind_sub T1)] ++ G); trivial.
+    fsetdec.
+    simpl_env in *.
+    eauto.
+  - apply wf_typ_capt.
+    apply IHHwf_typ with (G3 := G1) (G4 := G2) (G0 := G); trivial.
+    unfold wf_cset in *.
+    split.
+    + apply H.
+    + unfold allbound in *.
+      csetdec.
+      destruct C.
+      apply H.
+      inversion H.
+      simpl_env in *.
+      fsetdec.
+Qed.
+
 Lemma wf_typ_weakening : forall T E F G,
   wf_typ (G ++ E) T ->
   ok (G ++ F ++ E) ->
   wf_typ (G ++ F ++ E) T.
-Proof with simpl_env; eauto.
-  intros T E F G Hwf_typ Hk.
-  remember (G ++ E).
-  generalize dependent G.
-  induction Hwf_typ; intros G Hok Heq; subst...
-  Case "type_all".
-    (* pick fresh Y and apply wf_typ_all...
-    rewrite <- concat_assoc.
-    apply H0... *)
-Admitted.
+Proof.
+  eauto using wf_covariant_typ_weakening.
+Qed.
 
 Lemma wf_typ_weaken_head : forall T E F,
   wf_typ E T ->
