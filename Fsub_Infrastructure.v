@@ -1116,7 +1116,7 @@ Lemma subst_ct_type : forall T z c,
 Proof with auto.
   intros T z c Tpe Closed.
   induction Tpe; simpl; econstructor...
-  - let L' := gather_atoms in instantiate (1 := L').
+  - let F := gather_atoms in instantiate (1 := F).
     intros X HXfresh.
     assert ((open_ct (subst_ct z c T2) (cset_singleton_fvar X)) =
             (subst_ct z c (open_ct T2 (cset_singleton_fvar X)))).
@@ -1124,7 +1124,8 @@ Proof with auto.
     rewrite H1. apply H0...
   (* Can we use subst_ct_fresh??? -- no, that requires z to be fresh; but we get a simple
       helper lemma above for the equality. *)
-  - let L' := gather_atoms in instantiate (1 := L'). intro X. intro HXfresh.
+  - let F := gather_atoms in instantiate (1 := F).
+    intros X HXfresh.
     assert ((open_tt (subst_ct z c T2) X) = (subst_ct z c (open_tt T2 X))).
     { apply open_tt_subst_ct_aux. csetdec; destruct c... }
     rewrite H1. apply H0...
@@ -1143,23 +1144,14 @@ Proof with eauto using subst_ct_type.
   intros z e1 e2 c He1 He2 Closed. revert z.
   induction He1; intro z; simpl; auto;
   try solve [
-    econstructor;
-    try instantiate (1 := L `union` singleton z);
+    econstructor; eauto using subst_ct_type;
+    try let F := gather_atoms in instantiate (1 := F);
     intros;
     try rewrite subst_ee_open_ee_var;
     try rewrite subst_ee_open_te_var;
     eauto
   ].
   - destruct (x == z)...
-  - econstructor...
-    instantiate (1 := L `union` singleton z).
-    intros.
-    rewrite subst_ee_open_ee_var...
-  - econstructor...
-    instantiate (1 := L `union` singleton z).
-    intros.
-    rewrite subst_ee_open_te_var...
-  - econstructor...
 Qed.
 
 
