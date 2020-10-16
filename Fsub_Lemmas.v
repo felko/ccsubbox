@@ -234,8 +234,10 @@ Proof with auto.
   - specialize (IHT1 k). specialize (IHT2 (S k))...
   - specialize (IHT1 k). specialize (IHT2 k)...
   - specialize (IHT1 k). specialize (IHT2 k)...
+(*
   - specialize (IHT k). admit.
   - specialize (IHT k)...
+*)
 Admitted.
 
 (* Maybe we need to generalize this to E Ep and Em? *)
@@ -258,13 +260,14 @@ Proof with auto.
     assert (Y `notin` L). { fsetdec. }
     specialize (H0 Y H1).
     apply notin_fv_tt_open with (Y := Y)...
+(*
   - destruct H.
     unfold allbound in H0. 
     unfold cset_fvars in H0. 
     destruct C... 
     unfold cset_fvar. 
     admit.
-    (* X _could_ be in Ep... *)
+    (* X _could_ be in Ep... *) *)
 Admitted.
 
 Lemma map_subst_tb_id : forall G Z P,
