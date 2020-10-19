@@ -363,8 +363,12 @@ Proof with simpl_env; auto*.
   induction H...
   Case "sub_trans_tvar".
     eauto*.
+  Case "sub_arrow".
+   admit.
   Case "sub_all".
-    (* repeat split...
+    destruct IHsub ; auto.
+    destruct H3.
+    repeat split ; auto.            
     SCase "Second of original three conjuncts".
       pick fresh Y and apply wf_typ_all...
       destruct (H1 Y)...
@@ -372,7 +376,16 @@ Proof with simpl_env; auto*.
       apply (wf_typ_narrowing T1)...
     SCase "Third of original three conjuncts".
       pick fresh Y and apply wf_typ_all...
-      destruct (H1 Y)... *)
+      destruct (H1 Y)...
+  Case "sub_capt".
+    destruct IHsub ; auto.
+    destruct H2.
+    repeat split ; auto.
+    SCase "Second of original three conjuncts".
+      - constructor ; auto.
+        admit.
+      - constructor ; auto.
+        admit.
 Admitted.
 
 Lemma typing_regular : forall E e T,
