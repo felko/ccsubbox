@@ -177,9 +177,20 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ.
     SCase "X <> Z".
       binds_cases H...
       apply (wf_typ_var (subst_tt Z P U))...
-  (* Case "wf_typ_all".
+      simpl_env in *.
+      unfold binds.
+      
+      admit.
+      admit.
+  Case "wf_typ_arrow".
+    admit.
+  Case "wf_typ_all".
     pick fresh Y and apply wf_typ_all...
-    rewrite subst_tt_open_tt_var...
+    admit.
+    admit.
+  Case "wf_typ_capt".
+    admit.
+    (* rewrite subst_tt_open_tt_var...
     rewrite_env (map (subst_tb Z P) ([(Y, bind_sub T1)] ++ F) ++ E).
     apply H0... *)
 Admitted.
@@ -347,11 +358,21 @@ Proof with simpl_env; auto*.
   Case "sub_trans_tvar".
     eauto*.
   Case "sub_arrow".
-   admit.
+    destruct IHsub1 ; auto.
+    destruct IHsub2 ; auto.
+    destruct H2.
+    destruct H4.
+    repeat split ; auto.
+    econstructor...
+    intros.
+    admit.
+    econstructor...
+    intros.
+    admit.
   Case "sub_all".
     destruct IHsub ; auto.
     destruct H3.
-    repeat split ; auto.            
+    repeat split ; auto.
     SCase "Second of original three conjuncts".
       pick fresh Y and apply wf_typ_all...
       destruct (H1 Y)...
@@ -360,12 +381,14 @@ Proof with simpl_env; auto*.
     SCase "Third of original three conjuncts".
       pick fresh Y and apply wf_typ_all...
       destruct (H1 Y)...
+  (* Do we need to add wf conditions on capturesets to subcapt just for regularity?  *)
   Case "sub_capt".
     destruct IHsub ; auto.
     destruct H2.
     repeat split ; auto.
     SCase "Second of original three conjuncts".
       - constructor ; auto.
+        unfold wf_cset.
         admit.
       - constructor ; auto.
         admit.
