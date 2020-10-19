@@ -122,22 +122,45 @@ Proof with simpl_env; eauto.
   eauto using wf_covariant_typ_narrowing.
 Qed.
 
-Lemma wf_typ_strengthening : forall E F x U T,
- wf_typ (F ++ [(x, bind_typ U)] ++ E) T ->
- wf_typ (F ++ E) T.
-Proof with simpl_env; eauto.
-  intros E F x U T H.
-  remember (F ++ [(x, bind_typ U)] ++ E).
+(* X could occur in a capture set in T 
+   TODO maybe modify the lemma to include 
+    X `notin` fv_et T
+*)
+Lemma wf_covariant_typ_strengthening : forall E F G1 G2 X U T,
+ wf_covariant_typ (F ++ [(X, bind_typ U)] ++ E) G1 G2 T ->
+ wf_covariant_typ (F ++ E) G1 G2 T.
+Proof.
+  intros E F G1 G2 X U T H.
+  remember (F ++ [(X, bind_typ U)] ++ E).
+  remember G1.
+  remember G2.
   generalize dependent F.
-(*   
-  induction H; intros F Heq; subst...
-  Case "wf_typ_var".
-    binds_cases H...
-  Case "wf_typ_all".
-    pick fresh Y and apply wf_typ_all...
+  generalize dependent G1.
+  generalize dependent G2.
+  induction H ; intros G2 Heqm G1 Heqp F Heq ; subst; auto.
+  - binds_cases H ; eauto.
+  - eapply wf_typ_arrow with (L := L); eauto.
+  - pick fresh Y and apply wf_typ_all; eauto.
     rewrite <- concat_assoc.
-    apply H1... *)
+    eapply H1; auto.
+  - apply wf_typ_capt.
+    + apply IHwf_covariant_typ with (G3 := G2) (G4 := G1) ; auto.
+    + destruct H0. econstructor ; auto. 
+      unfold allbound in *. 
+      csetdec.
+      destruct C.
+      apply H1.
+      simpl_env in *.
+      assert (X `notin` t). { admit. }
+      fsetdec.
 Admitted.
+
+Lemma wf_typ_strengthening : forall E F X U T,
+ wf_typ (F ++ [(X, bind_typ U)] ++ E) T ->
+ wf_typ (F ++ E) T.
+Proof.
+  eauto using wf_covariant_typ_strengthening.
+Qed.
 
 Lemma wf_typ_subst_tb : forall F Q E Z P T,
   wf_typ (F ++ [(Z, bind_sub Q)] ++ E) T ->
@@ -263,7 +286,7 @@ Proof.
  induction T; simpl; intros k Fr; notin_simpl; try apply notin_union; eauto.
 Qed.
 
-Lemma notin_fv_tc_open : forall (X : atom) T C,
+Lemma notin_fv_ct_open : forall (X : atom) T C,
   X `notin` fv_tt (open_ct T C) ->
   X `notin` fv_tt T.
 Proof with auto.
@@ -274,11 +297,7 @@ Proof with auto.
   - specialize (IHT1 k). specialize (IHT2 (S k))...
   - specialize (IHT1 k). specialize (IHT2 k)...
   - specialize (IHT1 k). specialize (IHT2 k)...
-(*
-  - specialize (IHT k). admit.
-  - specialize (IHT k)...
-*)
-Admitted.
+Qed.
 
 (* Maybe we need to generalize this to E Ep and Em? *)
 Lemma notin_fv_wf : forall E (X : atom) T,
@@ -294,21 +313,13 @@ Proof with auto.
     specialize (IHWf_typ Fr).
     assert (Y `notin` L). { fsetdec. }
     specialize (H0 Y H1 Fr). 
-    apply notin_fv_tc_open with (C := (cset_singleton_fvar Y))...
+    apply notin_fv_ct_open with (C := (cset_singleton_fvar Y))...
   - pick fresh Y.
     specialize (IHWf_typ Fr).
     assert (Y `notin` L). { fsetdec. }
     specialize (H0 Y H1).
     apply notin_fv_tt_open with (Y := Y)...
-(*
-  - destruct H.
-    unfold allbound in H0. 
-    unfold cset_fvars in H0. 
-    destruct C... 
-    unfold cset_fvar. 
-    admit.
-    (* X _could_ be in Ep... *) *)
-Admitted.
+Qed.
 
 Lemma map_subst_tb_id : forall G Z P,
   wf_env G ->
@@ -335,8 +346,12 @@ Proof with simpl_env; auto*.
   induction H...
   Case "sub_trans_tvar".
     eauto*.
+  Case "sub_arrow".
+   admit.
   Case "sub_all".
-    (* repeat split...
+    destruct IHsub ; auto.
+    destruct H3.
+    repeat split ; auto.            
     SCase "Second of original three conjuncts".
       pick fresh Y and apply wf_typ_all...
       destruct (H1 Y)...
@@ -344,7 +359,16 @@ Proof with simpl_env; auto*.
       apply (wf_typ_narrowing T1)...
     SCase "Third of original three conjuncts".
       pick fresh Y and apply wf_typ_all...
-      destruct (H1 Y)... *)
+      destruct (H1 Y)...
+  Case "sub_capt".
+    destruct IHsub ; auto.
+    destruct H2.
+    repeat split ; auto.
+    SCase "Second of original three conjuncts".
+      - constructor ; auto.
+        admit.
+      - constructor ; auto.
+        admit.
 Admitted.
 
 Lemma typing_regular : forall E e T,
@@ -352,9 +376,10 @@ Lemma typing_regular : forall E e T,
   wf_env E /\ expr e /\ wf_typ E T.
 Proof with simpl_env; auto*.
   intros E e T H; induction H...
-  (* Case "typing_var".
+  Case "typing_var".
     repeat split...
-    eauto using wf_typ_from_binds_typ.
+    apply wf_typ_from_binds_typ with (x := x) ; auto.
+    admit.
   Case "typing_abs".
     pick fresh y.
     destruct (H0 y) as [Hok [J K]]...
@@ -364,25 +389,34 @@ Proof with simpl_env; auto*.
         eauto using type_from_wf_typ, wf_typ_from_wf_env_typ.
         destruct (H0 x)...
     SCase "Third of original three conjuncts".
-      apply wf_typ_arrow; eauto using wf_typ_from_wf_env_typ.
+      apply wf_typ_capt.
+      apply wf_typ_arrow with (L := L).
+      apply wf_typ_from_wf_env_typ with (x := y) ; auto.
+      admit.
+      admit.
+      (* eapply wf_typ_arrow. ; eauto using wf_typ_from_wf_env_typ.
       rewrite_env (empty ++ E).
-      eapply wf_typ_strengthening; simpl_env; eauto.
+      eapply wf_typ_strengthening; simpl_env; eauto. *)      
   Case "typing_app".
     repeat split...
     destruct IHtyping1 as [_ [_ K]].
-    inversion K...
+    inversion K ; admit...
   Case "typing_tabs".
     pick fresh Y.
     destruct (H0 Y) as [Hok [J K]]...
     inversion Hok; subst.
-    repeat split...
+    repeat split.
+    auto.
     SCase "Second of original three conjuncts".
       pick fresh X and apply expr_tabs.
         eauto using type_from_wf_typ, wf_typ_from_wf_env_sub...
         destruct (H0 X)...
     SCase "Third of original three conjuncts".
-      pick fresh Z and apply wf_typ_all...
+      pick fresh Z.
+      eapply wf_typ_capt.
       destruct (H0 Z)...
+      admit.
+      admit.
   Case "typing_tapp".
     destruct (sub_regular _ _ _ H0) as [R1 [R2 R3]].
     repeat split...
@@ -392,9 +426,10 @@ Proof with simpl_env; auto*.
     SCase "Third of original three conjuncts".
       destruct IHtyping as [R1' [R2' R3']].
       eapply wf_typ_open; eauto.
+      admit.
   Case "typing_sub".
     repeat split...
-    destruct (sub_regular _ _ _ H0)... *)
+    destruct (sub_regular _ _ _ H0)...
 Admitted.
 
 Lemma value_regular : forall e,
@@ -410,10 +445,12 @@ Lemma red_regular : forall e e',
 Proof with auto*.
   intros e e' H.
   induction H; assert(J := value_regular); split...
-  (* Case "red_abs".
+  Case "red_abs".
     inversion H. pick fresh y. rewrite (subst_ee_intro y)...
+    (* rewrite <- subst_ee_open_ee_var. *)
+    admit.    
   Case "red_tabs".
-    inversion H. pick fresh Y. rewrite (subst_te_intro Y)... *)
+    inversion H. pick fresh Y. rewrite (subst_te_intro Y)...
 Admitted.
 
 

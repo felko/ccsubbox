@@ -100,21 +100,36 @@ Admitted.
 (* ********************************************************************** *)
 (** ** Weakening (2) *)
 
+Lemma cv_weakening : forall E F G T C,
+    wf_env (G ++ E) ->
+    cv T (G ++ E) C ->
+    wf_env (G ++ F ++ E) ->
+    cv T (G ++ F ++ E) C.
+Proof.
+Admitted.
+
 Lemma sub_weakening : forall E F G S T,
   sub (G ++ E) S T ->
   wf_env (G ++ F ++ E) ->
   sub (G ++ F ++ E) S T.
-Proof with simpl_env; auto using wf_typ_weakening.
+Proof with simpl_env; auto using wf_typ_weakening, sub_top.
   intros E F G S T Sub Ok.
   remember (G ++ E).
   generalize dependent G.
   induction Sub; intros G Ok EQ; subst...
-  Case "sub_trans_tvar".
+  - Case "sub_top".
+    apply sub_top.
+    + trivial.
+    + apply wf_typ_weakening; auto.
+    + apply cv_weakening; trivial.
+  - Case "sub_trans_tvar".
     apply (sub_trans_tvar U)...
-  Case "sub_all".
+  - Case "sub_all".
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
     apply H0...
+  - Case "sub_capt".
+    apply sub_capt.
 Qed.
 
 
