@@ -44,7 +44,7 @@ Lemma wf_covariant_typ_weakening : forall T E F G G1 G2,
   wf_covariant_typ (G ++ E) G1 G2 T ->
   ok (G ++ F ++ E) ->
   wf_covariant_typ (G ++ F ++ E) G1 G2 T.
-Proof with simpl_env; eauto.
+Proof with eauto.
   intros T E F G G1 G2 Hwf_typ Hk.
   remember (G ++ E).
   remember G1.
@@ -98,22 +98,46 @@ Proof.
   auto using wf_typ_weakening.
 Qed.
 
+Lemma wf_covariant_typ_narrowing : forall V U T E G G1 G2 X,
+  wf_covariant_typ (G ++ [(X, bind_sub V)] ++ E) G1 G2 T ->
+  ok (G ++ [(X, bind_sub U)] ++ E) ->
+  wf_covariant_typ (G ++ [(X, bind_sub U)] ++ E) G1 G2 T.
+Proof.
+  intros V U T E G G1 G2 X Hwf_typ Hk.
+  remember (G ++ [(X, bind_sub V)] ++ E).
+  remember G1.
+  remember G2.
+  generalize dependent G.
+  generalize dependent G1.
+  generalize dependent G2.
+  induction Hwf_typ; intros G1 Heq1 G2 Heq2 G Hok Heq; subst; auto.
+  - binds_cases H ; eauto.
+  - eapply wf_typ_arrow with (L := L); eauto.
+  - pick fresh Y and apply wf_typ_all; eauto.
+    rewrite <- concat_assoc.
+    apply H0 with (G0 := ([(Y, bind_sub T1)] ++ G)) (G4 := G2) (G3 := G1) ; auto.
+    apply ok_push ; auto.
+  - apply wf_typ_capt.
+    apply IHHwf_typ with (G3 := G1) (G4 := G2) (G0 := G); trivial.
+    unfold wf_cset in *.
+    split.
+    + apply H.
+    + unfold allbound in *.
+      csetdec.
+      destruct C.
+      apply H.
+      inversion H.
+      simpl_env in *.
+      fsetdec.
+Qed.
+
 Lemma wf_typ_narrowing : forall V U T E F X,
   wf_typ (F ++ [(X, bind_sub V)] ++ E) T ->
   ok (F ++ [(X, bind_sub U)] ++ E) ->
   wf_typ (F ++ [(X, bind_sub U)] ++ E) T.
-Proof with simpl_env; eauto.
-  intros V U T E F X Hwf_typ Hok.
-  remember (F ++ [(X, bind_sub V)] ++ E).
-  generalize dependent F.
-  (* induction Hwf_typ; intros F Hok Heq; subst...
-  Case "wf_typ_var".
-    binds_cases H...
-  Case "typ_all".
-    pick fresh Y and apply wf_typ_all...
-    rewrite <- concat_assoc.
-    apply H0... *)
-Admitted.
+Proof.
+  eauto using wf_covariant_typ_narrowing.
+Qed.
 
 Lemma wf_typ_strengthening : forall E F x U T,
  wf_typ (F ++ [(x, bind_typ U)] ++ E) T ->
