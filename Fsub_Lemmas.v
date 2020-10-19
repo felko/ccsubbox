@@ -139,22 +139,45 @@ Proof.
   eauto using wf_covariant_typ_narrowing.
 Qed.
 
-Lemma wf_typ_strengthening : forall E F x U T,
- wf_typ (F ++ [(x, bind_typ U)] ++ E) T ->
- wf_typ (F ++ E) T.
-Proof with simpl_env; eauto.
-  intros E F x U T H.
-  remember (F ++ [(x, bind_typ U)] ++ E).
+(* X could occur in a capture set in T 
+   TODO maybe modify the lemma to include 
+    X `notin` fv_tt T
+*)
+Lemma wf_covariant_typ_strengthening : forall E F G1 G2 X U T,
+ wf_covariant_typ (F ++ [(X, bind_typ U)] ++ E) G1 G2 T ->
+ wf_covariant_typ (F ++ E) G1 G2 T.
+Proof.
+  intros E F G1 G2 X U T H.
+  remember (F ++ [(X, bind_typ U)] ++ E).
+  remember G1.
+  remember G2.
   generalize dependent F.
-(*   
-  induction H; intros F Heq; subst...
-  Case "wf_typ_var".
-    binds_cases H...
-  Case "wf_typ_all".
-    pick fresh Y and apply wf_typ_all...
+  generalize dependent G1.
+  generalize dependent G2.
+  induction H ; intros G2 Heqm G1 Heqp F Heq ; subst; auto.
+  - binds_cases H ; eauto.
+  - eapply wf_typ_arrow with (L := L); eauto.
+  - pick fresh Y and apply wf_typ_all; eauto.
     rewrite <- concat_assoc.
-    apply H1... *)
+    eapply H1; auto.
+  - apply wf_typ_capt.
+    + apply IHwf_covariant_typ with (G3 := G2) (G4 := G1) ; auto.
+    + destruct H0. econstructor ; auto. 
+      unfold allbound in *. 
+      csetdec.
+      destruct C.
+      apply H1.
+      simpl_env in *.
+      assert (X `notin` t). { admit. }
+      fsetdec.
 Admitted.
+
+Lemma wf_typ_strengthening : forall E F X U T,
+ wf_typ (F ++ [(X, bind_typ U)] ++ E) T ->
+ wf_typ (F ++ E) T.
+Proof.
+  eauto using wf_covariant_typ_strengthening.
+Qed.
 
 Lemma wf_typ_subst_tb : forall F Q E Z P T,
   wf_typ (F ++ [(Z, bind_sub Q)] ++ E) T ->
