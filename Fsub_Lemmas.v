@@ -141,7 +141,7 @@ Qed.
 
 (* X could occur in a capture set in T 
    TODO maybe modify the lemma to include 
-    X `notin` fv_tt T
+    X `notin` fv_et T
 *)
 Lemma wf_covariant_typ_strengthening : forall E F G1 G2 X U T,
  wf_covariant_typ (F ++ [(X, bind_typ U)] ++ E) G1 G2 T ->
@@ -303,7 +303,7 @@ Proof.
  induction T; simpl; intros k Fr; notin_simpl; try apply notin_union; eauto.
 Qed.
 
-Lemma notin_fv_tc_open : forall (X : atom) T C,
+Lemma notin_fv_ct_open : forall (X : atom) T C,
   X `notin` fv_tt (open_ct T C) ->
   X `notin` fv_tt T.
 Proof with auto.
@@ -314,11 +314,7 @@ Proof with auto.
   - specialize (IHT1 k). specialize (IHT2 (S k))...
   - specialize (IHT1 k). specialize (IHT2 k)...
   - specialize (IHT1 k). specialize (IHT2 k)...
-(*
-  - specialize (IHT k). admit.
-  - specialize (IHT k)...
-*)
-Admitted.
+Qed.
 
 (* Maybe we need to generalize this to E Ep and Em? *)
 Lemma notin_fv_wf : forall E (X : atom) T,
@@ -334,21 +330,13 @@ Proof with auto.
     specialize (IHWf_typ Fr).
     assert (Y `notin` L). { fsetdec. }
     specialize (H0 Y H1 Fr). 
-    apply notin_fv_tc_open with (C := (cset_singleton_fvar Y))...
+    apply notin_fv_ct_open with (C := (cset_singleton_fvar Y))...
   - pick fresh Y.
     specialize (IHWf_typ Fr).
     assert (Y `notin` L). { fsetdec. }
     specialize (H0 Y H1).
     apply notin_fv_tt_open with (Y := Y)...
-(*
-  - destruct H.
-    unfold allbound in H0. 
-    unfold cset_fvars in H0. 
-    destruct C... 
-    unfold cset_fvar. 
-    admit.
-    (* X _could_ be in Ep... *) *)
-Admitted.
+Qed.
 
 Lemma map_subst_tb_id : forall G Z P,
   wf_env G ->
