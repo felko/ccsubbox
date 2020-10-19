@@ -393,9 +393,10 @@ Lemma typing_regular : forall E e T,
   wf_env E /\ expr e /\ wf_typ E T.
 Proof with simpl_env; auto*.
   intros E e T H; induction H...
-  (* Case "typing_var".
+  Case "typing_var".
     repeat split...
-    eauto using wf_typ_from_binds_typ.
+    apply wf_typ_from_binds_typ with (x := x) ; auto.
+    admit.
   Case "typing_abs".
     pick fresh y.
     destruct (H0 y) as [Hok [J K]]...
@@ -405,25 +406,34 @@ Proof with simpl_env; auto*.
         eauto using type_from_wf_typ, wf_typ_from_wf_env_typ.
         destruct (H0 x)...
     SCase "Third of original three conjuncts".
-      apply wf_typ_arrow; eauto using wf_typ_from_wf_env_typ.
+      apply wf_typ_capt.
+      apply wf_typ_arrow with (L := L).
+      apply wf_typ_from_wf_env_typ with (x := y) ; auto.
+      admit.
+      admit.
+      (* eapply wf_typ_arrow. ; eauto using wf_typ_from_wf_env_typ.
       rewrite_env (empty ++ E).
-      eapply wf_typ_strengthening; simpl_env; eauto.
+      eapply wf_typ_strengthening; simpl_env; eauto. *)      
   Case "typing_app".
     repeat split...
     destruct IHtyping1 as [_ [_ K]].
-    inversion K...
+    inversion K ; admit...
   Case "typing_tabs".
     pick fresh Y.
     destruct (H0 Y) as [Hok [J K]]...
     inversion Hok; subst.
-    repeat split...
+    repeat split.
+    auto.
     SCase "Second of original three conjuncts".
       pick fresh X and apply expr_tabs.
         eauto using type_from_wf_typ, wf_typ_from_wf_env_sub...
         destruct (H0 X)...
     SCase "Third of original three conjuncts".
-      pick fresh Z and apply wf_typ_all...
+      pick fresh Z.
+      eapply wf_typ_capt.
       destruct (H0 Z)...
+      admit.
+      admit.
   Case "typing_tapp".
     destruct (sub_regular _ _ _ H0) as [R1 [R2 R3]].
     repeat split...
@@ -433,9 +443,10 @@ Proof with simpl_env; auto*.
     SCase "Third of original three conjuncts".
       destruct IHtyping as [R1' [R2' R3']].
       eapply wf_typ_open; eauto.
+      admit.
   Case "typing_sub".
     repeat split...
-    destruct (sub_regular _ _ _ H0)... *)
+    destruct (sub_regular _ _ _ H0)...
 Admitted.
 
 Lemma value_regular : forall e,
