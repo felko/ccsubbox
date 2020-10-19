@@ -451,10 +451,12 @@ Lemma red_regular : forall e e',
 Proof with auto*.
   intros e e' H.
   induction H; assert(J := value_regular); split...
-  (* Case "red_abs".
+  Case "red_abs".
     inversion H. pick fresh y. rewrite (subst_ee_intro y)...
+    (* rewrite <- subst_ee_open_ee_var. *)
+    admit.    
   Case "red_tabs".
-    inversion H. pick fresh Y. rewrite (subst_te_intro Y)... *)
+    inversion H. pick fresh Y. rewrite (subst_te_intro Y)...
 Admitted.
 
 
