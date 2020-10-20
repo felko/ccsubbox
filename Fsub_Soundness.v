@@ -107,6 +107,16 @@ Proof with auto.
   apply cset_subset_reflexivity.
 Qed.
 
+Lemma subcapt_transitivity : forall E C1 C2 C3,
+  wf_env E ->
+  subcapt E C1 C2 ->
+  subcapt E C2 C3 ->
+  subcapt E C1 C3.
+Proof with auto.
+  intros E C Ok.
+  induction C ; intros...
+Admitted.
+
 
 Lemma sub_reflexivity : forall E T,
   wf_env E ->
@@ -119,28 +129,25 @@ Proof with auto.
   - apply sub_refl_tvar... 
     eapply wf_typ_var.
     apply H.
-  - apply sub_arrow with (L := L)...
+  - apply sub_arrow with (L := L `union` dom E)...
     intros.
-    specialize (H x H1).
-    specialize (H0 x H1 Ok).
+    assert (x `notin` L) as Hx. { fsetdec. }
+    specialize (H x Hx).
+    specialize (H0 x Hx Ok).
     specialize (IHWf Ok).
     rewrite_env (empty ++ [(x, bind_typ T1)] ++ E).
     apply sub_weakening...        
     constructor...
-    (* Here we need to show `X notin dom E` but only know `X notin L` *)
-    admit.
-  - apply sub_all with (L := L)...
+  - apply sub_all with (L := L `union` dom E)...
     intros.
-    specialize (H X H1).
-    specialize (H0 X H1).
+    assert (X `notin` L) as Hx. { fsetdec. }
+    specialize (H X Hx).
+    specialize (H0 X Hx).
     specialize (IHWf Ok).
     apply H0.
     apply wf_env_sub...
-    (* Here we need to show `X notin dom E` but only know `X notin L` *)
-    admit.
   - apply sub_capt... apply subcapt_reflexivity...
-Admitted.
-
+Qed.
 
 
 (* ********************************************************************** *)
@@ -262,27 +269,61 @@ Qed.
 (* ********************************************************************** *)
 (** ** Type substitution preserves subtyping (10) *)
 
-(* Lemma cv_through_subst_tt : forall G E P Q X T C D,
-  sub G P Q ->
-  cv (subst_tt X P S) (G ++ [(X, bind_sub P)] ++ E) C ->
-  cv P E D ->
-  subcapt E C D *)
+Lemma cv_subst_empty : forall S G Z Q E P,
+  cv S (G ++ [(Z, bind_sub Q)] ++ E) {}C ->
+  cv (subst_tt Z P S) (map (subst_tb Z P) G ++ E) {}C.
+Proof.
+Admitted.
+
+
+Lemma cv_strengthening : forall T G E C,  
+  wf_typ E T ->
+  wf_env (G ++ E) ->
+  cv T (G ++ E) C ->
+  cv T E C.
+Proof.
+Admitted.
+
+Lemma cv_through_subst_tt : forall X P T E G C,
+  exists D : captureset,
+    cv (subst_tt X P T) (map (subst_tb X P) G ++ E) D /\
+    subcapt (map (subst_tb X P) G ++ E) D C.
+Proof.
+Admitted.
 
 (* Type substitution preserves subcapturing *)
 Lemma subcapt_through_subst_tt : forall E P Q G X C D,
-  (* wf_env (G ++ [(X, bind_sub Q)] ++ E) -> *)
+  wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
   subcapt (G ++ [(X, bind_sub Q)] ++ E) C D ->
-  sub G P Q ->
+  sub E P Q ->
   subcapt (map (subst_tb X P) G ++ E) C D.
-Proof.
-  intros E P Q G X C D H Hsub.
+Proof with auto.
+  intros E P Q G X C D Hwf H Hsub.
   remember (G ++ [(X, bind_sub Q)] ++ E).
   induction H; auto.
   subst.
   binds_cases H...  
-  admit. (* requires lemma "cv-type substitution relation" *)
-  admit. (* requires lemma "cv-type substitution relation" *)
-Admitted.
+  (* In both cases we have to show that `{X0} subset C1` *)
+  - apply subcapt_var with (C2 := C2) (T := T)...
+    + assert (cv T E C2). {
+        apply cv_strengthening with (G := G ++ [(X, bind_sub Q)]) ; simpl_env...
+        apply wf_typ_from_binds_typ with (x := X0)...
+      }
+      rewrite_env (empty ++ E) in H2.
+      apply cv_weakening with (F := (map (subst_tb X P) G)) in H2.
+      simpl_env in H2.
+      trivial.
+      auto.
+      simpl_env.
+      apply wf_env_subst_tb with (Q := Q)...
+  - assert (exists (C3 : captureset), 
+      cv (subst_tt X P T) (map (subst_tb X P) G ++ E) C3 /\
+      subcapt (map (subst_tb X P) G ++ E) C3 C2
+    ) as [C3 [C3sub C3eq]]. { apply cv_through_subst_tt. }    
+    apply subcapt_var with (C2 := C3) (T := subst_tt X P T)...
+    apply subcapt_transitivity with (C2 := C2)...
+    apply wf_env_subst_tb with (Q := Q)...
+Qed.
 
 Lemma sub_through_subst_tt : forall Q E F Z S T P,
   sub (F ++ [(Z, bind_sub Q)] ++ E) S T ->
@@ -297,14 +338,7 @@ Proof with
   induction SsubT; intros G EQ; subst; simpl subst_tt...
   Case "sub_top".
     apply sub_top...
-    (* 
-      In contrast to the pen-and-paper proof, here we need
-      to show that:
-        cv (subst_tt Z P S) (map (subst_tb Z P) G ++ E) {}C
-      given 
-        cv S (G ++ [(Z, bind_sub Q)] ++ E) {}C
-     *)
-    admit.
+    apply cv_subst_empty with (Q := Q)...
   Case "sub_refl_tvar".
     destruct (X == Z); subst.
     SCase "X = Z".
@@ -356,10 +390,6 @@ Proof with
   Case "sub_capt".
     apply sub_capt...
     apply subcapt_through_subst_tt with (Q := Q)...
-    (* 
-      Interestingly, we need to show `sub G P Q` but only have `sub E P Q`.
-    *)
-    admit.
 Admitted.
 
 

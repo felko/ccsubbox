@@ -275,6 +275,13 @@ Proof with eauto using wf_typ_strengthening.
   induction F; intros Wf_env; inversion Wf_env; subst; simpl_env in *...
 Qed.
 
+Lemma wf_env_strengthen_context : forall E F,
+  wf_env (F ++ E) ->
+  wf_env E.
+Proof with eauto.
+  induction F; intros Wf_env; inversion Wf_env...
+Qed.
+
 Lemma wf_env_subst_tb : forall Q Z P E F,
   wf_env (F ++ [(Z, bind_sub Q)] ++ E) ->
   wf_typ E P ->
