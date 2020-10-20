@@ -73,27 +73,33 @@ Lemma sub_reflexivity : forall E T,
   sub E T T.
 Proof with auto.
   intros E T Ok Wf.
-  induction Wf ; try constructor...
+  induction Wf...
   (* eauto and econstructor is still broken... hence we need to proof this manually *)
-  - eapply wf_typ_var.
+  - apply sub_refl_tvar... 
+    eapply wf_typ_var.
     apply H.
-  - pick fresh Y.
+  - apply sub_arrow...
+    pick fresh Y.
     assert (Y `notin` L) as YL. { fsetdec. }
     specialize (H Y YL).
     specialize (H0 Y YL Ok).
     specialize (IHWf Ok).
-    replace (open_ct T2 (cset_singleton_fvar Y)) with T2 in H0.
-    apply H0.
-    apply open_ct_rec_type.
-    admit.    
+    (* Here we need to show that 
+         sub E (openct T C2) (openct T C2)
+       implies
+         sub E T T
+     *)
+    admit.
   - apply sub_all with (L := L)...
     intros.
     specialize (H X H1).
     specialize (H0 X H1).
     specialize (IHWf Ok).
     apply H0.
+    apply wf_env_sub...
+    (* Here we need to show `X notin dom E` but only know `X notin L` *)
     admit.
-  - apply subcapt_reflexivity...
+  - apply sub_capt... apply subcapt_reflexivity...
 Admitted.
 
 
@@ -150,6 +156,7 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
   induction SsubT; intros F EQ; subst...
   Case "sub_top".
     apply sub_top...
+    admit.
   Case "sub_refl_tvar".
     apply sub_refl_tvar...
   Case "sub_trans_tvar".
@@ -175,7 +182,9 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
     apply H0...
-Qed.
+  Case "sub_capt".
+    admit.
+Admitted.
 
 Lemma sub_transitivity : forall Q,
   transitivity_on Q.
@@ -204,8 +213,9 @@ Proof with simpl_env; auto.
   eauto 4 using sub_trans_tvar.
   eauto 4 using sub_trans_tvar.
   eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
+  (* crashes with depth 2 *)
+  admit.
+  admit.
   eauto 4 using sub_trans_tvar.
   eauto 4 using sub_trans_tvar.
   Case "sub_all / sub_top".
@@ -224,7 +234,11 @@ Proof with simpl_env; auto.
       apply (sub_narrowing_aux T1)...
       unfold transitivity_on.
       auto using (IHW T1).
-Qed.
+  eauto 4 using sub_trans_tvar.
+  eauto 4 using sub_trans_tvar.
+  admit.
+  admit.
+Admitted.
 
 Lemma sub_narrowing : forall Q E F Z P S T,
   sub E P Q ->
