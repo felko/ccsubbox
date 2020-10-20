@@ -469,30 +469,56 @@ Inductive subcapt : env -> captureset -> captureset -> Prop :=
     [sub_all] case). *)
 
 Inductive sub : env -> typ -> typ -> Prop :=
+(* 
+    cv(S, E) = {}
+    -------------
+     E ⊢ S <: ⊤
+*)
   | sub_top : forall E S,
       wf_env E ->
       wf_typ E S ->
       (** NEW: S can't capture anything *)
       cv S E empty_cset ->
       sub E S typ_top
+
   | sub_refl_tvar : forall E X,
       wf_env E ->
       wf_typ E (typ_fvar X) ->
       sub E (typ_fvar X) (typ_fvar X)
+
   | sub_trans_tvar : forall U E T X,
       binds X (bind_sub U) E ->
       sub E U T ->
       sub E (typ_fvar X) T
+
+(* 
+    E ⊢ T₁ <: S₁    E, x: T₁ ⊢ S₂ <: T₂
+    ------------------------------------
+        E ⊢ ∀(x: S₁)S₂ <: ∀(x: T₁)T₂
+
+Jonathan: This looks wrong, we do not extend the context here!
+*)
   | sub_arrow : forall E S1 S2 T1 T2,
       sub E T1 S1 ->
       sub E S2 T2 ->
       sub E (typ_arrow S1 S2) (typ_arrow T1 T2)
+
+(* 
+    E ⊢ T₁ <: S₁    E, X<:T₁ ⊢ S₂ <: T₂
+    ------------------------------------
+       E ⊢ ∀[X<:S₁]S₂ <: ∀[X<:T₁]T₂
+ *)
   | sub_all : forall L E S1 S2 T1 T2,
       sub E T1 S1 ->
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
       sub E (typ_all S1 S2) (typ_all T1 T2)
-  (** NEW : Capture Sets *)
+  
+(*
+    E ⊢ C₁ <: C₂    E ⊢ T₁ <: T₂
+    -----------------------------
+         E ⊢  C₁ T₁ <: C₂ T₂
+*)
   | sub_capt : forall E C1 C2 T1 T2,
       sub E T1 T2 ->
       subcapt E C1 C2 ->
