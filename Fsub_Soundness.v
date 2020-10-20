@@ -153,6 +153,20 @@ Qed.
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
 
+Lemma cv_narrowing : forall S G Z Q E P C,
+  sub E P Q ->
+  cv S (G ++ [(Z, bind_sub Q)] ++ E) C ->
+  cv S (G ++ [(Z, bind_sub P)] ++ E) C.
+Proof.
+Admitted.
+
+Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
+  sub E P Q ->
+  subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
+  subcapt (F ++ [(Z, bind_sub P)] ++ E) C1 C2.
+Proof.
+Admitted.
+
 Definition transitivity_on Q := forall E S T,
   sub E S Q -> sub E Q T -> sub E S T.
 
@@ -167,7 +181,7 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
   induction SsubT; intros F EQ; subst...
   Case "sub_top".
     apply sub_top...
-    admit.
+    apply cv_narrowing with (Q := Q)...
   Case "sub_refl_tvar".
     apply sub_refl_tvar...
   Case "sub_trans_tvar".
@@ -198,8 +212,9 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
     rewrite <- concat_assoc.
     apply H0...
   Case "sub_capt".
-    admit.
-Admitted.
+    constructor...
+    apply subcapt_narrowing with (Q := Q)...
+Qed.
 
 Lemma sub_transitivity : forall Q,
   transitivity_on Q.
