@@ -149,6 +149,14 @@ Proof with auto.
   - apply sub_capt... apply subcapt_reflexivity...
 Qed.
 
+(* Subtyping implies subcapturing *)
+Lemma sub_implies_subcapt : forall E S T C D,
+  sub E S T ->
+  cv S E C ->
+  cv T E D ->
+  subcapt E C D.
+Proof.
+Admitted.
 
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
@@ -157,7 +165,13 @@ Lemma cv_narrowing : forall S G Z Q E P C,
   sub E P Q ->
   cv S (G ++ [(Z, bind_sub Q)] ++ E) C ->
   cv S (G ++ [(Z, bind_sub P)] ++ E) C.
-Proof.
+Proof with auto.
+  intros S G Z Q E P C HSub HCv.
+  remember (G ++ [(Z, bind_sub Q)] ++ E). generalize dependent G.
+  induction HCv ; intros ; subst...
+  destruct (X == Z) ; subst.
+  - admit.
+  - admit.
 Admitted.
 
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
