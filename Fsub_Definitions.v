@@ -481,6 +481,9 @@ Inductive sub : env -> typ -> typ -> Prop :=
       cv S E empty_cset ->
       sub E S typ_top
 
+  (* Instead of having rules for refl and trans, the original Fsub calculus special cases
+     those rules to type variables. Refl and Trans are then defined externally in sub_reflexivity
+     and sub_transitivity. *)
   | sub_refl_tvar : forall E X,
       wf_env E ->
       wf_typ E (typ_fvar X) ->
@@ -496,11 +499,12 @@ Inductive sub : env -> typ -> typ -> Prop :=
     ------------------------------------
         E ⊢ ∀(x: S₁)S₂ <: ∀(x: T₁)T₂
 
-Jonathan: This looks wrong, we do not extend the context here!
+    New: Here we open S2 and T2 with x
 *)
-  | sub_arrow : forall E S1 S2 T1 T2,
+  | sub_arrow : forall L E S1 S2 T1 T2,
       sub E T1 S1 ->
-      sub E S2 T2 ->
+      (forall x : atom, x `notin` L ->
+          sub ([(x, bind_typ T1)] ++ E) (open_ct S2 (cset_singleton_fvar x)) (open_ct T2 (cset_singleton_fvar x))) ->
       sub E (typ_arrow S1 S2) (typ_arrow T1 T2)
 
 (* 
