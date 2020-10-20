@@ -164,8 +164,17 @@ Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
   subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(Z, bind_sub P)] ++ E) C1 C2.
-Proof.
-Admitted.
+Proof with auto.
+  intros F E Z P Q C1 C2 SubPQ SubCap.
+  remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
+  induction SubCap ; intros...
+  subst.
+  apply subcapt_var with (T := T) (C2 := C2)...
+  - binds_cases H.
+    * apply binds_tail. apply binds_tail. auto. auto. auto.
+    * auto.
+  - apply cv_narrowing with (Q := Q)...
+Qed.
 
 Definition transitivity_on Q := forall E S T,
   sub E S Q -> sub E Q T -> sub E S T.
