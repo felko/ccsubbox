@@ -108,28 +108,28 @@ Lemma cv_weakening : forall E F G T C,
 Proof.
 Admitted.
 
+Lemma subcapt_weakening : forall E F G C1 C2,
+  subcapt (G ++ E) C1 C2 ->
+  wf_env (G ++ F ++ E) ->
+  subcapt (G ++ F ++ E) C1 C2.
+Proof.
+Admitted. 
+
 Lemma sub_weakening : forall E F G S T,
   sub (G ++ E) S T ->
   wf_env (G ++ F ++ E) ->
   sub (G ++ F ++ E) S T.
-Proof with simpl_env; auto using wf_typ_weakening, sub_top.
+Proof with simpl_env; auto using wf_typ_weakening, cv_weakening, subcapt_weakening.
   intros E F G S T Sub Ok.
   remember (G ++ E).
   generalize dependent G.
   induction Sub; intros G Ok EQ; subst...
-  - Case "sub_top".
-    apply sub_top.
-    + trivial.
-    + apply wf_typ_weakening; auto.
-    + apply cv_weakening; trivial.
   - Case "sub_trans_tvar".
     apply (sub_trans_tvar U)...
   - Case "sub_all".
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
     apply H0...
-  - Case "sub_capt".
-    apply sub_capt.
 Qed.
 
 
