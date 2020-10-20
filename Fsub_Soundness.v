@@ -262,6 +262,12 @@ Qed.
 (* ********************************************************************** *)
 (** ** Type substitution preserves subtyping (10) *)
 
+(* Lemma cv_through_subst_tt : forall G E P Q X T C D,
+  sub G P Q ->
+  cv (subst_tt X P S) (G ++ [(X, bind_sub P)] ++ E) C ->
+  cv P E D ->
+  subcapt E C D *)
+
 (* Type substitution preserves subcapturing *)
 Lemma subcapt_through_subst_tt : forall E P Q G X C D,
   (* wf_env (G ++ [(X, bind_sub Q)] ++ E) -> *)
@@ -269,6 +275,13 @@ Lemma subcapt_through_subst_tt : forall E P Q G X C D,
   sub G P Q ->
   subcapt (map (subst_tb X P) G ++ E) C D.
 Proof.
+  intros E P Q G X C D H Hsub.
+  remember (G ++ [(X, bind_sub Q)] ++ E).
+  induction H; auto.
+  subst.
+  binds_cases H...  
+  admit. (* requires lemma "cv-type substitution relation" *)
+  admit. (* requires lemma "cv-type substitution relation" *)
 Admitted.
 
 Lemma sub_through_subst_tt : forall Q E F Z S T P,
@@ -284,6 +297,13 @@ Proof with
   induction SsubT; intros G EQ; subst; simpl subst_tt...
   Case "sub_top".
     apply sub_top...
+    (* 
+      In contrast to the pen-and-paper proof, here we need
+      to show that:
+        cv (subst_tt Z P S) (map (subst_tb Z P) G ++ E) {}C
+      given 
+        cv S (G ++ [(Z, bind_sub Q)] ++ E) {}C
+     *)
     admit.
   Case "sub_refl_tvar".
     destruct (X == Z); subst.
@@ -314,6 +334,7 @@ Proof with
       rewrite (map_subst_tb_id E Z P);
         [ | auto | eapply fresh_mid_tail; eauto ].
       binds_cases H...
+  (* this case is not worked out in the P&P proof. *)
   Case "sub_arrow".
   pick fresh X and apply sub_arrow...
     repeat (rewrite <- subst_tt_open_ct).
