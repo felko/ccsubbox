@@ -262,6 +262,15 @@ Qed.
 (* ********************************************************************** *)
 (** ** Type substitution preserves subtyping (10) *)
 
+(* Type substitution preserves subcapturing *)
+Lemma subcapt_through_subst_tt : forall E P Q G X C D,
+  (* wf_env (G ++ [(X, bind_sub Q)] ++ E) -> *)
+  subcapt (G ++ [(X, bind_sub Q)] ++ E) C D ->
+  sub G P Q ->
+  subcapt (map (subst_tb X P) G ++ E) C D.
+Proof.
+Admitted.
+
 Lemma sub_through_subst_tt : forall Q E F Z S T P,
   sub (F ++ [(Z, bind_sub Q)] ++ E) S T ->
   sub E P Q ->
@@ -325,15 +334,9 @@ Proof with
     apply H0...
   Case "sub_capt".
     apply sub_capt...
+    apply subcapt_through_subst_tt with (Q := Q)...
     (* 
-      this appears crucial! We need to show
-        subcapt (map (subst_tb Z P) G ++ E) C1 C2
-      from
-        subcapt (G ++ [(Z, bind_sub Q)] ++ E) C1 C2    
-      and
-        sub E P Q
-       
-      In the proof draft, we use "Substitution preserves subcapturing".
+      Interestingly, we need to show `sub G P Q` but only have `sub E P Q`.
     *)
     admit.
 Admitted.
