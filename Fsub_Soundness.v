@@ -20,6 +20,46 @@ Require Export Fsub_Lemmas.
 
 
 (* ********************************************************************** *)
+(** ** Weakening (2) *)
+
+Lemma cv_weakening : forall E F G T C,
+    wf_env (G ++ E) ->
+    cv T (G ++ E) C ->
+    wf_env (G ++ F ++ E) ->
+    cv T (G ++ F ++ E) C.
+Proof.
+Admitted.
+
+Lemma subcapt_weakening : forall E F G C1 C2,
+  subcapt (G ++ E) C1 C2 ->
+  wf_env (G ++ F ++ E) ->
+  subcapt (G ++ F ++ E) C1 C2.
+Proof.
+Admitted. 
+
+Lemma sub_weakening : forall E F G S T,
+  sub (G ++ E) S T ->
+  wf_env (G ++ F ++ E) ->
+  sub (G ++ F ++ E) S T.
+Proof with simpl_env; auto using wf_typ_weakening, cv_weakening, subcapt_weakening.
+  intros E F G S T Sub Ok.
+  remember (G ++ E).
+  generalize dependent G.
+  induction Sub; intros G Ok EQ; subst...
+  - Case "sub_trans_tvar".
+    apply (sub_trans_tvar U)...
+  - Case "sub_arrow".
+    pick fresh Y and apply sub_arrow...
+    rewrite <- concat_assoc.
+    apply H0...
+  - Case "sub_all".
+    pick fresh Y and apply sub_all...
+    rewrite <- concat_assoc.
+    apply H0...
+Qed.
+
+
+(* ********************************************************************** *)
 (** ** Reflexivity (1) *)
 
 (*
@@ -67,6 +107,7 @@ Proof with auto.
   apply cset_subset_reflexivity.
 Qed.
 
+
 Lemma sub_reflexivity : forall E T,
   wf_env E ->
   wf_typ E T ->
@@ -78,17 +119,15 @@ Proof with auto.
   - apply sub_refl_tvar... 
     eapply wf_typ_var.
     apply H.
-  - apply sub_arrow...
-    pick fresh Y.
-    assert (Y `notin` L) as YL. { fsetdec. }
-    specialize (H Y YL).
-    specialize (H0 Y YL Ok).
+  - apply sub_arrow with (L := L)...
+    intros.
+    specialize (H x H1).
+    specialize (H0 x H1 Ok).
     specialize (IHWf Ok).
-    (* Here we need to show that 
-         sub E (openct T C2) (openct T C2)
-       implies
-         sub E T T
-     *)
+    rewrite_env (empty ++ [(x, bind_typ T1)] ++ E).
+    apply sub_weakening...        
+    constructor...
+    (* Here we need to show `X notin dom E` but only know `X notin L` *)
     admit.
   - apply sub_all with (L := L)...
     intros.
@@ -102,41 +141,6 @@ Proof with auto.
   - apply sub_capt... apply subcapt_reflexivity...
 Admitted.
 
-
-(* ********************************************************************** *)
-(** ** Weakening (2) *)
-
-Lemma cv_weakening : forall E F G T C,
-    wf_env (G ++ E) ->
-    cv T (G ++ E) C ->
-    wf_env (G ++ F ++ E) ->
-    cv T (G ++ F ++ E) C.
-Proof.
-Admitted.
-
-Lemma subcapt_weakening : forall E F G C1 C2,
-  subcapt (G ++ E) C1 C2 ->
-  wf_env (G ++ F ++ E) ->
-  subcapt (G ++ F ++ E) C1 C2.
-Proof.
-Admitted. 
-
-Lemma sub_weakening : forall E F G S T,
-  sub (G ++ E) S T ->
-  wf_env (G ++ F ++ E) ->
-  sub (G ++ F ++ E) S T.
-Proof with simpl_env; auto using wf_typ_weakening, cv_weakening, subcapt_weakening.
-  intros E F G S T Sub Ok.
-  remember (G ++ E).
-  generalize dependent G.
-  induction Sub; intros G Ok EQ; subst...
-  - Case "sub_trans_tvar".
-    apply (sub_trans_tvar U)...
-  - Case "sub_all".
-    pick fresh Y and apply sub_all...
-    rewrite <- concat_assoc.
-    apply H0...
-Qed.
 
 
 (* ********************************************************************** *)
@@ -178,6 +182,10 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
     SCase "X <> Z".
       apply (sub_trans_tvar U)...
       binds_cases H...
+  Case "sub_arrow".
+    pick fresh Y and apply sub_arrow...
+    rewrite <- concat_assoc.
+    apply H0...
   Case "sub_all".
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
