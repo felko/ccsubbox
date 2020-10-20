@@ -275,6 +275,7 @@ Proof with
   induction SsubT; intros G EQ; subst; simpl subst_tt...
   Case "sub_top".
     apply sub_top...
+    admit.
   Case "sub_refl_tvar".
     destruct (X == Z); subst.
     SCase "X = Z".
@@ -282,7 +283,7 @@ Proof with
     SCase "X <> Z".
       apply sub_reflexivity...
       inversion H0; subst.
-      binds_cases H3...
+      binds_cases H5...
       apply (wf_typ_var (subst_tt Z P U))...
   Case "sub_trans_tvar".
     destruct (X == Z); subst.
@@ -304,13 +305,38 @@ Proof with
       rewrite (map_subst_tb_id E Z P);
         [ | auto | eapply fresh_mid_tail; eauto ].
       binds_cases H...
+  Case "sub_arrow".
+  pick fresh X and apply sub_arrow...
+    repeat (rewrite <- subst_tt_open_ct).
+    assert (X `notin` L) as XL. { fsetdec. } 
+    assert ([(X, bind_typ T1)] ++ G ++ [(Z, bind_sub Q)] ++ E = G ++ [(Z, bind_sub Q)] ++ E) as Heq. { admit. }
+    specialize (H0 X XL G Heq). 
+    rewrite_env (empty ++ [(X, bind_typ (subst_tt Z P T1))] ++ (map (subst_tb Z P) G ++ E)).
+    apply sub_weakening.
+    apply H0.
+    admit.
+    admit.
+    admit.
   Case "sub_all".
     pick fresh X and apply sub_all...
     rewrite subst_tt_open_tt_var...
     rewrite subst_tt_open_tt_var...
     rewrite_env (map (subst_tb Z P) ([(X, bind_sub T1)] ++ G) ++ E).
     apply H0...
-Qed.
+  Case "sub_capt".
+    apply sub_capt...
+    (* 
+      this appears crucial! We need to show
+        subcapt (map (subst_tb Z P) G ++ E) C1 C2
+      from
+        subcapt (G ++ [(Z, bind_sub Q)] ++ E) C1 C2    
+      and
+        sub E P Q
+       
+      In the proof draft, we use "Substitution preserves subcapturing".
+    *)
+    admit.
+Admitted.
 
 
 (* ********************************************************************** *)
