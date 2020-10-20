@@ -418,7 +418,7 @@ Inductive wf_env : env -> Prop :=
 Inductive cv : typ -> env -> captureset -> Prop :=
   (** C T has cv C cup cv T *)
   | cv_typ_capt : forall T E C1 C2,
-    cv T E C1 ->
+    cv T E C2 ->
     cv (typ_capt C1 T) E (cset_union C1 C2)
   (** Looking up in the environment *)
   | cv_typ_var : forall (X : atom) T E C,

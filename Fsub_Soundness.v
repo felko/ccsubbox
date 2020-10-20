@@ -322,11 +322,76 @@ Lemma cv_strengthening : forall T G E C,
 Proof.
 Admitted.
 
-Lemma cv_through_subst_tt : forall X P T E G C,
+Lemma re_cv_through_subst_tt : forall X P Q T E G C,
+  wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
+  wf_typ (G ++ [(X, bind_sub Q)] ++ E) T ->
+  cv T (G ++ [(X, bind_sub Q)] ++ E) C ->
+  sub E P Q ->
   exists D : captureset,
-    cv (subst_tt X P T) (map (subst_tb X P) G ++ E) D /\
-    subcapt (map (subst_tb X P) G ++ E) D C.
+    cv (subst_tt X P T) (map (subst_tb X P) G ++ E) D.
 Proof.
+  intros until 0. intros Hwf_env Hwf_typ H Hsub.
+  generalize dependent C.
+  induction T; intro C; intro; subst; eauto.
+  - Case "bvar".
+    admit.
+  - Case "fvar".
+    admit.
+  - exists {}C. apply cv_typ_arrow.
+  - exists {}C. apply cv_typ_all.
+  - inversion H; subst.
+    inversion Hwf_typ; subst.
+    specialize (IHT H6 C2 H4).
+    destruct IHT as [ C0 IHT ].
+    exists (cset_union c C0).
+    apply cv_typ_capt.
+    apply IHT.
+Admitted.
+
+Lemma correlate_union_cv : forall E C1 C2 D1 D2,
+  subcapt E C1 C2 ->
+  subcapt E D1 D2 ->
+  subcapt E (cset_union C1 D1) (cset_union C2 D2).
+Proof.
+  (* Somehow by transivity. *)
+Admitted.
+
+Lemma cv_through_subst_tt : forall X P Q T E G C D,
+  wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
+  wf_typ (G ++ [(X, bind_sub Q)] ++ E) T ->
+  cv T (G ++ [(X, bind_sub Q)] ++ E) C ->
+  cv (subst_tt X P T) (map (subst_tb X P) G ++ E) D ->
+  sub E P Q ->
+  subcapt (map (subst_tb X P) G ++ E) D C.
+Proof.
+  intros *. intros Hwf_env Hwf_typ Hcv_wide Hcv_narrow Hsub.
+  generalize dependent C.
+  generalize dependent D.
+  induction T; intros D Hcv_narrow C Hcv_wide.
+  - inversion Hcv_wide; subst.
+    inversion Hcv_narrow; subst.
+    apply subcapt_split.
+    apply cset_subset_reflexivity.
+  - Case "bvar".
+    (* What's going on here, why do I get a bvar? Doesn't this mean that T would be simply ill-formed? *)
+    admit.
+  - Case "fvar".
+    admit.
+  - inversion Hcv_narrow; subst.
+    inversion Hcv_wide; subst.
+    apply subcapt_split.
+    apply cset_subset_reflexivity.
+  - inversion Hcv_narrow; subst.
+    inversion Hcv_wide; subst.
+    apply subcapt_split.
+    apply cset_subset_reflexivity.
+  - inversion Hwf_typ; subst.
+    inversion Hcv_narrow; subst.
+    inversion Hcv_wide; subst.
+    specialize (IHT H4 C2 H3 C0 H6).
+    apply correlate_union_cv; trivial.
+    apply subcapt_reflexivity.
+    apply wf_env_subst_tb with (Q := Q); auto.
 Admitted.
 
 (* Type substitution preserves subcapturing *)
@@ -357,7 +422,12 @@ Proof with auto.
   - assert (exists (C3 : captureset), 
       cv (subst_tt X P T) (map (subst_tb X P) G ++ E) C3 /\
       subcapt (map (subst_tb X P) G ++ E) C3 C2
-    ) as [C3 [C3sub C3eq]]. { apply cv_through_subst_tt. }    
+           ) as [C3 [C3sub C3eq]]. {
+      apply cv_through_subst_tt with (Q := Q)...
+      assert (binds X0 (bind_typ T) (G ++ [(X, bind_sub Q)] ++ E)); auto.
+      eapply wf_typ_from_binds_typ; auto.
+      apply H.
+    }
     apply subcapt_var with (C2 := C3) (T := subst_tt X P T)...
     apply subcapt_transitivity with (C2 := C2)...
     apply wf_env_subst_tb with (Q := Q)...
