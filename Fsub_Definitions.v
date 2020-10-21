@@ -439,29 +439,18 @@ Inductive cv : typ -> env -> captureset -> Prop :=
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
 
-(** Subcapturing captures (mind the pun) the notion that one capture
-    set can be subsumed by another. *)
+
 Inductive subcapt : env -> captureset -> captureset -> Prop :=
-  (** the universal capture set captures all. *)
   | subcapt_universal : forall E C1,
       subcapt E C1 cset_universal
-  (** If x : T is bound in the environment, then a capture set referencing {x}
-      can be resolved as if it were cv(T). *)
-  | subcapt_var : forall E C1 C2 X T,
-      binds X (bind_typ T) E ->
-      cv T E C2 ->
-      subcapt E C2 C1 ->
-      subcapt E (cset_singleton_fvar X) C1
-  (** Subcapturing behaves well across taking subsets *)
-  | subcapt_split : forall E C1 C2,
-      cset_subset_prop C1 C2 ->
-      subcapt E C1 C2
-  (** ... and taking unions. *)
-  | subcapt_join : forall E C1 C2 C,
-      subcapt E C1 C ->
-      subcapt E C2 C ->
-      subcapt E (cset_union C1 C2) C
+  | subcapt_distl : forall E fn C,
+      AtomSet.F.For_all (fun x => subcapt E (cset_singleton_fvar x) C) fn ->
+      subcapt E (cset_set fn {}N) C
+  | subcapt_distr : forall E x fn,
+      x `in` fn ->
+      subcapt E (cset_singleton_fvar x) (cset_set fn {}N)
 .
+
 
 (** The definition of subtyping is straightforward.  It uses the
     [binds] relation from the [Environment] library (in the
