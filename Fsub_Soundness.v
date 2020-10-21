@@ -23,19 +23,28 @@ Require Export Fsub_Lemmas.
 (** ** Weakening (2) *)
 
 Lemma cv_weakening : forall E F G T C,
-    wf_env (G ++ E) ->
     cv T (G ++ E) C ->
     wf_env (G ++ F ++ E) ->
     cv T (G ++ F ++ E) C.
-Proof.
-Admitted.
+Proof with auto.
+  intros E F G T C HCv Hwf2.
+  remember (G ++ E).
+  induction HCv ; subst...
+  apply cv_typ_var with (T := T)...
+Qed.
 
 Lemma subcapt_weakening : forall E F G C1 C2,
   subcapt (G ++ E) C1 C2 ->
   wf_env (G ++ F ++ E) ->
   subcapt (G ++ F ++ E) C1 C2.
-Proof.
-Admitted. 
+Proof with auto.
+  intros E F G C1 C2 Hsc Hwf.
+  remember (G ++ E).
+  remember (G ++ F ++ E).
+  induction Hsc ; subst...  
+  apply subcapt_var with (C2 := C2) (T := T)...
+  apply cv_weakening...
+Qed. 
 
 Lemma sub_weakening : forall E F G S T,
   sub (G ++ E) S T ->
