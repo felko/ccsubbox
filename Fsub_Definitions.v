@@ -449,6 +449,10 @@ Inductive subcapt : env -> captureset -> captureset -> Prop :=
   | subcapt_distr : forall E x fn,
       x `in` fn ->
       subcapt E (cset_singleton_fvar x) (cset_set fn {}N)
+  | subcapt_var : forall E x T C,
+      binds x (bind_typ T) E ->
+      cv T E C ->
+      subcapt E (cset_singleton_fvar x) C
 .
 
 
