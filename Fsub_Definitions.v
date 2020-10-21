@@ -362,24 +362,24 @@ Definition wf_cset (E Ep : env) (C : captureset) : Prop :=
 
 (* Wellformedness of types where variables are bound. *)
 Inductive wf_bound_typ : env -> typ -> Prop :=
-  | wf_typ_top : forall E,
+  | wf_bound_typ_top : forall E,
       wf_bound_typ E typ_top
-  | wf_typ_var : forall U E (X : atom),
+  | wf_bound_typ_var : forall U E (X : atom),
       binds X (bind_sub U) E ->
       wf_bound_typ E (typ_fvar X)
-  | wf_typ_arrow : forall L E T1 T2,
+  | wf_bound_typ_arrow : forall L E T1 T2,
     wf_bound_typ E T1 ->
       (** NEW: we need to be able to open capture sets. *)
       (forall X : atom, X `notin` L ->
         wf_bound_typ ([(X, bind_typ T1)] ++ E) (open_ct T2 (cset_singleton_fvar X))) ->
        wf_bound_typ E (typ_arrow T1 T2)
-  | wf_typ_all : forall L E T1 T2,
+  | wf_tbound_yp_all : forall L E T1 T2,
       wf_bound_typ E T1 ->
       (forall X : atom, X `notin` L ->
       wf_bound_typ ([(X, bind_sub T1)] ++ E) (open_tt T2 X)) ->
       wf_bound_typ E (typ_all T1 T2)
   (** NEW: capture sets. *)
-  | wf_typ_capt : forall E C T,
+  | wf_bound_typ_capt : forall E C T,
     wf_bound_typ E T ->
     wf_cset E empty C ->
     wf_bound_typ E (typ_capt C T)
@@ -388,33 +388,31 @@ Inductive wf_bound_typ : env -> typ -> Prop :=
 (* Wellformedness of types where locally bound variables are only 
    allowed in positive positions. *)
 Inductive wf_covariant_typ : env -> env -> env -> typ -> Prop :=
-  | wf_covariant_typ_top : forall E Ep Em,
+  | wf_typ_top : forall E Ep Em,
       wf_covariant_typ E Ep Em typ_top
-  | wf_covariant_typ_var : forall U E Ep Em (X : atom),
+  | wf_typ_var : forall U E Ep Em (X : atom),
       binds X (bind_sub U) E ->
       wf_covariant_typ E Ep Em (typ_fvar X)
-  | wf_covariant_typ_arrow : forall L E Ep Em T1 T2,
+  | wf_typ_arrow : forall L E Ep Em T1 T2,
     wf_covariant_typ E Em Ep T1 ->
       (** NEW: we need to be able to open capture sets.  Capture
           variables can only be opened in covariant positions. *)
       (forall X : atom, X `notin` L ->
         wf_covariant_typ E ([(X, bind_typ T1)] ++ Ep) Em (open_ct T2 (cset_singleton_fvar X))) ->
        wf_covariant_typ E Ep Em (typ_arrow T1 T2)
-  | wf_covariant_typ_all : forall L E Ep Em T1 T2,
+  | wf_typ_all : forall L E Ep Em T1 T2,
       wf_covariant_typ E Em Ep T1 ->
       (forall X : atom, X `notin` L ->
       wf_covariant_typ ([(X, bind_sub T1)] ++ E) Ep Em (open_tt T2 X)) ->
       wf_covariant_typ E Ep Em (typ_all T1 T2)
   (** NEW: capture sets check if their variables are defined in covariant positions. *)
-  | wf_covariant_typ_capt : forall E Ep Em C T,
+  | wf_typ_capt : forall E Ep Em C T,
     wf_covariant_typ E Ep Em T ->
     wf_cset E Ep C ->
     wf_covariant_typ E Ep Em (typ_capt C T)
 .
 
-Definition wf_typ (E : env): typ -> Prop := 
-    wf_covariant_typ E empty empty.
-
+Definition wf_typ (E : env) := wf_covariant_typ E empty empty.
 
 (** An environment E is well-formed, denoted [(wf_env E)], if each
     atom is bound at most at once and if each binding is to a
