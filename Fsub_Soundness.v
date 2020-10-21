@@ -161,7 +161,8 @@ Proof with auto.
       csetdec.
       inversion H.
   - Case "subcapt_var".
-    admit.
+    specialize (IHsubcapt Ok H23).
+    apply subcapt_var with (T := T) (C2 := C2)...
   - Case "subcapt_split".
     admit.
   - Case "subcapt_join".
