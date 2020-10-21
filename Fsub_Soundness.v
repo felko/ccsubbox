@@ -116,14 +116,56 @@ Proof with auto.
   apply cset_subset_reflexivity.
 Qed.
 
+(* unversals can't be subcaptres of concrete capture sets. *)
+Lemma cset_universal_subset : forall tf tb, 
+  cset_subset_prop cset_universal (cset_set tf tb) ->
+  False.
+Proof with auto.
+  intros tf tb H.
+  inversion H...
+Qed.
+
+(* if we have a subcapture of a concrete capture set, it has to be
+   concrete as well. *)
+Lemma subcapt_exists : forall E C tf tb,
+  subcapt E C (cset_set tf tb) ->
+  exists tf' tb', C = cset_set tf' tb'.
+Proof with auto.
+  intros E C tf tb H.
+  remember (cset_set tf tb).
+  induction H.
+  - inversion Heqc.
+  - exists (AtomSet.F.singleton X). exists (NatSet.F.empty)...
+  - inversion H. subst.
+    + inversion H1.
+    + exists ac. exists nc...
+  - specialize (IHsubcapt1 Heqc) as [tf1 [tb1 eq1]].
+    specialize (IHsubcapt2 Heqc) as [tf2 [tb2 eq2]].
+    subst. simpl. exists (tf1 `union` tf2). exists (NatSet.F.union tb1 tb2)...
+Qed.
+
 Lemma subcapt_transitivity : forall E C1 C2 C3,
   wf_env E ->
   subcapt E C1 C2 ->
   subcapt E C2 C3 ->
   subcapt E C1 C3.
 Proof with auto.
-  intros E C Ok.
-  induction C ; intros...
+  intros E C1 C2 C3 Ok H12 H23.
+  induction H12.
+  - Case "subcapt_universal".
+    destruct C3... exfalso. inversion H23. 
+      apply (cset_universal_subset t t0)...
+      apply subcapt_exists in H0 as [tf0 [tb0 H0eq]].
+      apply subcapt_exists in H2 as [tf2 [tb2 H2eq]].
+      subst.
+      csetdec.
+      inversion H.
+  - Case "subcapt_var".
+    admit.
+  - Case "subcapt_split".
+    admit.
+  - Case "subcapt_join".
+    admit.
 Admitted.
 
 
