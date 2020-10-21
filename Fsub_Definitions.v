@@ -373,7 +373,7 @@ Inductive wf_bound_typ : env -> typ -> Prop :=
       (forall X : atom, X `notin` L ->
         wf_bound_typ ([(X, bind_typ T1)] ++ E) (open_ct T2 (cset_singleton_fvar X))) ->
        wf_bound_typ E (typ_arrow T1 T2)
-  | wf_tbound_yp_all : forall L E T1 T2,
+  | wf_bound_typ_all : forall L E T1 T2,
       wf_bound_typ E T1 ->
       (forall X : atom, X `notin` L ->
       wf_bound_typ ([(X, bind_sub T1)] ++ E) (open_tt T2 X)) ->

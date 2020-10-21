@@ -30,8 +30,19 @@ Require Export Fsub_Infrastructure.
 (** This is really a sanity check and should be easy to prove. *)
 Lemma wf_typ_implies_classic : forall E T,
   wf_typ E T -> wf_bound_typ E T.
-Proof with eauto; try constructor.
+Proof with eauto; try constructor; eauto.
+  (* This is not the way to solve this, as we need to account for the binding
+      that is introduced in typ_var and is used in typ_capt.
+
+      A stronger induction hypothesis is needed here.  Maybe wf_covariant_type E Ep Em ->
+      wf_bound_typ (E ++ Ep ++ Em), but then there are ordering issues in the environment that
+      are really messy to deal with. *)
   intros E T H; induction H...
+  - apply wf_bound_typ_var with (U := U)...
+  - pick fresh Y and apply wf_bound_typ_arrow...
+    admit.
+  - pick fresh Y and apply wf_bound_typ_all...
+  - admit.
 Admitted.
 
 (** If a type is well-formed in an environment, then it is locally
