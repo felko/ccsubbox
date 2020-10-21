@@ -55,6 +55,13 @@ Proof with eauto.
   destruct H0...
 Qed.
 
+Lemma type_from_wf_covariant_typ : forall E Ep Em T,
+  wf_covariant_typ E Ep Em T -> type T.
+Proof with eauto.
+  intros E Ep Em T H; induction H...
+  destruct H0...
+Qed.
+
 (** The remaining properties are analogous to the properties that we
     need to show for the subtyping and typing relations. *)
 
@@ -96,6 +103,17 @@ Lemma wf_typ_weakening : forall T E F G,
 Proof.
   eauto using wf_covariant_typ_weakening.
 Qed.
+
+Lemma wf_covariant_typ_weaken_head : forall T E Ep Em F,
+  wf_covariant_typ E Ep Em T ->
+  ok (F ++ E) ->
+  wf_covariant_typ (F ++ E) Ep Em T.
+Proof.
+  intros.
+  rewrite_env (empty ++ F++ E).
+  auto using wf_covariant_typ_weakening.
+Qed.
+
 
 Lemma wf_typ_weaken_head : forall T E F,
   wf_typ E T ->
@@ -179,6 +197,56 @@ Lemma wf_typ_strengthening : forall E F X U T,
 Proof.
   eauto using wf_covariant_typ_strengthening.
 Qed.
+
+Lemma wf_covariant_typ_weakening_variance : forall T E Ep Gp Fp Em Gm Fm,
+  wf_covariant_typ E (Gp ++ Ep) (Gm ++ Em) T ->
+  ok (Gp ++ Fp ++ Ep) ->
+  ok (Gm ++ Fm ++ Em) ->
+  wf_covariant_typ E (Gp ++ Fp ++ Ep) (Gm ++ Fm ++ Em) T.
+Proof with simpl_env; auto; try fsetdec.
+  intros T E Ep Gp Fp Em Gm Fm Hwf_typ Hokp Hokm.
+  remember (Gp ++ Ep).
+  remember (Gm ++ Em).
+  generalize dependent Gp.
+  generalize dependent Gm.
+  generalize dependent Fp.
+  generalize dependent Fm.
+  generalize dependent Ep.
+  generalize dependent Em.
+  induction Hwf_typ; intros Em' Ep' Fm Fp Gm Heqm Hokm Gp Heqp Hokp; subst; auto.
+  - apply wf_typ_var with (U := U)...
+  - pick fresh Y and apply wf_typ_arrow; simpl_env; auto.
+    apply H0 with (Gp0 := [(Y, bind_typ T1)] ++ Gp).
+    fsetdec.
+    auto.
+    auto.
+    auto.
+    simpl_env. auto.
+  - pick fresh Y and apply wf_typ_all...
+  - apply wf_typ_capt...
+    unfold wf_cset in *; split; csetdec; destruct C; simpl_env in *...
+    apply H.
+    simpl_env in *.
+    unfold allbound in *. fsetdec.
+Qed.
+
+Admitted.
+Lemma wf_covariant_typ_subst_tb : forall F Q E Ep Em Z P T,
+  wf_covariant_typ (F ++ [(Z, bind_sub Q)] ++ E) Ep Em T ->
+  wf_typ E P ->
+  ok (map (subst_tb Z P) F ++ E) ->
+  wf_covariant_typ (map (subst_tb Z P) F ++ E) Ep Em (subst_tt Z P T).
+Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ.
+  intros F Q E Ep Em Z P T WT WP.
+  remember (F ++ [(Z, bind_sub Q)] ++ E).
+  generalize dependent F.
+  induction WT; intros F EQ Ok; subst; simpl subst_tt...
+  Case "wf_typ_var".
+    destruct (X == Z); subst...
+    SCase "X <> Z".
+      binds_cases H...
+      (* needs wf_covariant_typ_weakening_variance to weaken Ep and Em... *)
+Admitted.
 
 Lemma wf_typ_subst_tb : forall F Q E Z P T,
   wf_typ (F ++ [(Z, bind_sub Q)] ++ E) T ->
