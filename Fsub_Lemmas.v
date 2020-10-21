@@ -27,6 +27,13 @@ Require Export Fsub_Infrastructure.
 (* ********************************************************************** *)
 (** * #<a name="wft"></a># Properties of [wf_typ] *)
 
+(** This is really a sanity check and should be easy to prove. *)
+Lemma wf_typ_implies_classic : forall E T,
+  wf_typ E T -> wf_bound_typ E T.
+Proof with eauto; try constructor.
+  intros E T H; induction H...
+Admitted.
+
 (** If a type is well-formed in an environment, then it is locally
     closed. *)
 
