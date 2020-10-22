@@ -440,19 +440,25 @@ Inductive cv : typ -> env -> captureset -> Prop :=
 (** * #<a name="sub"></a># Subtyping *)
 
 
-Inductive subcapt : env -> captureset -> captureset -> Prop :=
-  | subcapt_universal : forall E C1,
-      subcapt E C1 cset_universal
-  | subcapt_distl : forall E fn C,
-      AtomSet.F.For_all (fun x => subcapt E (cset_singleton_fvar x) C) fn ->
-      subcapt E (cset_set fn {}N) C
-  | subcapt_distr : forall E x fn,
-      x `in` fn ->
-      subcapt E (cset_singleton_fvar x) (cset_set fn {}N)
-  | subcapt_var : forall E x T C,
+Inductive captures : env -> atoms -> atom -> Prop :=
+  (* xs captures x if it includes it verbatim *)
+  | captures_in : forall E x xs,
+      x `in` xs ->
+      captures E xs x
+  (* xs captures x if it includes its capture set (cv) *)
+  | captures_var : forall E T x xs ys,
       binds x (bind_typ T) E ->
-      cv T E C ->
-      subcapt E (cset_singleton_fvar x) C
+      cv T E (cset_set ys {}N) ->
+      AtomSet.F.For_all (captures E xs) ys ->
+      captures E xs x
+.
+
+Inductive subcapt : env -> captureset -> captureset -> Prop :=
+  | subcapt_universal : forall E C,
+      subcapt E C cset_universal
+  | subcapt_set : forall E xs ys,
+      AtomSet.F.For_all (captures E ys) xs ->
+      subcapt E (cset_set xs {}N) (cset_set ys {}N)
 .
 
 
@@ -649,7 +655,7 @@ Inductive red : exp -> exp -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type expr wf_covariant_typ wf_env value red cv sub subcapt typing : core.
+Hint Constructors type expr wf_covariant_typ wf_env value red cv sub captures subcapt typing : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var typing_app typing_tapp typing_sub : core.
 Hint Unfold wf_typ wf_cset : core.
