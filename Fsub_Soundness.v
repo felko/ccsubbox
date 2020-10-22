@@ -217,7 +217,6 @@ Proof with auto.
     apply captures_transitivity with (ys := ys)...
 Qed.
 
-
 Lemma sub_reflexivity : forall E T,
   wf_env E ->
   wf_typ E T ->
