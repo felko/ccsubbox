@@ -33,6 +33,23 @@ Proof with auto.
   apply cv_typ_var with (T := T)...
 Qed.
 
+Lemma captures_weakening : forall E F G xs x,
+  captures (G ++ E) xs x ->
+  wf_env (G ++ F ++ E) ->
+  captures (G ++ F ++ E) xs x.
+Proof with auto.
+  intros E F G xs x Hcap Hwf.
+  remember (G ++ E).
+  remember (G ++ F ++ E).
+  induction Hcap.
+  - apply captures_in...
+  - apply captures_var with (T := T) (ys := ys) ; subst...
+    apply cv_weakening...
+    unfold AtomSet.F.For_all.
+    intros.
+    apply H2...
+Qed.
+
 Lemma subcapt_weakening : forall E F G C1 C2,
   subcapt (G ++ E) C1 C2 ->
   wf_env (G ++ F ++ E) ->
@@ -41,10 +58,12 @@ Proof with auto.
   intros E F G C1 C2 Hsc Hwf.
   remember (G ++ E).
   remember (G ++ F ++ E).
-  induction Hsc ; subst...  
-  apply subcapt_var with (C2 := C2) (T := T)...
-  apply cv_weakening...
-Qed. 
+  induction Hsc ; subst...
+  apply subcapt_set.
+  unfold AtomSet.F.For_all.
+  intros.
+  apply captures_weakening...
+Qed.
 
 Lemma sub_weakening : forall E F G S T,
   sub (G ++ E) S T ->
@@ -108,12 +127,17 @@ Qed.
 
 Lemma subcapt_reflexivity : forall E C,
   wf_env E ->
+  (* We need as a precondition that C is locally closed! *)
+  empty_cset_bvars C ->
   subcapt E C C.
 Proof with auto.
-  intros E C Ok.
-  induction C...
-  apply subcapt_split...
-  apply cset_subset_reflexivity.
+  intros E C Ok Closed.
+  destruct C...
+  assert (t0 = {}N). { unfold empty_cset_bvars in Closed. csetdec. }
+  subst.
+  apply subcapt_set.
+  unfold AtomSet.F.For_all. intros.
+  apply captures_in...
 Qed.
 
 (* unversals can't be subcaptres of concrete capture sets. *)
@@ -135,40 +159,63 @@ Proof with auto.
   remember (cset_set tf tb).
   induction H.
   - inversion Heqc.
-  - exists (AtomSet.F.singleton X). exists (NatSet.F.empty)...
-  - inversion H. subst.
-    + inversion H1.
-    + exists ac. exists nc...
-  - specialize (IHsubcapt1 Heqc) as [tf1 [tb1 eq1]].
-    specialize (IHsubcapt2 Heqc) as [tf2 [tb2 eq2]].
-    subst. simpl. exists (tf1 `union` tf2). exists (NatSet.F.union tb1 tb2)...
+  - exists xs. exists {}N...
+Qed.
+
+Lemma cv_unique : forall T E C1 C2,
+  cv T E C1 ->
+  cv T E C2 ->
+  C1 = C2.
+Proof.
+Admitted.
+
+Lemma captures_transitivity : forall E xs ys x,
+  (* E |- {x} <: {ys} *)
+  captures E ys x ->
+  (* E |- {ys} <: {xs} *)
+  AtomSet.F.For_all (captures E xs) ys -> 
+  (* E |- {x} <: {xs} *)
+  captures E xs x.
+Proof with auto.
+  intros E xs ys x Hc Hall.  
+  remember ys.
+  generalize dependent ys.
+  remember xs.
+  generalize dependent xs.
+  remember x.
+  generalize dependent x.
+  induction Hc ; intros ; subst...
+  eapply captures_var.
+  apply H.
+  apply H0.
+  unfold AtomSet.F.For_all. intros.
+  eapply H2...
 Qed.
 
 Lemma subcapt_transitivity : forall E C1 C2 C3,
   wf_env E ->
+  empty_cset_bvars C3 -> 
   subcapt E C1 C2 ->
   subcapt E C2 C3 ->
   subcapt E C1 C3.
 Proof with auto.
-  intros E C1 C2 C3 Ok H12 H23.
-  induction H12.
+  intros E C1 C2 C3 Ok Closed H12 H23.
+  remember C1.
+  remember C2.
+  inversion H12.
   - Case "subcapt_universal".
-    destruct C3... exfalso. inversion H23. 
-      apply (cset_universal_subset t t0)...
-      apply subcapt_exists in H0 as [tf0 [tb0 H0eq]].
-      apply subcapt_exists in H2 as [tf2 [tb2 H2eq]].
-      subst.
-      csetdec.
-      inversion H.
-  - Case "subcapt_var".
-    specialize (IHsubcapt Ok H23).
-    apply subcapt_var with (T := T) (C2 := C2)...
-  - Case "subcapt_split".
-    admit.
-  - Case "subcapt_join".
-    admit.
-Admitted.
-
+    destruct C3... exfalso. subst. inversion H23.
+  - Case "subcapt_set".
+    subst.
+    remember C3.
+    destruct C3. subst...
+    assert (t0 = {}N) as cl. { subst. unfold empty_cset_bvars in Closed. csetdec. }
+    subst.
+    eapply subcapt_set.
+    unfold AtomSet.F.For_all. intros.
+    inversion H23. subst.
+    apply captures_transitivity with (ys := ys)...
+Qed.
 
 Lemma sub_reflexivity : forall E T,
   wf_env E ->
@@ -199,6 +246,8 @@ Proof with auto.
     apply H0.
     apply wf_env_sub...
   - apply sub_capt... apply subcapt_reflexivity...
+    unfold wf_cset in H.
+    intuition.
 Qed.
 
 (* Subtyping implies subcapturing *)

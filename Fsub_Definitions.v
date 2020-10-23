@@ -462,29 +462,28 @@ Inductive cv : typ -> env -> captureset -> Prop :=
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
 
-(** Subcapturing captures (mind the pun) the notion that one capture
-    set can be subsumed by another. *)
-Inductive subcapt : env -> captureset -> captureset -> Prop :=
-  (** the universal capture set captures all. *)
-  | subcapt_universal : forall E C1,
-      subcapt E C1 cset_universal
-  (** If x : T is bound in the environment, then a capture set referencing {x}
-      can be resolved as if it were cv(T). *)
-  | subcapt_var : forall E C1 C2 X T,
-      binds X (bind_typ T) E ->
-      cv T E C2 ->
-      subcapt E C2 C1 ->
-      subcapt E (cset_singleton_fvar X) C1
-  (** Subcapturing behaves well across taking subsets *)
-  | subcapt_split : forall E C1 C2,
-      cset_subset_prop C1 C2 ->
-      subcapt E C1 C2
-  (** ... and taking unions. *)
-  | subcapt_join : forall E C1 C2 C,
-      subcapt E C1 C ->
-      subcapt E C2 C ->
-      subcapt E (cset_union C1 C2) C
+
+Inductive captures : env -> atoms -> atom -> Prop :=
+  (* xs captures x if it includes it verbatim *)
+  | captures_in : forall E x xs,
+      x `in` xs ->
+      captures E xs x
+  (* xs captures x if it includes its capture set (cv) *)
+  | captures_var : forall E T x xs ys,
+      binds x (bind_typ T) E ->
+      cv T E (cset_set ys {}N) ->
+      AtomSet.F.For_all (captures E xs) ys ->
+      captures E xs x
 .
+
+Inductive subcapt : env -> captureset -> captureset -> Prop :=
+  | subcapt_universal : forall E C,
+      subcapt E C cset_universal
+  | subcapt_set : forall E xs ys,
+      AtomSet.F.For_all (captures E ys) xs ->
+      subcapt E (cset_set xs {}N) (cset_set ys {}N)
+.
+
 
 (** The definition of subtyping is straightforward.  It uses the
     [binds] relation from the [Environment] library (in the
@@ -679,7 +678,7 @@ Inductive red : exp -> exp -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type expr wf_covariant_typ wf_env value red cv sub subcapt typing : core.
+Hint Constructors type expr wf_covariant_typ wf_env value red cv sub captures subcapt typing : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var typing_app typing_tapp typing_sub : core.
 Hint Unfold wf_typ wf_cset : core.
