@@ -356,9 +356,13 @@ Notation "[ x ]" := (x :: nil).
 
 (* A wellformed cset has no open debruijn indices and all bound fvars are in E *)
 Definition allbound (E : atoms) (X : atoms) : Prop := AtomSet.F.Subset X E.
+(** For our current calculus, we disallow type variables from showing up in capture
+  sets -- only term variables are allowed. *)
+Definition allbound_typ (E : env) (Ep : env ) (X : atoms) : Prop :=
+  forall x, AtomSet.F.In x X -> exists T, binds x (bind_typ T) E \/ binds x (bind_typ T) Ep.
 
 Definition wf_cset (E Ep : env) (C : captureset) : Prop := 
-  (empty_cset_bvars C) /\ (cset_fvars (allbound (AtomSet.F.union (dom E) (dom Ep))) C).
+  (empty_cset_bvars C) /\ (cset_fvars (allbound_typ E Ep) C).
 
 (* Wellformedness of types where variables are bound. *)
 Inductive wf_bound_typ : env -> typ -> Prop :=
