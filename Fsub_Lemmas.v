@@ -79,7 +79,12 @@ Ltac wf_cset_simpl instantiate_ext :=
       destruct H as [_ Hexists];
       apply Hexists in Hx;
       destruct Hx as [T HT];
-      match instantiate_ext with
+      (* Here we have two cases; if instantiate_ext is True,
+          we automatically instantiate the type that x should be bound to
+          with the type it's bound to in the hypothesis.  This is useful in most cases,
+          but when substituting this might not be true. *)
+      lazymatch instantiate_ext with
+      (* HT is always a disjunction --> is x in E or in Ep? *)
       | True => exists T; destruct HT
       | False => idtac
       end
@@ -105,9 +110,7 @@ Proof with simpl_env; eauto; try fsetdec.
   - pick fresh Y and apply wf_typ_all...
     apply H0 with (X := Y) (G0 := [(Y, bind_sub T1)] ++ G)...
   - apply wf_typ_capt...
-    wf_cset_simpl True.
-    + left...
-    + right...
+    wf_cset_simpl True...
 Qed.
 Local Lemma wf_covariant_typ_weakening_variance : forall T E Ep Gp Fp Em Gm Fm,
   wf_covariant_typ E (Gp ++ Ep) (Gm ++ Em) T ->
@@ -133,8 +136,7 @@ Proof with simpl_env; auto.
     + right...
   - pick fresh Y and apply wf_typ_all...
   - apply wf_typ_capt...
-    wf_cset_simpl True.
-    + left...
+    wf_cset_simpl True...
     + right. destruct Hokp; subst...
 Qed.
 
@@ -211,10 +213,8 @@ Proof with simpl_env; eauto.
     apply H0...
   (* typ_capt *)
   - eapply wf_typ_capt...
-    wf_cset_simpl True.
-    + left.
-      binds_cases H...
-    + right...
+    wf_cset_simpl True...
+    + binds_cases H...
 Qed.
 (** Again, a simpler version which is used more often. *)
 Lemma wf_typ_narrowing : forall V U T E F X,
@@ -224,69 +224,6 @@ Lemma wf_typ_narrowing : forall V U T E F X,
 Proof with simpl_env; eauto.
   eauto using wf_covariant_typ_narrowing.
 Qed.
-
-(* X could occur in a capture set in T 
-   TODO maybe modify the lemma to include 
-    X `notin` fv_et T
-*)
-Lemma wf_covariant_typ_strengthening : forall E F G1 G2 X U T,
- wf_covariant_typ (F ++ [(X, bind_typ U)] ++ E) G1 G2 T ->
- wf_covariant_typ (F ++ E) G1 G2 T.
-Proof.
-  intros E F G1 G2 X U T H.
-  remember (F ++ [(X, bind_typ U)] ++ E).
-  remember G1.
-  remember G2.
-  generalize dependent F.
-  generalize dependent G1.
-  generalize dependent G2.
-  induction H ; intros G2 Heqm G1 Heqp F Heq ; subst; auto.
-  - binds_cases H ; eauto.
-  - eapply wf_typ_arrow with (L := L); eauto.
-  - pick fresh Y and apply wf_typ_all; eauto.
-    rewrite <- concat_assoc.
-    eapply H1; auto.
-  - apply wf_typ_capt.
-    + apply IHwf_covariant_typ with (G3 := G2) (G4 := G1) ; auto.
-    + destruct H0. econstructor ; auto. 
-      unfold allbound in *. 
-      csetdec.
-      destruct C.
-      apply H1.
-      simpl_env in *.
-      assert (X `notin` t). { admit. }
-      admit.
-Admitted.
-
-Lemma wf_typ_strengthening : forall E F X U T,
- wf_typ (F ++ [(X, bind_typ U)] ++ E) T ->
- wf_typ (F ++ E) T.
-Proof.
-  eauto using wf_covariant_typ_strengthening.
-Qed.
-
-Ltac prepend_empty_env :=
-  match goal with
-  | H : _ |- context R [(?G ++ ?F ++ ?E)] => fail
-  | H : _ |- context R [(?E)] =>
-    let Y := E in change (Y) with (empty ++ Y)
-  | H : _ |- context R [(?E)] =>
-    let Y := E in replace (Y) with (empty ++ Y); [ | try reflexivity; simpl_env; reflexivity ]
-  | H : _ |- context R [(?F ++ ?E)] =>
-    let X := F in let Y := E in change (X ++ Y) with (empty ++ X ++ Y)
-  | H : _ |- context R [(?F ++ ?E)] =>
-    let X := F in let Y := E in replace (X ++ Y) with (empty ++ X ++ Y); [ | try reflexivity; simpl_env; reflexivity ]
-  end
-.
-Ltac append_empty_env :=
-  match goal with
-  | H : _ |- context R [(?G ++ ?F ++ ?E)] => fail
-  | H : _ |- context R [(?G ++ ?F)] =>
-    let X := G in let Y := F in change (X ++ Y) with (X ++ Y ++ empty)
-  | H : _ |- context R [(?G ++ ?F)] =>
-    let X := G in let Y := F in replace (X ++ Y) with (X ++ Y ++ empty); [ | try reflexivity; simpl_env; reflexivity ]    
-  end
-.
 
 (** Lemmas around substituion, and how they preserve local closure.
     We need a technical lemma around substituting in the presence of +/-
@@ -314,17 +251,9 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ.
     + SCase "X = Z".
       binds_cases H...
       all: rewrite_env (empty ++ map (subst_tb Z P) F ++ E);
-           rewrite_env (empty ++ (map (subst_tb Z P) Fp) ++ Ep');
-           rewrite_env (empty ++ (map (subst_tb Z P) Fm) ++ Em');
+           rewrite_env (empty ++ ((map (subst_tb Z P) Fp) ++ Ep') ++ empty);
+           rewrite_env (empty ++ ((map (subst_tb Z P) Fm) ++ Em') ++ empty);
            apply wf_covariant_typ_weakening...
-      all: rewrite_env (empty ++ Ep' ++ empty);
-           rewrite_env (empty ++ Em' ++ empty);
-           rewrite_env (empty ++ empty ++ E);
-           apply wf_covariant_typ_weakening...
-
-      all: left; prepend_empty_env; try solve
-        [(try solve [(apply ok_remove_mid with (F:= map (subst_tb Z P) Fp); simpl_env; eauto*)])
-          || (try solve [(apply ok_remove_mid with (F:= map (subst_tb Z P) Fm); simpl_env; eauto*)])].
     + SCase "X <> Z".
       binds_cases H...
       apply (wf_typ_var (subst_tt Z P U))...
@@ -341,6 +270,8 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ.
     apply H0...
   - Case "wf_typ_capt".
     apply wf_typ_capt...
+    (** Here we need to do the manual destruction of the binding term, as the type x is bound to
+        might need to be substituted in. *)
     wf_cset_simpl False.
     destruct HT; binds_cases H; eauto; exists (subst_tt Z P T0)...
 Qed.
@@ -428,19 +359,6 @@ Proof with eauto 6 using wf_typ_narrowing.
     inversion Wf_env; subst; simpl_env in *...
 Qed.
 
-Lemma wf_env_strengthening : forall x T E F,
-  wf_env (F ++ [(x, bind_typ T)] ++ E) ->
-  wf_env (F ++ E).
-Proof with eauto using wf_typ_strengthening.
-  induction F; intros Wf_env; inversion Wf_env; subst; simpl_env in *...
-Qed.
-
-Lemma wf_env_strengthen_context : forall E F,
-  wf_env (F ++ E) ->
-  wf_env E.
-Proof with eauto.
-  induction F; intros Wf_env; inversion Wf_env...
-Qed.
 
 Lemma wf_env_subst_tb : forall Q Z P E F,
   wf_env (F ++ [(Z, bind_sub Q)] ++ E) ->
