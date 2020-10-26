@@ -496,21 +496,12 @@ Lemma notin_fv_wf : forall E (X : atom) T,
   wf_typ E T ->
   X `notin` dom E ->
   X `notin` fv_tt T.
-Proof with auto.
-  intros E X T Wf_typ.
-  induction Wf_typ; intros Fr; simpl ; try apply notin_union...
-  - assert (X0 `in` (dom E))...
-    eapply binds_In; eauto.
-  - pick fresh Y.
-    specialize (IHWf_typ Fr).
-    assert (Y `notin` L). { fsetdec. }
-    specialize (H0 Y H1 Fr). 
-    apply notin_fv_ct_open with (C := (cset_singleton_fvar Y))...
-  - pick fresh Y.
-    specialize (IHWf_typ Fr).
-    assert (Y `notin` L). { fsetdec. }
-    specialize (H0 Y H1).
-    apply notin_fv_tt_open with (Y := Y)...
+Proof with eauto.
+  intros E X T Wf_typ F.
+  assert (X `notin` (fv_tt T `union` fv_et T)). {
+    eapply notin_fv_wf_covariant...
+  }
+  fsetdec.
 Qed.
 
 Lemma map_subst_tb_id : forall G Z P,
