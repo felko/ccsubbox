@@ -373,7 +373,8 @@ Qed.
 (* ********************************************************************** *)
 (** * #<a name="subst"></a># Environment is unchanged by substitution for a fresh name *)
 
-Lemma notin_fv_tt_open : forall (Y X : atom) T,
+(** These proofs are all the same, but Coq isn't smart enough unfortunately... *)
+Local Lemma notin_fv_tt_open_tt : forall (Y X : atom) T,
   X `notin` fv_tt (open_tt T Y) ->
   X `notin` fv_tt T.
 Proof.
@@ -381,8 +382,26 @@ Proof.
  generalize 0.
  induction T; simpl; intros k Fr; notin_simpl; try apply notin_union; eauto.
 Qed.
+Local Lemma notin_fv_tt_open_et : forall (Y X : atom) T,
+  X `notin` fv_et (open_tt T Y) ->
+  X `notin` fv_et T.
+Proof.
+ intros Y X T. unfold open_tt.
+ generalize 0.
+ induction T; simpl; intros k Fr; notin_simpl; try apply notin_union; eauto.
+Qed.
+Local Lemma notin_fv_tt_open : forall (Y X : atom) T,
+  X `notin` fv_tt (open_tt T Y) ->
+  X `notin` fv_et (open_tt T Y) ->
+  X `notin` (fv_tt T `union` fv_et T).
+Proof with auto.
+ intros. apply notin_union.
+ - apply notin_fv_tt_open_tt with (Y := Y)...
+ - apply notin_fv_tt_open_et with (Y := Y)...
+Qed.
 
-Lemma notin_fv_ct_open : forall (X : atom) T C,
+(** Again, these proofs are all the same, but Coq isn't smart enough unfortunately. *)
+Local Lemma notin_fv_ct_open_tt : forall (X : atom) T C,
   X `notin` fv_tt (open_ct T C) ->
   X `notin` fv_tt T.
 Proof with auto.
@@ -394,8 +413,85 @@ Proof with auto.
   - specialize (IHT1 k). specialize (IHT2 k)...
   - specialize (IHT1 k). specialize (IHT2 k)...
 Qed.
+Local Lemma notin_fv_ct_open_et : forall (X : atom) T C,
+  C <> cset_universal ->
+  X `notin` fv_et (open_ct T C) ->
+  X `notin` fv_et T.
+Proof with auto.
+  intros X T C Hc. unfold open_ct.
+  generalize 0.
+  induction T ; simpl ; intros k Fr ; try apply notin_union; eauto.
+  - specialize (IHT1 k). specialize (IHT2 (S k))...
+  - specialize (IHT1 k). specialize (IHT2 (S k))...
+  - specialize (IHT1 k). specialize (IHT2 k)...
+  - specialize (IHT1 k). specialize (IHT2 k)...
+  - notin_simpl. clear IHT H0.
+    revert H. unfold cset_fvar. unfold open_captureset_bvar. cset_split; destruct C eqn:HC; destruct c eqn:Hcd...
+  - specialize (IHT k)...
+Qed.
+Lemma notin_fv_ct_open : forall (X : atom) T C,
+  C <> cset_universal ->
+  X `notin` fv_et (open_ct T C) ->
+  X `notin` fv_tt (open_ct T C) ->
+  X `notin` (fv_tt T `union` fv_et T).
+Proof with auto.
+  intros. apply notin_union...
+  - apply notin_fv_ct_open_tt with (C := C)...
+  - apply notin_fv_ct_open_et with (C := C)...
+Qed.
 
-(* Maybe we need to generalize this to E Ep and Em? *)
+(* Maybe we need to generalize this to E Ep and Em.
+   Hopefully not.... *)
+Lemma notin_fv_wf_covariant : forall E Ep Em (X : atom) T,
+  wf_covariant_typ E Ep Em T ->
+  X `notin` dom E ->
+  X `notin` dom Ep ->
+  X `notin` dom Em ->
+  X `notin` (fv_tt T `union` fv_et T).
+Proof with eauto.
+  intros E Ep Em X T Wf_typ.
+  induction Wf_typ; intros FrE FrEp FrEm; simpl.
+  - fsetdec.
+  - assert (X0 `in` dom E) by (eapply binds_In; eauto)...
+  - pick fresh Y.
+    assert (Y `notin` L) by fsetdec.
+    assert (X `notin` dom ([(Y, bind_typ T1)] ++ Ep)). {
+      simpl_env. fsetdec.
+    }
+    specialize (H0 Y H1 FrE H2 FrEm).
+    notin_simpl.
+    repeat apply notin_union...
+    + apply notin_fv_ct_open_tt with (C := cset_singleton_fvar Y)...
+    + apply notin_fv_ct_open_et with (C := cset_singleton_fvar Y).
+      discriminate. intuition.
+  - pick fresh Y.
+    assert (Y `notin` L) by fsetdec.
+    assert (X `notin` dom ([(Y, bind_typ T1)] ++ E)). {
+      simpl_env. fsetdec.
+    }
+    specialize (H0 Y H1 H2 FrEp FrEm).
+    notin_simpl.
+    repeat apply notin_union...
+    + apply notin_fv_tt_open_tt with (Y := Y)...
+    + apply notin_fv_tt_open_et with (Y := Y)...
+  - specialize (IHWf_typ FrE FrEp FrEm).
+    unfold wf_cset in H.
+    inversion H.
+    destruct C.
+    + fsetdec.
+    + repeat apply notin_union; try fsetdec.
+      unfold cset_fvars in *.
+      unfold allbound_typ in *.
+      unfold cset_fvar.
+      intro.
+      specialize (H1 X H2).
+      destruct H1.
+      destruct H1.
+      * assert (X `in` dom E) by (eapply binds_In; eauto).
+        contradiction.
+      * assert (X `in` dom Ep) by (eapply binds_In; eauto).
+        contradiction.
+Qed.
 Lemma notin_fv_wf : forall E (X : atom) T,
   wf_typ E T ->
   X `notin` dom E ->
@@ -448,10 +544,15 @@ Proof with simpl_env; auto*.
     repeat split ; auto.
     pick fresh Y and apply wf_typ_arrow...
     destruct (H1 Y) as [HEnv [HS2 HT2]]...
-    admit.
-    econstructor...
-    intros.
-    admit.
+    - admit.
+    - pick fresh Y and apply wf_typ_arrow...
+      admit.
+    - repeat split...
+      + admit.
+      + admit.
+    - repeat split...
+      + admit.
+      + admit.
   Case "sub_all".
     destruct IHsub ; auto.
     destruct H3.
