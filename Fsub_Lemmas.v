@@ -517,7 +517,6 @@ Proof with auto.
     rewrite <- subst_tt_fresh... eapply notin_fv_wf; eauto.
 Qed.
 
-
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)
 
@@ -535,7 +534,15 @@ Proof with simpl_env; auto*.
     repeat split ; auto.
     pick fresh Y and apply wf_typ_arrow...
     destruct (H1 Y) as [HEnv [HS2 HT2]]...
-    - admit.
+    - unfold wf_typ in HS2.
+      rewrite_env (empty ++ empty ++ E).
+      rewrite_env (empty ++ empty ++ [(Y, bind_typ S1)] ).
+      rewrite_env (empty ++ empty ++ empty).
+      apply wf_covariant_typ_weakening...
+
+      (** stuck here *)
+      admit.
+       
     - pick fresh Y and apply wf_typ_arrow...
       admit.
     - repeat split...
