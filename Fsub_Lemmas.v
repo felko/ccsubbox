@@ -520,62 +520,29 @@ Qed.
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)
 
+Lemma subcapt_regular : forall E C1 C2,
+  subcapt E C1 C2 ->
+  wf_cset E empty C1 /\ wf_cset E empty C2.
+Proof with eauto*.
+  intros. inversion H...
+  - split...
+    (* make universal cset wf *)
+    admit.
+Admitted.
+
 Lemma sub_regular : forall E S T,
   sub E S T ->
   wf_env E /\ wf_typ E S /\ wf_typ E T.
 Proof with simpl_env; auto*.
   intros E S T H.
   induction H...
-  Case "sub_trans_tvar".
+  - Case "sub_trans_tvar".
     eauto*.
-  Case "sub_arrow".
-    destruct IHsub.
-    destruct H3.
-    repeat split ; auto.
-    pick fresh Y and apply wf_typ_arrow...
-    destruct (H1 Y) as [HEnv [HS2 HT2]]...
-    - unfold wf_typ in HS2.
-      rewrite_env (empty ++ empty ++ E).
-      rewrite_env (empty ++ empty ++ [(Y, bind_typ S1)] ).
-      rewrite_env (empty ++ empty ++ empty).
-      apply wf_covariant_typ_weakening...
-
-      (** stuck here *)
-      admit.
-       
-    - pick fresh Y and apply wf_typ_arrow...
-      admit.
-    - repeat split...
-      + admit.
-      + admit.
-    - repeat split...
-      + admit.
-      + admit.
-  Case "sub_all".
-    destruct IHsub ; auto.
-    destruct H3.
-    repeat split ; auto.
-    SCase "Second of original three conjuncts".
-      pick fresh Y and apply wf_typ_all...
-      destruct (H1 Y)...
-      destruct H6...
-      rewrite_env (empty ++ [(Y, bind_sub S1)] ++ E).
-      apply (wf_typ_narrowing T1)...
-    SCase "Third of original three conjuncts".
-      pick fresh Y and apply wf_typ_all...
-      destruct (H1 Y)...
-  (* Do we need to add wf conditions on capturesets to subcapt just for regularity?  *)
-  Case "sub_capt".
-    destruct IHsub ; auto.
-    destruct H2.
-    repeat split ; auto.
-    SCase "Second of original three conjuncts".
-      - constructor ; auto.
-        unfold wf_cset.
-        admit.
-      - constructor ; auto.
-        admit.
-Admitted.
+  - Case "sub_capt".
+    repeat split...
+    all: constructor...
+    all: pose proof (subcapt_regular E C1 C2 H0)...
+Qed.
 
 Lemma typing_regular : forall E e T,
   typing E e T ->
@@ -685,6 +652,10 @@ Admitted.
 
     The other three hints try outright to solve their respective
     goals. *)
+
+Hint Extern 1 (wf_cset ?E) =>
+  match goal with |-
+  | H: subcapt _ _ _ |- _ => apply (proj1 (subcapt_regular _ _ _ H)).
 
 Hint Extern 1 (wf_env ?E) =>
   match goal with

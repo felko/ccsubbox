@@ -482,8 +482,11 @@ Inductive captures : env -> atoms -> atom -> Prop :=
 
 Inductive subcapt : env -> captureset -> captureset -> Prop :=
   | subcapt_universal : forall E C,
+      wf_cset E empty C ->
       subcapt E C cset_universal
   | subcapt_set : forall E xs ys,
+      wf_cset E empty (cset_set xs {}N) ->
+      wf_cset E empty (cset_set ys {}N) ->
       AtomSet.F.For_all (captures E ys) xs ->
       subcapt E (cset_set xs {}N) (cset_set ys {}N)
 .
@@ -529,6 +532,8 @@ Inductive sub : env -> typ -> typ -> Prop :=
 *)
   | sub_arrow : forall L E S1 S2 T1 T2,
       sub E T1 S1 ->
+      wf_typ E (typ_arrow T1 T2) ->
+      wf_typ E (typ_arrow S1 S2) ->
       (forall x : atom, x `notin` L ->
           sub ([(x, bind_typ T1)] ++ E) (open_ct S2 (cset_singleton_fvar x)) (open_ct T2 (cset_singleton_fvar x))) ->
       sub E (typ_arrow S1 S2) (typ_arrow T1 T2)
@@ -540,6 +545,8 @@ Inductive sub : env -> typ -> typ -> Prop :=
  *)
   | sub_all : forall L E S1 S2 T1 T2,
       sub E T1 S1 ->
+      wf_typ E (typ_all T1 T2) ->
+      wf_typ E (typ_all S1 S2) ->
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
       sub E (typ_all S1 S2) (typ_all T1 T2)
