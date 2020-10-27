@@ -66,33 +66,35 @@ Qed.
 
 (** This is a useful helper tactic for clearing away
     capture set wellformedness. *)
+
 Ltac wf_cset_simpl instantiate_ext :=
   match goal with 
+  | H : _ |- (wf_cset _ _ cset_universal) =>
+    constructor
   | H : (wf_cset _ _ ?C) |- (wf_cset _ _ ?C) =>
+    let Hdestruct := fresh "Hdestruct" in
     let x  := fresh "x" in
     let Hx := fresh "Hxin" in
     let Hexists := fresh "Hexists" in
     let T := fresh "T" in
-    let HT := fresh "HT" in
-      unfold wf_cset in *; split; csetdec; destruct C; simpl_env in *; try apply H;
-      unfold allbound_typ in *; intros x Hx;
-      destruct H as [_ Hexists];
-      apply Hexists in Hx;
-      destruct Hx as [T HT];
-      (* Here we have two cases; if instantiate_ext is True,
-          we automatically instantiate the type that x should be bound to
-          with the type it's bound to in the hypothesis.  This is useful in most cases,
-          but when substituting this might not be true. *)
-      lazymatch instantiate_ext with
-      (* HT is always a disjunction --> is x in E or in Ep? *)
-      | True => exists T; destruct HT
-      | False => idtac
-      end
+    let Hbound := fresh "Hbound" in
+    let tmp1 := fresh "tmp1" in
+    let tmp2 := fresh "tmp2" in
+    let fvars := fresh "fvars" in
+    let tmp3 := fresh "tmp3" in
+      inversion H as [|tmp1 tmp2 fvars Hbound tmp3]; subst; [ auto | 
+        constructor;
+        unfold allbound_typ in Hbound;
+        intros x Hx;
+        destruct (Hbound x Hx) as [T Hexists];
+        lazymatch instantiate_ext with
+        | True => exists T; destruct Hexists
+        | False => idtac
+      end ]
   end.
 
 (** The remaining properties are analogous to the properties that we
     need to show for the subtyping and typing relations. *)
-
 
 (** These two lemmas give a general weakening lemma for wf_covariant_typ.
     They stay separate as the techniques needed to prove them are different. *)
@@ -214,7 +216,7 @@ Proof with simpl_env; eauto.
   (* typ_capt *)
   - eapply wf_typ_capt...
     wf_cset_simpl True...
-    + binds_cases H...
+    + binds_cases H0...
 Qed.
 (** Again, a simpler version which is used more often. *)
 Lemma wf_typ_narrowing : forall V U T E F X,
@@ -222,7 +224,8 @@ Lemma wf_typ_narrowing : forall V U T E F X,
   ok (F ++ [(X, bind_sub U)] ++ E) ->
   wf_typ (F ++ [(X, bind_sub U)] ++ E) T.
 Proof with simpl_env; eauto.
-  eauto using wf_covariant_typ_narrowing.
+  intros.
+  apply wf_covariant_typ_narrowing with (V := V)...
 Qed.
 
 (** Lemmas around substituion, and how they preserve local closure.
@@ -273,7 +276,7 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ.
     (** Here we need to do the manual destruction of the binding term, as the type x is bound to
         might need to be substituted in. *)
     wf_cset_simpl False.
-    destruct HT; binds_cases H; eauto; exists (subst_tt Z P T0)...
+    destruct Hexists; binds_cases H0; eauto; exists (subst_tt Z P T0)...
 Qed.
 
 Lemma wf_typ_subst_tb : forall F Q E Z P T,
@@ -297,7 +300,8 @@ Proof with simpl_env; eauto.
   pick fresh X.
   rewrite (subst_tt_intro X)...
   rewrite_env (map (subst_tb X U) empty ++ E).
-  eapply wf_typ_subst_tb...
+  apply wf_typ_subst_tb with (Q := T1)...
+  apply H5...
 Qed.
 
 
@@ -475,18 +479,19 @@ Proof with eauto.
     + apply notin_fv_tt_open_tt with (Y := Y)...
     + apply notin_fv_tt_open_et with (Y := Y)...
   - specialize (IHWf_typ FrE FrEp FrEm).
-    unfold wf_cset in H.
-    inversion H.
+    inversion H;
     destruct C.
     + fsetdec.
+    + repeat apply notin_union; try fsetdec.
+    + contradict H3; discriminate.
     + repeat apply notin_union; try fsetdec.
       unfold cset_fvars in *.
       unfold allbound_typ in *.
       unfold cset_fvar.
       intro.
-      specialize (H1 X H2).
-      destruct H1.
-      destruct H1.
+      specialize (H0 X H4).
+      destruct H0.
+      destruct H0.
       * assert (X `in` dom E) by (eapply binds_In; eauto).
         contradiction.
       * assert (X `in` dom Ep) by (eapply binds_In; eauto).
@@ -525,10 +530,7 @@ Lemma subcapt_regular : forall E C1 C2,
   wf_cset E empty C1 /\ wf_cset E empty C2.
 Proof with eauto*.
   intros. inversion H...
-  - split...
-    (* make universal cset wf *)
-    admit.
-Admitted.
+Qed.
 
 Lemma sub_regular : forall E S T,
   sub E S T ->
@@ -536,12 +538,14 @@ Lemma sub_regular : forall E S T,
 Proof with simpl_env; auto*.
   intros E S T H.
   induction H...
+  - Case "sub_top".
+    repeat split... constructor.
   - Case "sub_trans_tvar".
-    eauto*.
-  - Case "sub_capt".
     repeat split...
-    all: constructor...
-    all: pose proof (subcapt_regular E C1 C2 H0)...
+    apply wf_typ_var with (U := U)...
+  - Case "sub_capt".
+    pose proof (subcapt_regular E C1 C2)...
+    repeat split; try constructor...
 Qed.
 
 Lemma typing_regular : forall E e T,

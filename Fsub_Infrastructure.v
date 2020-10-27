@@ -675,12 +675,12 @@ Proof with auto*.
     apply open_ct_rec_type_aux with (j := 0) (S := X)...
   (* Case typ_capt *)
   * unfold open_captureset_bvar.
-    case_eq (cset_references_bvar_dec k C0); intros.
+    case_eq (cset_references_bvar_dec k (cset_set fvars {}N)); intros.
     ** unfold empty_cset_bvars in H. unfold cset_bvars in H.
-       assert (cset_references_bvar_dec k C0 = false).
-        { unfold cset_references_bvar_dec. destruct C0 ; auto. apply NatSetFacts.not_mem_iff.
+       assert (cset_references_bvar_dec k (cset_set fvars {}N) = false).
+        { unfold cset_references_bvar_dec. apply NatSetFacts.not_mem_iff.
           nnotin_solve. }
-       csethyp. discriminate H0.
+       csethyp. destruct C...
     ** auto.
 Qed.
 
@@ -700,15 +700,13 @@ Proof with auto*.
   - intro. apply open_ct_rec_type with (T := typ_arrow P1 P2). apply H.
   - intro. apply open_ct_rec_type with (T := typ_all P1 P2). apply H.
   - intro ; inversion H ; simpl ; f_equal... 
-    unfold empty_cset_bvars in H3.
-    unfold cset_bvars in H3.
     destruct c...
     unfold open_captureset_bvar.
     unfold cset_singleton_fvar.
     destruct (cset_references_bvar_dec k (cset_set t t0)) eqn:Hb.    
     * rewrite cset_references_bvar_eq in Hb. unfold cset_references_bvar in Hb. unfold cset_bvars in Hb.
-      contradict Hb. nnotin_solve.
-    * reflexivity.
+      contradict Hb. inversion H0. nnotin_solve.
+    * simpl. assert (NatSet.F.mem k {}N = false). { apply NatSetFacts.not_mem_iff. fnsetdec. } rewrite H3...
 Qed.
 
 (* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
@@ -1115,7 +1113,7 @@ Lemma subst_ct_type : forall T z c,
   type (subst_ct z c T).
 Proof with auto.
   intros T z c Tpe Closed.
-  induction Tpe; simpl; econstructor...
+  induction Tpe; simpl; try econstructor...
   - let F := gather_atoms in instantiate (1 := F).
     intros X HXfresh.
     assert ((open_ct (subst_ct z c T2) (cset_singleton_fvar X)) =
@@ -1130,8 +1128,13 @@ Proof with auto.
     { apply open_tt_subst_ct_aux. csetdec; destruct c... }
     rewrite H1. apply H0...
   (* TODO: This should probably go in a tactic *)
-  - csetdec. destruct c eqn:Hc; destruct C eqn:HC; cset_split; cset_cleanup.
-    unfold empty_cset_bvars in *. csetdec.
+  - unfold substitute_captureset_fvar in *.
+    cset_split; cset_cleanup; destruct c...
+    assert (t0 = {}N). {
+      unfold empty_cset_bvars in *. unfold cset_bvars in *.
+      fnsetdec.
+    }
+    subst. csetdec. rewrite elim_empty_nat_set...
 Qed.
 
 (* TODO clean up the proof here *)

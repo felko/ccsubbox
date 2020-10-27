@@ -229,10 +229,12 @@ Inductive type : typ -> Prop :=
       type T1 ->
       (forall X : atom, X `notin` L -> type (open_tt T2 X)) ->
       type (typ_all T1 T2)
-  | type_capt : forall C T,
+  | type_capt_universal : forall T,
       type T ->
-      (empty_cset_bvars C) ->
-      type (typ_capt C T)
+      type (typ_capt cset_universal T)
+  | type_capt : forall fvars T,
+      type T ->
+      type (typ_capt (cset_set fvars {}N) T)
 .
 
 Inductive expr : exp -> Prop :=
@@ -358,11 +360,16 @@ Notation "[ x ]" := (x :: nil).
 Definition allbound (E : atoms) (X : atoms) : Prop := AtomSet.F.Subset X E.
 (** For our current calculus, we disallow type variables from showing up in capture
   sets -- only term variables are allowed. *)
-Definition allbound_typ (E : env) (Ep : env ) (X : atoms) : Prop :=
+Definition allbound_typ (E : env) (Ep : env) (X : atoms) : Prop :=
   forall x, AtomSet.F.In x X -> exists T, binds x (bind_typ T) E \/ binds x (bind_typ T) Ep.
 
-Definition wf_cset (E Ep : env) (C : captureset) : Prop := 
-  (empty_cset_bvars C) /\ (cset_fvars (allbound_typ E Ep) C).
+Inductive wf_cset : env -> env -> captureset -> Prop :=
+  | wf_universal_cset : forall E Ep,
+    wf_cset E Ep cset_universal
+  | wf_concrete_cset : forall E Ep fvars,
+    (allbound_typ E Ep fvars) ->
+    wf_cset E Ep (cset_set fvars {}N)
+.
 
 (* Wellformedness of types where variables are bound. *)
 Inductive wf_bound_typ : env -> typ -> Prop :=
@@ -689,7 +696,6 @@ Inductive red : exp -> exp -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type expr wf_covariant_typ wf_env value red cv sub captures subcapt typing : core.
+Hint Constructors type expr wf_covariant_typ wf_env value red cv sub captures subcapt typing wf_cset : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var typing_app typing_tapp typing_sub : core.
-Hint Unfold wf_typ wf_cset : core.
