@@ -50,16 +50,29 @@ Proof with auto.
     apply H2...
 Qed.
 
+(* TODO this should go to Lemmas *)
+Lemma wf_cset_weakening : forall G F E C,
+  wf_cset (G ++ E) empty C ->
+  wf_cset (G ++ F ++ E) empty C.
+Proof.
+Admitted.
+
+Lemma wf_cset_closed : forall E t,
+  empty_cset_bvars (cset_set t {}N) ->
+  wf_cset E empty (cset_set t {}N).
+Proof.
+Admitted.
+
 Lemma subcapt_weakening : forall E F G C1 C2,
   subcapt (G ++ E) C1 C2 ->
   wf_env (G ++ F ++ E) ->
   subcapt (G ++ F ++ E) C1 C2.
-Proof with auto.
+Proof with auto using wf_cset_weakening.
   intros E F G C1 C2 Hsc Hwf.
   remember (G ++ E).
   remember (G ++ F ++ E).
   induction Hsc ; subst...
-  apply subcapt_set.
+  apply subcapt_set...
   unfold AtomSet.F.For_all.
   intros.
   apply captures_weakening...
@@ -79,11 +92,11 @@ Proof with simpl_env; auto using wf_typ_weakening, cv_weakening, subcapt_weakeni
   - Case "sub_arrow".
     pick fresh Y and apply sub_arrow...
     rewrite <- concat_assoc.
-    apply H0...
+    apply H2...
   - Case "sub_all".
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
-    apply H0...
+    apply H2...
 Qed.
 
 
@@ -130,12 +143,12 @@ Lemma subcapt_reflexivity : forall E C,
   (* We need as a precondition that C is locally closed! *)
   empty_cset_bvars C ->
   subcapt E C C.
-Proof with auto.
+Proof with auto using wf_cset_closed.
   intros E C Ok Closed.
   destruct C...
   assert (t0 = {}N). { unfold empty_cset_bvars in Closed. csetdec. }
   subst.
-  apply subcapt_set.
+  apply subcapt_set...
   unfold AtomSet.F.For_all. intros.
   apply captures_in...
 Qed.
@@ -198,7 +211,7 @@ Lemma subcapt_transitivity : forall E C1 C2 C3,
   subcapt E C1 C2 ->
   subcapt E C2 C3 ->
   subcapt E C1 C3.
-Proof with auto.
+Proof with auto using wf_cset_closed.
   intros E C1 C2 C3 Ok Closed H12 H23.
   remember C1.
   remember C2.
@@ -211,7 +224,7 @@ Proof with auto.
     destruct C3. subst...
     assert (t0 = {}N) as cl. { subst. unfold empty_cset_bvars in Closed. csetdec. }
     subst.
-    eapply subcapt_set.
+    eapply subcapt_set...
     unfold AtomSet.F.For_all. intros.
     inversion H23. subst.
     apply captures_transitivity with (ys := ys)...
