@@ -57,6 +57,12 @@ Lemma wf_cset_weakening : forall G F E C,
 Proof.
 Admitted.
 
+Lemma wf_cset_narrowing : forall F E Z P Q C,
+  wf_cset (F ++ [(Z, bind_sub Q)] ++ E) empty C ->
+  wf_cset (F ++ [(Z, bind_sub P)] ++ E) empty C.
+Proof.
+Admitted.
+
 Lemma wf_cset_closed : forall E t,
   empty_cset_bvars (cset_set t {}N) ->
   wf_cset E empty (cset_set t {}N).
@@ -307,17 +313,18 @@ Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
   subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(Z, bind_sub P)] ++ E) C1 C2.
-Proof with auto.
+Proof with eauto using wf_cset_narrowing.
   intros F E Z P Q C1 C2 SubPQ SubCap.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
-  induction SubCap ; intros...
-  subst.
-  apply subcapt_var with (T := T) (C2 := C2)...
-  - binds_cases H.
-    * apply binds_tail. apply binds_tail. auto. auto. auto.
-    * auto.
-  - apply cv_narrowing with (Q := Q)...
-Qed.
+  induction SubCap ; intros ; subst...
+  apply subcapt_set...
+  unfold AtomSet.F.For_all.
+  intros.
+  unfold AtomSet.F.For_all in H1.
+  specialize (H1 x H2).
+  (* requires lemma: captures_narrowing *)
+  admit.
+Admitted.
 
 Definition transitivity_on Q := forall E S T,
   sub E S Q -> sub E Q T -> sub E S T.
@@ -358,11 +365,11 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
   Case "sub_arrow".
     pick fresh Y and apply sub_arrow...
     rewrite <- concat_assoc.
-    apply H0...
+    apply H2...
   Case "sub_all".
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
-    apply H0...
+    apply H2...
   Case "sub_capt".
     constructor...
     apply subcapt_narrowing with (Q := Q)...
