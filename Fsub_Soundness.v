@@ -165,13 +165,8 @@ Proof with auto using wf_cset_closed.
   subst.
   apply subcapt_set...
   unfold AtomSet.F.For_all. intros.
-  - (* Either I don't understand something, or we need a stronger assumption than empty_cset_bvars. *)
-    admit.
-  - (* Yep, we probably need a stronger assumption. *)
-    admit.
-  - unfold AtomSet.F.For_all. intros.
-    apply captures_in...
-Admitted.
+  apply captures_in...
+Qed.
 
 (* unversals can't be subcaptres of concrete capture sets. *)
 Lemma cset_universal_subset : forall tf tb, 
@@ -246,11 +241,9 @@ Proof with auto using wf_cset_closed.
     subst.
     eapply subcapt_set...
     unfold AtomSet.F.For_all. intros.
-    inversion H23. subst...
-    + pose proof (subcapt_regular _ _ _ H23) as [ H02 H01 ]...
-    + unfold AtomSet.F.For_all. intros.
-      admit.
-Admitted.
+    inversion H23. subst.
+    apply captures_transitivity with (ys := ys)...
+Qed.
 
 Lemma sub_reflexivity : forall E T,
   wf_env E ->
@@ -262,10 +255,6 @@ Proof with auto.
   - apply sub_top...
     apply wf_typ_top.
   (* eauto and econstructor is still broken... hence we need to proof this manually *)
-  - apply sub_top.
-    + trivial.
-    + constructor.
-    + 
   - apply sub_refl_tvar... 
     eapply wf_typ_var.
     apply H.
