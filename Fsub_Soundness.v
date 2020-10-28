@@ -51,11 +51,21 @@ Proof with auto.
 Qed.
 
 (* TODO this should go to Lemmas *)
-Lemma wf_cset_weakening : forall G F E C,
-  wf_cset (G ++ E) empty C ->
-  wf_cset (G ++ F ++ E) empty C.
-Proof.
-Admitted.
+Lemma wf_cset_weakening : forall E F G Ep C,
+    wf_cset (G ++ E) Ep C ->
+    wf_env (G ++ F ++ E) ->
+    wf_cset (G ++ F ++ E) Ep C.
+Proof with auto.
+  intros *.
+  intros Hcset Henv.
+  remember (G ++ E).
+  induction Hcset ; subst...
+  apply wf_concrete_cset.
+  unfold allbound_typ in *.
+  intros x Hb.
+  specialize (H x Hb).
+  destruct H as [ T [ H1 | H2 ] ] ; eauto using binds_weaken.
+Qed.
 
 Lemma wf_cset_narrowing : forall F E Z P Q C,
   wf_cset (F ++ [(Z, bind_sub Q)] ++ E) empty C ->
@@ -104,7 +114,6 @@ Proof with simpl_env; auto using wf_typ_weakening, cv_weakening, subcapt_weakeni
     rewrite <- concat_assoc.
     apply H2...
 Qed.
-
 
 (* ********************************************************************** *)
 (** ** Reflexivity (1) *)
@@ -156,8 +165,13 @@ Proof with auto using wf_cset_closed.
   subst.
   apply subcapt_set...
   unfold AtomSet.F.For_all. intros.
-  apply captures_in...
-Qed.
+  - (* Either I don't understand something, or we need a stronger assumption than empty_cset_bvars. *)
+    admit.
+  - (* Yep, we probably need a stronger assumption. *)
+    admit.
+  - unfold AtomSet.F.For_all. intros.
+    apply captures_in...
+Admitted.
 
 (* unversals can't be subcaptres of concrete capture sets. *)
 Lemma cset_universal_subset : forall tf tb, 
@@ -232,9 +246,11 @@ Proof with auto using wf_cset_closed.
     subst.
     eapply subcapt_set...
     unfold AtomSet.F.For_all. intros.
-    inversion H23. subst.
-    apply captures_transitivity with (ys := ys)...
-Qed.
+    inversion H23. subst...
+    + pose proof (subcapt_regular _ _ _ H23) as [ H02 H01 ]...
+    + unfold AtomSet.F.For_all. intros.
+      admit.
+Admitted.
 
 Lemma sub_reflexivity : forall E T,
   wf_env E ->
@@ -246,6 +262,10 @@ Proof with auto.
   - apply sub_top...
     apply wf_typ_top.
   (* eauto and econstructor is still broken... hence we need to proof this manually *)
+  - apply sub_top.
+    + trivial.
+    + constructor.
+    + 
   - apply sub_refl_tvar... 
     eapply wf_typ_var.
     apply H.
