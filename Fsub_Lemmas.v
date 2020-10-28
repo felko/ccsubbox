@@ -591,20 +591,31 @@ Proof.
   intros e H. induction H; auto.
 Qed.
 
+Lemma cv_free_is_bvar_free : forall e C,
+  cv_free e C ->
+  empty_cset_bvars C.
+Proof with eauto*.
+  intros. induction H... 
+  - simpl; fnsetdec...
+  - simpl; fnsetdec...
+  - destruct C1; destruct C2...
+    csethyp. unfold empty_cset_bvars in *. unfold cset_bvars in *.
+    fnsetdec.
+Qed.
+
 Lemma red_regular : forall e e',
   red e e' ->
   expr e /\ expr e'.
 Proof with auto*.
   intros e e' H.
   induction H; assert(J := value_regular); split...
-  Case "red_abs".
+  - Case "red_abs".
     inversion H. pick fresh y. rewrite (subst_ee_intro y)...
-    (** needs a new infrastructure lemma. *)
-    (* rewrite <- subst_ee_open_ee_var... *)
-    admit.    
-  Case "red_tabs".
+    apply subst_ee_expr...
+    apply cv_free_is_bvar_free with (e := v2)...
+  - Case "red_tabs".
     inversion H. pick fresh Y. rewrite (subst_te_intro Y)...
-Admitted.
+Qed.
 
 
 (* *********************************************************************** *)
