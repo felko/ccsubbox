@@ -615,21 +615,25 @@ Inductive typing : env -> exp -> typ -> Prop :=
 
           In a type-variable-only-land, we'd probably do cv(x) = {T} if x : T in E.*)
       cv_free e1 C ->
+      wf_typ E (typ_capt C (typ_arrow V T1)) ->
       typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))
   | typing_app : forall T1 E e1 e2 T2 Cf Cv,
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
       typing E e2 T1 ->
       cv T1 E Cv ->
+      wf_typ E (open_ct T2 Cv) ->
       (** NEW: function application opens the capture set in the type. *)
       typing E (exp_app e1 e2) (open_ct T2 Cv)
   | typing_tabs : forall L E V e1 T1 C,
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
       cv_free e1 C ->
+      wf_typ E (typ_capt C (typ_all V T1)) ->
       typing E (exp_tabs V e1) (typ_capt C (typ_all V T1))
   | typing_tapp : forall T1 E e1 T T2 C,
       typing E e1 (typ_capt C (typ_all T1 T2)) ->
       sub E T T1 ->
+      wf_typ E (open_tt T2 T) ->
       typing E (exp_tapp e1 T) (open_tt T2 T)
   | typing_sub : forall S E e T,
       typing E e S ->
