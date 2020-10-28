@@ -237,11 +237,16 @@ Lemma sub_reflexivity : forall E T,
 Proof with auto.
   intros E T Ok Wf.
   induction Wf...
+  - apply sub_top...
+    apply wf_typ_top.
   (* eauto and econstructor is still broken... hence we need to proof this manually *)
   - apply sub_refl_tvar... 
     eapply wf_typ_var.
     apply H.
   - apply sub_arrow with (L := L `union` dom E)...
+    (* wellformedness... *)
+    admit.
+    admit.
     intros.
     assert (x `notin` L) as Hx. { fsetdec. }
     specialize (H x Hx).
@@ -251,6 +256,8 @@ Proof with auto.
     apply sub_weakening...        
     constructor...
   - apply sub_all with (L := L `union` dom E)...
+    admit.
+    admit.
     intros.
     assert (X `notin` L) as Hx. { fsetdec. }
     specialize (H X Hx).
@@ -258,10 +265,18 @@ Proof with auto.
     specialize (IHWf Ok).
     apply H0.
     apply wf_env_sub...
-  - apply sub_capt... apply subcapt_reflexivity...
+  - apply sub_capt. 
+    (* here we need to show captureset wellformedness
+     * @Edward could you look into this?
+     *)
+    admit.
+    admit.
+    (* 
+    apply subcapt_reflexivity.
     unfold wf_cset in H.
     intuition.
-Qed.
+    *)
+Admitted.
 
 (* Subtyping implies subcapturing *)
 Lemma sub_implies_subcapt : forall E S T C D,
