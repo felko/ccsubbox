@@ -287,16 +287,16 @@ Inductive polarity : Type :=
   | dontcare : polarity
   .
 
-Inductive context : Type :=
-  | covariant : context
-  | contravariant : context
+Inductive mode : Type :=
+  | covariant : mode
+  | contravariant : mode
   .
 
-Definition neg : context -> context.
+Definition neg : mode -> mode.
 Proof.
 Admitted.
 
-Definition cancapture (p : polarity) (c : context) : Prop := 
+Definition cancapture (p : polarity) (c : mode) : Prop := 
   match p , c with
   | negative , covariant => False
   | negative , contravariant =>  True
@@ -384,11 +384,11 @@ Notation "[ x ]" := (x :: nil).
 
 (** For our current calculus, we disallow type variables from showing up in capture
   sets -- only term variables are allowed. *)
-Definition allbound_typ (E : env) (c : context) (X : atoms) : Prop :=
+Definition allbound_typ (E : env) (c : mode) (X : atoms) : Prop :=
   forall x, AtomSet.F.In x X -> exists T p,
     cancapture p c /\ binds x (bind_typ T p) E.
 
-Inductive wf_cset : env -> context -> captureset -> Prop :=
+Inductive wf_cset : env -> mode -> captureset -> Prop :=
   | wf_universal_cset : forall E c,
     wf_cset E c cset_universal
   | wf_concrete_cset : forall E c fvars,
@@ -398,7 +398,7 @@ Inductive wf_cset : env -> context -> captureset -> Prop :=
 
 (* Wellformedness of types where locally bound variables are only 
    allowed in positive positions. *)
-Inductive wf_typ : env -> context -> typ -> Prop :=
+Inductive wf_typ : env -> mode -> typ -> Prop :=
   | wf_typ_top : forall E c,
       wf_typ E c typ_top
   | wf_typ_var : forall U E c (X : atom),
@@ -435,13 +435,13 @@ Inductive wf_typ : env -> context -> typ -> Prop :=
 Inductive wf_env : env -> Prop :=
   | wf_env_empty :
       wf_env empty
-  | wf_env_sub : forall (E : env) (c : context) (X : atom) (T : typ),
+  | wf_env_sub : forall (E : env) (c : mode) (X : atom) (T : typ),
       wf_env E ->
-      (* TODO is this the right polarity / context here? *)
+      (* TODO is this the right polarity / mode here? *)
       wf_typ E c T ->
       X `notin` dom E ->
       wf_env ([(X, bind_sub T)] ++ E)
-  | wf_env_typ : forall (E : env) (c : context) (x : atom) (T : typ) (p : polarity),
+  | wf_env_typ : forall (E : env) (c : mode) (x : atom) (T : typ) (p : polarity),
       wf_env E ->
       (* TODO do we care about the polarity here? *)
       wf_typ E c T ->
@@ -474,7 +474,7 @@ Inductive cv : typ -> env -> captureset -> Prop :=
 (** * #<a name="sub"></a># Subtyping *)
 
 
-Inductive captures : env -> context -> atoms -> atom -> Prop :=
+Inductive captures : env -> mode -> atoms -> atom -> Prop :=
   (* xs captures x if it includes it verbatim *)
   | captures_in : forall E c x xs,
       x `in` xs ->
@@ -488,7 +488,7 @@ Inductive captures : env -> context -> atoms -> atom -> Prop :=
       captures E c xs x
 .
 
-Inductive subcapt : env -> context -> captureset -> captureset -> Prop :=
+Inductive subcapt : env -> mode -> captureset -> captureset -> Prop :=
   | subcapt_universal : forall E p C,
       wf_cset E p C ->
       subcapt E p C cset_universal
@@ -505,7 +505,7 @@ Inductive subcapt : env -> context -> captureset -> captureset -> Prop :=
     [sub_trans_tvar] case) and cofinite quantification (in the
     [sub_all] case). *)
 
-Inductive sub : env -> context -> typ -> typ -> Prop :=
+Inductive sub : env -> mode -> typ -> typ -> Prop :=
 (* 
     cv(S, E) = {}
     -------------
