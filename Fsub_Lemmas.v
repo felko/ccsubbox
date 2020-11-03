@@ -167,11 +167,11 @@ Lemma wf_cset_weakening : forall E F G Ep C,
     wf_cset (G ++ E) Ep C ->
     ok (G ++ F ++ E) ->
     wf_cset (G ++ F ++ E) Ep C.
-Proof with auto.
-  intros *.
-  intros Hcset Henv.
+Proof with auto*.
+  intros E F G Ep C Hcset Henv.
   remember (G ++ E).
   induction Hcset ; subst...
+  (* Only complicated case is dealing with wf_cset. *)
   apply wf_concrete_cset.
   unfold allbound_typ in *.
   intros x Hb.
@@ -186,30 +186,16 @@ Lemma wf_typ_weakening : forall T E m F G,
 Proof with simpl_env; auto.
   intros.
   remember (G ++ E).
-  (* remember (G ++ F ++ E). *)
   generalize dependent G.
-  (* generalize dependent F. *)
-  induction H...
-  - intros *. intros.
-    subst.
-    apply wf_typ_var with (U := U).
-    apply (binds_weaken _ _ _ _ _ _ H)...
-  - intros *. intros.
-    subst.
-    pick fresh Y and apply wf_typ_arrow.
-    + apply (IHwf_typ G)...
-    + assert (Y `notin` L) as P by fsetdec.
-      apply (H1 Y P ([(Y, bind_typ T1 (polarity_from_mode (neg m)))] ++ G))...
-  - intros *. intros.
-    subst.
-    pick fresh Y and apply wf_typ_all.
-    + apply (IHwf_typ G)...
-    + assert (Y `notin` L) as P by fsetdec.
-      apply (H1 Y P ([(Y, bind_sub T1)] ++ G))...
-      (* apply wf_env_sub with (c := (neg c))... *)
-  - intros *. intros.
-    subst.
-    apply wf_typ_capt...
+  induction H; intros G Heql Hok; subst...
+  - apply wf_typ_var with (U := U)...
+  - pick fresh Y and apply wf_typ_arrow...
+    assert (Y `notin` L) as P by fsetdec.
+    apply (H1 Y P ([(Y, bind_typ T1 (polarity_from_mode (neg m)))] ++ G))...
+  - pick fresh Y and apply wf_typ_all...
+    assert (Y `notin` L) as P by fsetdec.
+    apply (H1 Y P ([(Y, bind_sub T1)] ++ G))...
+  - apply wf_typ_capt...
     apply wf_cset_weakening...
 Qed.
 
@@ -274,17 +260,11 @@ Proof with simpl_env; eauto.
   - binds_cases H...
   (* typ_arrow *)
   - pick fresh Y and apply wf_typ_arrow...
-    apply H1 with (X0 := Y) (F0 := [(Y, bind_typ T1 (polarity_from_mode (neg m)))] ++ F).
-    fsetdec...
-    reflexivity.
-    simpl_env...
+    apply H1 with (X0 := Y) (F0 := [(Y, bind_typ T1 (polarity_from_mode (neg m)))] ++ F)...
   (* typ_all *)
   - pick fresh Y and apply wf_typ_all...
     rewrite <- concat_assoc.
-    apply H1 with (X0 := Y) (F0 := [(Y, bind_sub T1)] ++ F).
-    fsetdec.
-    reflexivity.
-    simpl_env...
+    apply H1 with (X0 := Y) (F0 := [(Y, bind_sub T1)] ++ F)...
   (* typ_capt *)
   - eapply wf_typ_capt...
     wf_cset_simpl True...
@@ -343,31 +323,80 @@ Qed.
 (*     destruct Hexists; binds_cases H0; eauto; exists (subst_tt Z P T0)... *)
 (* Qed. *)
 
-Lemma wf_typ_subst_tb : forall F Q E Z P T,
-  wf_typ (F ++ [(Z, bind_sub Q)] ++ E) T ->
-  wf_typ E P ->
-  ok (map (subst_tb Z P) F ++ E) ->
-  wf_typ (map (subst_tb Z P) F ++ E) (subst_tt Z P T).
-Proof with try simpl_env; eauto*.
+Lemma double_negation : forall m, (neg (neg m)) = m.
+Proof with auto.
   intros.
-  apply wf_covariant_typ_subst_tb with (Ep := empty) (Em := empty) (Fp := empty) (Fm := empty) (Q := Q)...
+  unfold neg. destruct m...
+Qed.
+Hint Rewrite double_negation : core.
+
+Lemma wf_typ_subst_tb : forall F Q E m Z P T,
+  wf_typ (F ++ [(Z, bind_sub Q)] ++ E) m T ->
+  (** NOTE here that P needs to be well formed in both the + and - environments,
+      as we're substituting in both places. *)
+  wf_typ E m P ->
+  wf_typ E (neg m) P ->
+  ok (map (subst_tb Z P) F ++ E) ->
+  wf_typ (map (subst_tb Z P) F ++ E) m (subst_tt Z P T).
+Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ.
+  intros F Q E m Z P T HwfT HwfPp HwfPm Hok.
+  remember (F ++ [(Z, bind_sub Q)] ++ E).
+  remember m.
+  generalize dependent F.
+  generalize dependent m.
+  induction HwfT; intros m' EQm' F EQF Hok; subst; simpl subst_tt...
+  - Case "wf_typ_var".
+    destruct (X == Z); subst...
+    + SCase "X <> Z".
+      binds_cases H...
+      apply (wf_typ_var (subst_tt Z P U))...
+  - Case "wf_typ_arrow".
+    pick fresh Y and apply wf_typ_arrow...
+    + SCase "T1".
+      apply IHHwfT with (m := neg m')...
+      autorewrite with core...
+    + SCase "T2".
+      unfold open_ct in *...
+      rewrite <- subst_tt_open_ct_rec...
+      rewrite_env (map (subst_tb Z P) ([(Y, bind_typ T1 (polarity_from_mode (neg m')))] ++ F) ++ E).
+      apply H0 with (m := m')...
+  - Case "wf_typ_all".
+    pick fresh Y and apply wf_typ_all...
+    + SCase "T1".
+      apply IHHwfT with (m := neg m')...
+      autorewrite with core...
+    + SCase "T2".
+      unfold open_ct in *...
+      rewrite subst_tt_open_tt_var...
+      rewrite_env (map (subst_tb Z P) ([(Y, bind_sub T1)] ++ F) ++ E).
+      apply H0 with (m := m')...
+  - Case "wf_typ_capt".
+    apply wf_typ_capt...
+    wf_cset_simpl False.
+    destruct Hexists as [p [Hcapture Hbinds]];
+      binds_cases Hbinds;
+      eauto*;
+      exists (subst_tt Z P T0);
+      exists p...
+    split...
+    rewrite_env (map (subst_tb Z P) F ++ E ++ empty)...
+    apply binds_map with (f := subst_tb Z P) in H1...
 Qed.
 
-Lemma wf_typ_open : forall E U T1 T2,
+Lemma wf_typ_open : forall E m U T1 T2,
   ok E ->
-  wf_typ E (typ_all T1 T2) ->
-  wf_typ E U ->
-  wf_typ E (open_tt T2 U).
+  wf_typ E m (typ_all T1 T2) ->
+  wf_typ E m U ->
+  wf_typ E (neg m) U ->
+  wf_typ E m (open_tt T2 U).
 Proof with simpl_env; eauto.
-  intros E U T1 T2 Ok WA WU.
+  intros E m U T1 T2 O WA WUp WUm.
   inversion WA; subst.
   pick fresh X.
   rewrite (subst_tt_intro X)...
   rewrite_env (map (subst_tb X U) empty ++ E).
   apply wf_typ_subst_tb with (Q := T1)...
-  apply H5...
 Qed.
-
 
 (* ********************************************************************** *)
 (** * #<a name="oktwft"></a># Properties of [wf_env] and [wf_typ] *)
@@ -388,28 +417,33 @@ Qed.
 
 Hint Resolve ok_from_wf_env : core.
 
-Lemma wf_typ_from_binds_typ : forall x U E,
+Lemma wf_typ_from_binds_typ : forall x U E m,
   wf_env E ->
-  binds x (bind_typ U) E ->
-  wf_typ E U.
-Proof with auto using wf_typ_weaken_head.
-  induction 1; intros J; binds_cases J...
-  inversion H4; subst...
-Qed.
+  binds x (bind_typ U (polarity_from_mode m)) E ->
+  wf_typ E m U.
+Proof with eauto using wf_typ_weaken_head.
+  intros x U E m Hwf Hbinds.
+  (* remember m; generalize dependent m. *)
+  induction Hwf; binds_cases Hbinds...
+  inversion H3; subst...
+  (** This probably needs m = m0 here *)
+Admitted.
 
-Lemma wf_typ_from_wf_env_typ : forall x T E,
-  wf_env ([(x, bind_typ T)] ++ E) ->
-  wf_typ E T.
+Lemma wf_typ_from_wf_env_typ : forall x T E m,
+  wf_env ([(x, bind_typ T (polarity_from_mode m))] ++ E) ->
+  wf_typ E m T.
 Proof.
-  intros x T E H. inversion H; auto.
-Qed.
+  intros x T E m H. inversion H; auto.
+  (** This probably needs m = m0 here *)
+Admitted.
 
-Lemma wf_typ_from_wf_env_sub : forall x T E,
+Lemma wf_typ_from_wf_env_sub : forall x T E m,
   wf_env ([(x, bind_sub T)] ++ E) ->
-  wf_typ E T.
+  wf_typ E m T.
 Proof.
-  intros x T E H. inversion H; auto.
-Qed.
+  intros x T E m H. inversion H; auto.
+  (** This probably needs m = m0 here *)
+Admitted.
 
 
 (* ********************************************************************** *)
