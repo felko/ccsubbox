@@ -292,12 +292,20 @@ Inductive mode : Type :=
   | contravariant : mode
   .
 
-Definition neg : mode -> mode.
-Proof.
-Admitted.
+Definition polarity_from_mode (m : mode) : polarity :=
+  match m with
+  | covariant => positive
+  | contravariant => negative
+  end.
 
-Definition cancapture (p : polarity) (c : mode) : Prop := 
-  match p , c with
+Definition neg (m : mode) : mode :=
+  match m with
+    | covariant => contravariant
+    | contravariant => covariant
+  end.
+
+Definition cancapture (p : polarity) (m : mode) : Prop := 
+  match p , m with
   | negative , covariant => False
   | negative , contravariant =>  True
   | positive , covariant => True
@@ -384,43 +392,43 @@ Notation "[ x ]" := (x :: nil).
 
 (** For our current calculus, we disallow type variables from showing up in capture
   sets -- only term variables are allowed. *)
-Definition allbound_typ (E : env) (c : mode) (X : atoms) : Prop :=
+Definition allbound_typ (E : env) (m : mode) (X : atoms) : Prop :=
   forall x, AtomSet.F.In x X -> exists T p,
-    cancapture p c /\ binds x (bind_typ T p) E.
+    cancapture p m /\ binds x (bind_typ T p) E.
 
 Inductive wf_cset : env -> mode -> captureset -> Prop :=
-  | wf_universal_cset : forall E c,
-    wf_cset E c cset_universal
-  | wf_concrete_cset : forall E c fvars,
-    (allbound_typ E c fvars) ->
-    wf_cset E c (cset_set fvars {}N)
+  | wf_universal_cset : forall E m,
+    wf_cset E m cset_universal
+  | wf_concrete_cset : forall E m fvars,
+    (allbound_typ E m fvars) ->
+    wf_cset E m (cset_set fvars {}N)
 .
 
 (* Wellformedness of types where locally bound variables are only 
    allowed in positive positions. *)
 Inductive wf_typ : env -> mode -> typ -> Prop :=
-  | wf_typ_top : forall E c,
-      wf_typ E c typ_top
-  | wf_typ_var : forall U E c (X : atom),
+  | wf_typ_top : forall E m,
+      wf_typ E m typ_top
+  | wf_typ_var : forall U E m (X : atom),
       binds X (bind_sub U) E ->
-      wf_typ E c (typ_fvar X)
-  | wf_typ_arrow : forall L E c T1 T2,
-    wf_typ E (neg c) T1 ->
+      wf_typ E m (typ_fvar X)
+  | wf_typ_arrow : forall L E m T1 T2,
+    wf_typ E (neg m) T1 ->
       (** NEW: we need to be able to open capture sets.  Capture
           variables can only be opened in covariant positions. *)
       (forall X : atom, X `notin` L ->
-        wf_typ ([(X, bind_typ T1 negative)] ++ E) c (open_ct T2 (cset_singleton_fvar X))) ->
-       wf_typ E c (typ_arrow T1 T2)
-  | wf_typ_all : forall L E c T1 T2,
-      wf_typ E (neg c) T1 ->
+        wf_typ ([(X, bind_typ T1 (polarity_from_mode (neg m)))] ++ E) m (open_ct T2 (cset_singleton_fvar X))) ->
+       wf_typ E m (typ_arrow T1 T2)
+  | wf_typ_all : forall L E m T1 T2,
+      wf_typ E (neg m) T1 ->
       (forall X : atom, X `notin` L ->
-      wf_typ ([(X, bind_sub T1)] ++ E) c (open_tt T2 X)) ->
-      wf_typ E c (typ_all T1 T2)
+      wf_typ ([(X, bind_sub T1)] ++ E) m (open_tt T2 X)) ->
+      wf_typ E m (typ_all T1 T2)
   (** NEW: capture sets check if their variables are defined in covariant positions. *)
-  | wf_typ_capt : forall E c C T,
-    wf_typ E c T ->
-    wf_cset E c C ->
-    wf_typ E c (typ_capt C T)
+  | wf_typ_capt : forall E m C T,
+    wf_typ E m T ->
+    wf_cset E m C ->
+    wf_typ E m (typ_capt C T)
 .
 
 (** An environment E is well-formed, denoted [(wf_env E)], if each
@@ -435,16 +443,16 @@ Inductive wf_typ : env -> mode -> typ -> Prop :=
 Inductive wf_env : env -> Prop :=
   | wf_env_empty :
       wf_env empty
-  | wf_env_sub : forall (E : env) (c : mode) (X : atom) (T : typ),
+  | wf_env_sub : forall (E : env) (m : mode) (X : atom) (T : typ),
       wf_env E ->
-      (* TODO is this the right polarity / mode here? *)
-      wf_typ E c T ->
+      (* TODO verify this when we check regularity *)
+      wf_typ E m T ->
       X `notin` dom E ->
       wf_env ([(X, bind_sub T)] ++ E)
-  | wf_env_typ : forall (E : env) (c : mode) (x : atom) (T : typ) (p : polarity),
+  | wf_env_typ : forall (E : env) (m : mode) (x : atom) (T : typ) (p : polarity),
       wf_env E ->
-      (* TODO do we care about the polarity here? *)
-      wf_typ E c T ->
+      (* TODO verify this when we check regularity *)
+      wf_typ E m T ->
       x `notin` dom E ->
       wf_env ([(x, bind_typ T p)] ++ E).
 
@@ -476,27 +484,27 @@ Inductive cv : typ -> env -> captureset -> Prop :=
 
 Inductive captures : env -> mode -> atoms -> atom -> Prop :=
   (* xs captures x if it includes it verbatim *)
-  | captures_in : forall E c x xs,
+  | captures_in : forall E m x xs,
       x `in` xs ->
-      captures E c xs x
+      captures E m xs x
   (* xs captures x if it includes its capture set (cv) *)
-  | captures_var : forall E c T p x xs ys,
-      cancapture p c ->
+  | captures_var : forall E m T p x xs ys,
+      cancapture p m ->
       binds x (bind_typ T p) E ->
       cv T E (cset_set ys {}N) ->
-      AtomSet.F.For_all (captures E c xs) ys ->
-      captures E c xs x
+      AtomSet.F.For_all (captures E m xs) ys ->
+      captures E m xs x
 .
 
 Inductive subcapt : env -> mode -> captureset -> captureset -> Prop :=
-  | subcapt_universal : forall E p C,
-      wf_cset E p C ->
-      subcapt E p C cset_universal
-  | subcapt_set : forall E p xs ys,
-      wf_cset E p (cset_set xs {}N) ->
-      wf_cset E p (cset_set ys {}N) ->
-      AtomSet.F.For_all (captures E p ys) xs ->
-      subcapt E p (cset_set xs {}N) (cset_set ys {}N)
+  | subcapt_universal : forall E m C,
+      wf_cset E m C ->
+      subcapt E m C cset_universal
+  | subcapt_set : forall E m xs ys,
+      wf_cset E m (cset_set xs {}N) ->
+      wf_cset E m (cset_set ys {}N) ->
+      AtomSet.F.For_all (captures E m ys) xs ->
+      subcapt E m (cset_set xs {}N) (cset_set ys {}N)
 .
 
 
@@ -511,25 +519,25 @@ Inductive sub : env -> mode -> typ -> typ -> Prop :=
     -------------
      E ⊢ S <: ⊤
 *)
-  | sub_top : forall E c S,
+  | sub_top : forall E m S,
       wf_env E ->
-      wf_typ E c S ->
+      wf_typ E m S ->
       (** NEW: S can't capture anything *)
       cv S E empty_cset ->
-      sub E c S typ_top
+      sub E m S typ_top
 
   (* Instead of having rules for refl and trans, the original Fsub calculus special cases
      those rules to type variables. Refl and Trans are then defined externally in sub_reflexivity
      and sub_transitivity. *)
-  | sub_refl_tvar : forall E c X,
+  | sub_refl_tvar : forall E m X,
       wf_env E ->
-      wf_typ E c (typ_fvar X) ->
-      sub E c (typ_fvar X) (typ_fvar X)
+      wf_typ E m (typ_fvar X) ->
+      sub E m (typ_fvar X) (typ_fvar X)
 
-  | sub_trans_tvar : forall U E c T X,
+  | sub_trans_tvar : forall U E m T X,
       binds X (bind_sub U) E ->
-      sub E c U T ->
-      sub E c (typ_fvar X) T
+      sub E m U T ->
+      sub E m (typ_fvar X) T
 
 (* 
     E ⊢ T₁ <: S₁    E, x: T₁ ⊢ S₂ <: T₂
@@ -538,13 +546,13 @@ Inductive sub : env -> mode -> typ -> typ -> Prop :=
 
     New: Here we open S2 and T2 with x
 *)
-  | sub_arrow : forall L E c S1 S2 T1 T2,
-      sub E (neg c) T1 S1 ->
+  | sub_arrow : forall L E m S1 S2 T1 T2,
+      sub E (neg m) T1 S1 ->
       (forall x : atom, x `notin` L ->
-          sub ([(x, bind_typ T1 negative)] ++ E) c
+          sub ([(x, bind_typ T1 (polarity_from_mode (neg m)))] ++ E) m
             (open_ct S2 (cset_singleton_fvar x)) 
             (open_ct T2 (cset_singleton_fvar x))) ->
-      sub E c (typ_arrow S1 S2) (typ_arrow T1 T2)
+      sub E m (typ_arrow S1 S2) (typ_arrow T1 T2)
 
 (* 
     E ⊢ T₁ <: S₁    E, X<:T₁ ⊢ S₂ <: T₂
@@ -605,9 +613,9 @@ Inductive cv_free : exp -> captureset -> Prop :=
   env *only* contains dontcare bindings in the typing judgement 
  *)
 Inductive typing : env -> exp -> typ -> Prop :=
-  | typing_var : forall E x T p,
+  | typing_var : forall E x T,
       wf_env E ->
-      binds x (bind_typ T p) E ->
+      binds x (bind_typ T dontcare) E ->
       (** NEW: a variable always gets the type {x} T *)
       typing E (exp_fvar x) (typ_capt (cset_singleton_fvar x) T)
   | typing_abs : forall L E V e1 T1 C,
@@ -619,7 +627,6 @@ Inductive typing : env -> exp -> typ -> Prop :=
 
           In a type-variable-only-land, we'd probably do cv(x) = {T} if x : T in E.*)
       cv_free e1 C ->
-      wf_cset E covariant C ->
       typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))
   | typing_app : forall T1 E e1 e2 T2 Cf Cv,
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
@@ -631,14 +638,14 @@ Inductive typing : env -> exp -> typ -> Prop :=
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
       cv_free e1 C ->
-      (* this is a blunt guess *)
-      wf_typ E covariant (typ_all V T1) ->
+      (* below is possibly unnecessary, should be deriveable from typing jdgmt precondition *)
+      (* wf_typ E covariant (typ_all V T1) -> *)
       typing E (exp_tabs V e1) (typ_capt C (typ_all V T1))
   | typing_tapp : forall T1 E e1 T T2 C,
       typing E e1 (typ_capt C (typ_all T1 T2)) ->
       sub E covariant T T1 ->
-      (* maybe change to wf_typ of T *)
-      wf_typ E covariant (open_tt T2 T) ->
+      (* unsure about the below, probably should be wf_typ of T *)
+      (* wf_typ E covariant (open_tt T2 T) -> *)
       typing E (exp_tapp e1 T) (open_tt T2 T)
   | typing_sub : forall S E e T,
       typing E e S ->

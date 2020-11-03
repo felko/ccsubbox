@@ -50,23 +50,6 @@ Proof with auto.
     apply H2...
 Qed.
 
-(* TODO this should go to Lemmas *)
-Lemma wf_cset_weakening : forall E F G Ep C,
-    wf_cset (G ++ E) Ep C ->
-    wf_env (G ++ F ++ E) ->
-    wf_cset (G ++ F ++ E) Ep C.
-Proof with auto.
-  intros *.
-  intros Hcset Henv.
-  remember (G ++ E).
-  induction Hcset ; subst...
-  apply wf_concrete_cset.
-  unfold allbound_typ in *.
-  intros x Hb.
-  specialize (H x Hb).
-  destruct H as [ T [ H1 | H2 ] ] ; eauto using binds_weaken.
-Qed.
-
 Lemma wf_cset_narrowing : forall F E Z P Q C,
   wf_cset (F ++ [(Z, bind_sub Q)] ++ E) empty C ->
   wf_cset (F ++ [(Z, bind_sub P)] ++ E) empty C.
