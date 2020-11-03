@@ -50,19 +50,19 @@ Admitted.
 (** If a type is well-formed in an environment, then it is locally
     closed. *)
 
-Lemma type_from_wf_typ : forall E T,
-  wf_typ E T -> type T.
+Lemma type_from_wf_typ : forall E m T,
+  wf_typ E m T -> type T.
 Proof with eauto.
-  intros E T H; induction H...
+  intros E m T H; induction H...
   destruct H0...
 Qed.
 
-Lemma type_from_wf_covariant_typ : forall E Ep Em T,
-  wf_covariant_typ E Ep Em T -> type T.
-Proof with eauto.
-  intros E Ep Em T H; induction H...
-  destruct H0...
-Qed.
+(* Lemma type_from_wf_covariant_typ : forall E Ep Em T, *)
+(*   wf_covariant_typ E Ep Em T -> type T. *)
+(* Proof with eauto. *)
+(*   intros E Ep Em T H; induction H... *)
+(*   destruct H0... *)
+(* Qed. *)
 
 (** This is a useful helper tactic for clearing away
     capture set wellformedness. *)
@@ -98,186 +98,250 @@ Ltac wf_cset_simpl instantiate_ext :=
 
 (** These two lemmas give a general weakening lemma for wf_covariant_typ.
     They stay separate as the techniques needed to prove them are different. *)
-Local Lemma wf_covariant_typ_weakening_env : forall T E F G Ep Em,
-  wf_covariant_typ (G ++ E) Ep Em T ->
-  ok (G ++ F ++ E) ->
-  wf_covariant_typ (G ++ F ++ E) Ep Em T.
-Proof with simpl_env; eauto; try fsetdec.
-  intros T E F G Ep Em Hwf_typ Hk.
-  remember (G ++ E).
-  generalize dependent G.
-  induction Hwf_typ; intros G Hok Heq; subst; auto.
-  - apply wf_typ_var with (U := U)...
-  - pick fresh Y and apply wf_typ_arrow...
-  - pick fresh Y and apply wf_typ_all...
-    apply H0 with (X := Y) (G0 := [(Y, bind_sub T1)] ++ G)...
-  - apply wf_typ_capt...
-    wf_cset_simpl True...
-Qed.
-Local Lemma wf_covariant_typ_weakening_variance : forall T E Ep Gp Fp Em Gm Fm,
-  wf_covariant_typ E (Gp ++ Ep) (Gm ++ Em) T ->
-  ok (Gp ++ Fp ++ Ep) \/ Fp = empty ->
-  ok (Gm ++ Fm ++ Em) \/ Fm = empty ->
-  wf_covariant_typ E (Gp ++ Fp ++ Ep) (Gm ++ Fm ++ Em) T.
-Proof with simpl_env; auto.
-  intros T E Ep Gp Fp Em Gm Fm Hwf_typ Hokp Hokm.
-  remember (Gp ++ Ep).
-  remember (Gm ++ Em).
-  generalize dependent Gp.
-  generalize dependent Gm.
-  generalize dependent Fp.
-  generalize dependent Fm.
-  generalize dependent Ep.
-  generalize dependent Em.
-  induction Hwf_typ; intros Em' Ep' Fm Fp Gm Heqm Hokm Gp Heqp Hokp; subst; auto.
-  - apply wf_typ_var with (U := U)...
-  - pick fresh Y and apply wf_typ_arrow...
-    apply H0 with (Gp0 := [(Y, bind_typ T1)] ++ Gp)...
-    inversion Hokp.
-    + left...
-    + right...
-  - pick fresh Y and apply wf_typ_all...
-  - apply wf_typ_capt...
-    wf_cset_simpl True...
-    + right. destruct Hokp; subst...
-Qed.
+(* Local Lemma wf_covariant_typ_weakening_env : forall T E F G Ep Em, *)
+(*   wf_covariant_typ (G ++ E) Ep Em T -> *)
+(*   ok (G ++ F ++ E) -> *)
+(*   wf_covariant_typ (G ++ F ++ E) Ep Em T. *)
+(* Proof with simpl_env; eauto; try fsetdec. *)
+(*   intros T E F G Ep Em Hwf_typ Hk. *)
+(*   remember (G ++ E). *)
+(*   generalize dependent G. *)
+(*   induction Hwf_typ; intros G Hok Heq; subst; auto. *)
+(*   - apply wf_typ_var with (U := U)... *)
+(*   - pick fresh Y and apply wf_typ_arrow... *)
+(*   - pick fresh Y and apply wf_typ_all... *)
+(*     apply H0 with (X := Y) (G0 := [(Y, bind_sub T1)] ++ G)... *)
+(*   - apply wf_typ_capt... *)
+(*     wf_cset_simpl True... *)
+(* Qed. *)
+(* Local Lemma wf_covariant_typ_weakening_variance : forall T E Ep Gp Fp Em Gm Fm, *)
+(*   wf_covariant_typ E (Gp ++ Ep) (Gm ++ Em) T -> *)
+(*   ok (Gp ++ Fp ++ Ep) \/ Fp = empty -> *)
+(*   ok (Gm ++ Fm ++ Em) \/ Fm = empty -> *)
+(*   wf_covariant_typ E (Gp ++ Fp ++ Ep) (Gm ++ Fm ++ Em) T. *)
+(* Proof with simpl_env; auto. *)
+(*   intros T E Ep Gp Fp Em Gm Fm Hwf_typ Hokp Hokm. *)
+(*   remember (Gp ++ Ep). *)
+(*   remember (Gm ++ Em). *)
+(*   generalize dependent Gp. *)
+(*   generalize dependent Gm. *)
+(*   generalize dependent Fp. *)
+(*   generalize dependent Fm. *)
+(*   generalize dependent Ep. *)
+(*   generalize dependent Em. *)
+(*   induction Hwf_typ; intros Em' Ep' Fm Fp Gm Heqm Hokm Gp Heqp Hokp; subst; auto. *)
+(*   - apply wf_typ_var with (U := U)... *)
+(*   - pick fresh Y and apply wf_typ_arrow... *)
+(*     apply H0 with (Gp0 := [(Y, bind_typ T1)] ++ Gp)... *)
+(*     inversion Hokp. *)
+(*     + left... *)
+(*     + right... *)
+(*   - pick fresh Y and apply wf_typ_all... *)
+(*   - apply wf_typ_capt... *)
+(*     wf_cset_simpl True... *)
+(*     + right. destruct Hokp; subst... *)
+(* Qed. *)
 
 (** This is the proper well-formedness lemma that we expose, wrapping up the two
     helper lemmas. *)
-Lemma wf_covariant_typ_weakening : forall T E G F Ep Gp Fp Em Gm Fm,
-  wf_covariant_typ (G ++ E) (Gp ++ Ep) (Gm ++ Em) T ->
-  ok (G ++ F ++ E) \/ F = empty ->
-  ok (Gp ++ Fp ++ Ep) \/ Fp = empty ->
-  ok (Gm ++ Fm ++ Em) \/ Fm = empty ->
-  wf_covariant_typ (G ++ F ++ E) (Gp ++ Fp ++ Ep) (Gm ++ Fm ++ Em) T.
-Proof with auto.
-  intros.
-  inversion H0.
-  + apply wf_covariant_typ_weakening_env...
-    apply wf_covariant_typ_weakening_variance...
-  + apply wf_covariant_typ_weakening_variance...
-    assert (G ++ F ++ E = G ++ E). {
-      subst. simpl_env. auto.
-    }
-    subst. auto.
-Qed.
+(* Lemma wf_covariant_typ_weakening : forall T E G F Ep Gp Fp Em Gm Fm, *)
+(*   wf_covariant_typ (G ++ E) (Gp ++ Ep) (Gm ++ Em) T -> *)
+(*   ok (G ++ F ++ E) \/ F = empty -> *)
+(*   ok (Gp ++ Fp ++ Ep) \/ Fp = empty -> *)
+(*   ok (Gm ++ Fm ++ Em) \/ Fm = empty -> *)
+(*   wf_covariant_typ (G ++ F ++ E) (Gp ++ Fp ++ Ep) (Gm ++ Fm ++ Em) T. *)
+(* Proof with auto. *)
+(*   intros. *)
+(*   inversion H0. *)
+(*   + apply wf_covariant_typ_weakening_env... *)
+(*     apply wf_covariant_typ_weakening_variance... *)
+(*   + apply wf_covariant_typ_weakening_variance... *)
+(*     assert (G ++ F ++ E = G ++ E). { *)
+(*       subst. simpl_env. auto. *)
+(*     } *)
+(*     subst. auto. *)
+(* Qed. *)
 (** A simplification for just weakening wf_typ, which is used fairly often. *)
-Lemma wf_typ_weakening : forall T E F G,
-  wf_typ (G ++ E) T ->
+
+Lemma wf_cset_weakening : forall E F G Ep C,
+    wf_cset (G ++ E) Ep C ->
+    ok (G ++ F ++ E) ->
+    wf_cset (G ++ F ++ E) Ep C.
+Proof with auto.
+  intros *.
+  intros Hcset Henv.
+  remember (G ++ E).
+  induction Hcset ; subst...
+  apply wf_concrete_cset.
+  unfold allbound_typ in *.
+  intros x Hb.
+  specialize (H x Hb).
+  destruct H as [ T [ p [ H1 H2 ] ] ] ; eauto using binds_weaken.
+Qed.
+
+Lemma wf_typ_weakening : forall T E m F G,
+  wf_typ (G ++ E) m T ->
   ok (G ++ F ++ E) ->
-  wf_typ (G ++ F ++ E) T.
+  wf_typ (G ++ F ++ E) m T.
 Proof with simpl_env; auto.
   intros.
-  unfold wf_typ.
-  rewrite_env (empty ++ empty ++ empty).
-  apply wf_covariant_typ_weakening...
+  remember (G ++ E).
+  (* remember (G ++ F ++ E). *)
+  generalize dependent G.
+  (* generalize dependent F. *)
+  induction H...
+  - intros *. intros.
+    subst.
+    apply wf_typ_var with (U := U).
+    apply (binds_weaken _ _ _ _ _ _ H)...
+  - intros *. intros.
+    subst.
+    pick fresh Y and apply wf_typ_arrow.
+    + apply (IHwf_typ G)...
+    + assert (Y `notin` L) as P by fsetdec.
+      apply (H1 Y P ([(Y, bind_typ T1 (polarity_from_mode (neg m)))] ++ G))...
+  - intros *. intros.
+    subst.
+    pick fresh Y and apply wf_typ_all.
+    + apply (IHwf_typ G)...
+    + assert (Y `notin` L) as P by fsetdec.
+      apply (H1 Y P ([(Y, bind_sub T1)] ++ G))...
+      (* apply wf_env_sub with (c := (neg c))... *)
+  - intros *. intros.
+    subst.
+    apply wf_typ_capt...
+    apply wf_cset_weakening...
 Qed.
 
 (** Two simplifications for trimming off the head of the environment. *)
-Lemma wf_covariant_typ_weaken_head : forall T E Ep Em F,
-  wf_covariant_typ E Ep Em T ->
+(* Lemma wf_covariant_typ_weaken_head : forall T E Ep Em F, *)
+(*   wf_covariant_typ E Ep Em T -> *)
+(*   ok (F ++ E) -> *)
+(*   wf_covariant_typ (F ++ E) Ep Em T. *)
+(* Proof with auto. *)
+(*   intros. *)
+(*   rewrite_env (empty ++ F ++ E). *)
+(*   rewrite_env (empty ++ empty ++ Ep). *)
+(*   rewrite_env (empty ++ empty ++ Em). *)
+(*   apply wf_covariant_typ_weakening; simpl_env... *)
+(* Qed. *)
+
+Lemma wf_typ_weaken_head : forall T E m F,
+  wf_typ E m T ->
   ok (F ++ E) ->
-  wf_covariant_typ (F ++ E) Ep Em T.
-Proof with auto.
-  intros.
-  rewrite_env (empty ++ F ++ E).
-  rewrite_env (empty ++ empty ++ Ep).
-  rewrite_env (empty ++ empty ++ Em).
-  apply wf_covariant_typ_weakening; simpl_env...
-Qed.
-Lemma wf_typ_weaken_head : forall T E F,
-  wf_typ E T ->
-  ok (F ++ E) ->
-  wf_typ (F ++ E) T.
+  wf_typ (F ++ E) m T.
 Proof.
   intros.
-  rewrite_env (empty ++ F++ E).
+  rewrite_env (empty ++ F ++ E).
   auto using wf_typ_weakening.
 Qed.
 
 (** Narrowing for wellformedness. *)
-Lemma wf_covariant_typ_narrowing : forall V U T E F X Ep Em,
-  wf_covariant_typ (F ++ [(X, bind_sub V)] ++ E) T Ep Em->
+(* Lemma wf_covariant_typ_narrowing : forall V U T E F X Ep Em, *)
+(*   wf_covariant_typ (F ++ [(X, bind_sub V)] ++ E) T Ep Em-> *)
+(*   ok (F ++ [(X, bind_sub U)] ++ E) -> *)
+(*   wf_covariant_typ (F ++ [(X, bind_sub U)] ++ E) T Ep Em. *)
+(* Proof with simpl_env; eauto. *)
+(*   intros V U T E F X Ep Em Hwf_typ Hok. *)
+(*   remember (F ++ [(X, bind_sub V)] ++ E). *)
+(*   generalize dependent F. *)
+(*   induction Hwf_typ; intros F Hok Heq; subst; auto. *)
+(*   (* typ_var *) *)
+(*   - binds_cases H... *)
+(*   (* typ_arrow *) *)
+(*   - pick fresh Y and apply wf_typ_arrow... *)
+(*   (* typ_all *) *)
+(*   - pick fresh Y and apply wf_typ_all... *)
+(*     rewrite <- concat_assoc. *)
+(*     apply H0... *)
+(*   (* typ_capt *) *)
+(*   - eapply wf_typ_capt... *)
+(*     wf_cset_simpl True... *)
+(*     + binds_cases H0... *)
+(* Qed. *)
+
+(** Again, a simpler version which is used more often. *)
+Lemma wf_typ_narrowing : forall V U T E m F X,
+  wf_typ (F ++ [(X, bind_sub V)] ++ E) m T ->
   ok (F ++ [(X, bind_sub U)] ++ E) ->
-  wf_covariant_typ (F ++ [(X, bind_sub U)] ++ E) T Ep Em.
+  wf_typ (F ++ [(X, bind_sub U)] ++ E) m T.
 Proof with simpl_env; eauto.
-  intros V U T E F X Ep Em Hwf_typ Hok.
+  intros.
   remember (F ++ [(X, bind_sub V)] ++ E).
   generalize dependent F.
-  induction Hwf_typ; intros F Hok Heq; subst; auto.
+  induction H; intros F Hok Heq; subst; auto.
   (* typ_var *)
   - binds_cases H...
   (* typ_arrow *)
   - pick fresh Y and apply wf_typ_arrow...
+    apply H1 with (X0 := Y) (F0 := [(Y, bind_typ T1 (polarity_from_mode (neg m)))] ++ F).
+    fsetdec...
+    reflexivity.
+    simpl_env...
   (* typ_all *)
   - pick fresh Y and apply wf_typ_all...
     rewrite <- concat_assoc.
-    apply H0...
+    apply H1 with (X0 := Y) (F0 := [(Y, bind_sub T1)] ++ F).
+    fsetdec.
+    reflexivity.
+    simpl_env...
   (* typ_capt *)
   - eapply wf_typ_capt...
     wf_cset_simpl True...
-    + binds_cases H0...
-Qed.
-(** Again, a simpler version which is used more often. *)
-Lemma wf_typ_narrowing : forall V U T E F X,
-  wf_typ (F ++ [(X, bind_sub V)] ++ E) T ->
-  ok (F ++ [(X, bind_sub U)] ++ E) ->
-  wf_typ (F ++ [(X, bind_sub U)] ++ E) T.
-Proof with simpl_env; eauto.
-  intros.
-  apply wf_covariant_typ_narrowing with (V := V)...
+    inversion H1.
+    binds_cases H3...
 Qed.
 
 (** Lemmas around substituion, and how they preserve local closure.
     We need a technical lemma around substituting in the presence of +/-
     variance sets. *)
-Local Lemma wf_covariant_typ_subst_tb : forall F Fp Fm Q E Ep Em Z P T,
-  wf_covariant_typ (F ++ [(Z, bind_sub Q)] ++ E) (Fp ++ Ep) (Fm ++ Em) T ->
-  wf_typ E P ->
-  ok (map (subst_tb Z P) F ++ E) ->
-  ok (map (subst_tb Z P) Fp ++ Ep) ->
-  ok (map (subst_tb Z P) Fm ++ Em) ->
-  wf_covariant_typ (map (subst_tb Z P) F ++ E) (map (subst_tb Z P) Fp ++ Ep) (map (subst_tb Z P) Fm ++ Em) (subst_tt Z P T).
-Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ.
-  intros F Fp Fm Q E Ep Em Z P T WT WP.
-  remember (F ++ [(Z, bind_sub Q)] ++ E).
-  remember (Fp ++ Ep).
-  remember (Fm ++ Em).
-  generalize dependent F.
-  generalize dependent Fp.
-  generalize dependent Fm.
-  generalize dependent Ep.
-  generalize dependent Em.
-  induction WT; intros Em' Ep' Fm EQm Fp EQp F EQ Ok OkP OkM; subst; simpl subst_tt...
-  - Case "wf_typ_var".
-    destruct (X == Z); subst...
-    + SCase "X = Z".
-      binds_cases H...
-      all: rewrite_env (empty ++ map (subst_tb Z P) F ++ E);
-           rewrite_env (empty ++ ((map (subst_tb Z P) Fp) ++ Ep') ++ empty);
-           rewrite_env (empty ++ ((map (subst_tb Z P) Fm) ++ Em') ++ empty);
-           apply wf_covariant_typ_weakening...
-    + SCase "X <> Z".
-      binds_cases H...
-      apply (wf_typ_var (subst_tt Z P U))...
-  - Case "wf_typ_arrow".
-    pick fresh Y and apply wf_typ_arrow...
-    unfold open_ct.
-    rewrite <- subst_tt_open_ct_rec.
-    apply H0 with (F0 := F) (Fp0 := [(Y, bind_typ T1)] ++ Fp) (Fm0 := Fm) (Em := Em') (Ep := Ep') (X := Y)...
-    apply type_from_wf_typ with (E := E)...
-  - Case "wf_typ_var".
-    pick fresh Y and apply wf_typ_all...
-    rewrite subst_tt_open_tt_var...
-    rewrite_env (map (subst_tb Z P) ([(Y, bind_sub T1)] ++ F) ++ E).
-    apply H0...
-  - Case "wf_typ_capt".
-    apply wf_typ_capt...
-    (** Here we need to do the manual destruction of the binding term, as the type x is bound to
-        might need to be substituted in. *)
-    wf_cset_simpl False.
-    destruct Hexists; binds_cases H0; eauto; exists (subst_tt Z P T0)...
-Qed.
+(* Local Lemma wf_covariant_typ_subst_tb : forall F Fp Fm Q E Ep Em Z P T, *)
+(*   wf_covariant_typ (F ++ [(Z, bind_sub Q)] ++ E) (Fp ++ Ep) (Fm ++ Em) T -> *)
+(*   wf_typ E P -> *)
+(*   ok (map (subst_tb Z P) F ++ E) -> *)
+(*   ok (map (subst_tb Z P) Fp ++ Ep) -> *)
+(*   ok (map (subst_tb Z P) Fm ++ Em) -> *)
+(*   wf_covariant_typ (map (subst_tb Z P) F ++ E) (map (subst_tb Z P) Fp ++ Ep) (map (subst_tb Z P) Fm ++ Em) (subst_tt Z P T). *)
+(* Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ. *)
+(*   intros F Fp Fm Q E Ep Em Z P T WT WP. *)
+(*   remember (F ++ [(Z, bind_sub Q)] ++ E). *)
+(*   remember (Fp ++ Ep). *)
+(*   remember (Fm ++ Em). *)
+(*   generalize dependent F. *)
+(*   generalize dependent Fp. *)
+(*   generalize dependent Fm. *)
+(*   generalize dependent Ep. *)
+(*   generalize dependent Em. *)
+(*   induction WT; intros Em' Ep' Fm EQm Fp EQp F EQ Ok OkP OkM; subst; simpl subst_tt... *)
+(*   - Case "wf_typ_var". *)
+(*     destruct (X == Z); subst... *)
+(*     + SCase "X = Z". *)
+(*       binds_cases H... *)
+(*       all: rewrite_env (empty ++ map (subst_tb Z P) F ++ E); *)
+(*            rewrite_env (empty ++ ((map (subst_tb Z P) Fp) ++ Ep') ++ empty); *)
+(*            rewrite_env (empty ++ ((map (subst_tb Z P) Fm) ++ Em') ++ empty); *)
+(*            apply wf_covariant_typ_weakening... *)
+(*     + SCase "X <> Z". *)
+(*       binds_cases H... *)
+(*       apply (wf_typ_var (subst_tt Z P U))... *)
+(*   - Case "wf_typ_arrow". *)
+(*     pick fresh Y and apply wf_typ_arrow... *)
+(*     unfold open_ct. *)
+(*     rewrite <- subst_tt_open_ct_rec. *)
+(*     apply H0 with (F0 := F) (Fp0 := [(Y, bind_typ T1)] ++ Fp) (Fm0 := Fm) (Em := Em') (Ep := Ep') (X := Y)... *)
+(*     apply type_from_wf_typ with (E := E)... *)
+(*   - Case "wf_typ_var". *)
+(*     pick fresh Y and apply wf_typ_all... *)
+(*     rewrite subst_tt_open_tt_var... *)
+(*     rewrite_env (map (subst_tb Z P) ([(Y, bind_sub T1)] ++ F) ++ E). *)
+(*     apply H0... *)
+(*   - Case "wf_typ_capt". *)
+(*     apply wf_typ_capt... *)
+(*     (** Here we need to do the manual destruction of the binding term, as the type x is bound to *)
+(*         might need to be substituted in. *) *)
+(*     wf_cset_simpl False. *)
+(*     destruct Hexists; binds_cases H0; eauto; exists (subst_tt Z P T0)... *)
+(* Qed. *)
 
 Lemma wf_typ_subst_tb : forall F Q E Z P T,
   wf_typ (F ++ [(Z, bind_sub Q)] ++ E) T ->

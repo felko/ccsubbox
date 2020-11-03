@@ -136,7 +136,7 @@ Fixpoint subst_ee (z : atom) (u : exp) (c : captureset) (e : exp) {struct e} : e
 Definition subst_tb (Z : atom) (P : typ) (b : binding) : binding :=
   match b with
   | bind_sub T => bind_sub (subst_tt Z P T)
-  | bind_typ T => bind_typ (subst_tt Z P T)
+  | bind_typ T p => bind_typ (subst_tt Z P T) p
   end.
 
 
