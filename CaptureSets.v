@@ -189,7 +189,7 @@ Definition empty_cset_fvars (c : captureset) : Prop :=
 
 Definition cset_disjoint_fvars (c1 c2 :captureset) : Prop :=
   match c1 , c2 with
-  | cset_set A1 N1 , cset_set A2 N2 => AtomSet.F.Empty (AtomSet.F.inter A1 A2).
+  | (cset_set A1 N1), (cset_set A2 N2) => AtomSet.F.Empty (AtomSet.F.inter A1 A2)
   | _ , _ => True
   end.
 
