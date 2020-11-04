@@ -586,6 +586,18 @@ Proof.
 Qed.
   
 
+Lemma capt_from_empty_cset_bvars : forall C,
+  empty_cset_bvars C ->
+  capt C.
+Proof with auto.
+  intros C H.
+  destruct C.
+  - constructor...
+  - assert (t0 = {}N). { unfold empty_cset_bvars in *. unfold cset_all_bvars in *. fnsetdec. }
+    subst.
+    econstructor.
+Qed.
+
 (** NEW: Commuting local closure, when opening by disjoint capture sets with no bound variables,
     which are not universal.
 
@@ -1083,13 +1095,11 @@ Proof.
   destruct C eqn:HC; destruct C' eqn:HC';
   cset_split; cset_cleanup.
 Qed.
+
 Lemma subst_ct_open_fresh : forall k z C T X,
   (* X fresh requirement here in z c T *)
   X `notin` (singleton z `union` fv_tt T `union` fv_et T) /\ X `notin` fv_cset C ->
-  (* c is locally closed / no bound variables 
-    TODO replace with capt
-   *)
-  empty_cset_bvars C ->
+  capt C ->
   (open_ct_rec k (cset_fvar X) (subst_ct z C T)) =
     (subst_ct z C (open_ct_rec k (cset_fvar X) T)).
 Proof with eauto*.
@@ -1103,12 +1113,13 @@ Proof with eauto*.
     f_equal.
     + apply IHT1. split. fsetdec. apply HXfresh.
     + apply IHT2. split. fsetdec. apply HXfresh.
-  * (* Case typ_capt *)    
+  * (* Case typ_capt *)
     f_equal.
     + apply open_capt_subst_aux.
       (* csetdec; destruct .... should be a tactic at some point .*)
       destruct c... fsetdec. fsetdec.
       destruct C...
+      inversion HCfresh; subst. unfold cset_references_bvar. unfold cset_all_bvars. fnsetdec.
     + apply IHT. split. fsetdec. apply HXfresh.
 Qed.    
 
@@ -1125,7 +1136,7 @@ Qed.
 Lemma subst_ct_type : forall T z c,
   type T -> 
   (* TODO replace with capt *)
-  empty_cset_bvars c ->
+  capt c ->
   type (subst_ct z c T).
 Proof with auto.
   intros T z c Tpe Closed.
@@ -1148,8 +1159,7 @@ Proof with auto.
     cset_split; cset_cleanup; destruct c...
     destruct C; constructor.
     assert (t0 = {}N). {
-      unfold empty_cset_bvars in *. unfold cset_all_bvars in *.
-      fnsetdec.
+      inversion Closed...
     }
     subst.
     destruct C...
@@ -1167,6 +1177,9 @@ Lemma subst_ee_expr : forall z e1 e2 c,
   expr (subst_ee z e2 c e1).
 Proof with eauto using subst_ct_type.
   intros z e1 e2 c He1 He2 Closed. revert z.
+
+  assert (capt c). { apply capt_from_empty_cset_bvars... }
+
   induction He1; intro z; simpl; auto;
   try solve [
     econstructor; eauto using subst_ct_type;
