@@ -65,6 +65,11 @@ Ltac nnotin_simpl := NatSetNotin.notin_simpl_hyps.
 
 Ltac nnotin_solve := NatSetNotin.notin_solve.
 
+Definition disjoint (xs : atoms) (ys: atoms) : Prop :=
+  AtomSet.F.Empty (AtomSet.F.inter xs ys).
+
+Notation "a `disjoint` b" := (disjoint a b) (at level 1)  : metatheory_scope.
+
 Declare Scope cset_scope.
 
 (** A captureset -- a pair of free variables and bound variables. *)
@@ -86,13 +91,13 @@ Notation "{*}C" :=
              has an empty fvar set.
              I am trying to reduce the usage of cset_fvar  *)
 
-Definition cset_fvar (c : captureset) : atoms :=
+Definition cset_fvars (c : captureset) : atoms :=
   match c with
   | cset_universal => {}
   | cset_set A N => A
   end.
 
-Definition cset_bvar (c : captureset) : nats :=
+Definition cset_bvars (c : captureset) : nats :=
   match c with
   | cset_universal => {}N
   | cset_set A N => N
@@ -106,23 +111,23 @@ Definition cset_vars (pf : atoms -> Prop)  (pb : nats -> Prop) (c : captureset) 
   end.
 
 (* Could be implemented in terms of cset_vars but that leaves us with a dangeling /\ True *)
-Definition cset_fvars (p : atoms -> Prop) (c : captureset) : Prop :=
+Definition cset_all_fvars (p : atoms -> Prop) (c : captureset) : Prop :=
   match c with
   | cset_set A N => p A
   | cset_universal => False
   end.
 
 
-Definition cset_bvars (p : nats -> Prop) (c : captureset) : Prop :=
+Definition cset_all_bvars (p : nats -> Prop) (c : captureset) : Prop :=
   match c with
   | cset_set A N => p N
   | cset_universal => False
   end.
 
 (** Singletons *)
-Definition cset_singleton_fvar (a : atom) :=
+Definition cset_fvar (a : atom) :=
   (cset_set (AtomSet.F.singleton a) (NatSet.F.empty)).
-Definition cset_singleton_bvar (k : nat) :=
+Definition cset_bvar (k : nat) :=
   (cset_set (AtomSet.F.empty) (NatSet.F.singleton k)).
 
 (** Predicates for determining if a capture set explicity references
@@ -130,10 +135,10 @@ Definition cset_singleton_bvar (k : nat) :=
     Don't use these predicates for determining if a capture set
     captures a variable, as one needs to also test cset_universal. *)
 Definition cset_references_bvar (k : nat) (c : captureset) :=
-  cset_bvars (NatSet.F.In k) c.
+  cset_all_bvars (NatSet.F.In k) c.
 
 Definition cset_references_fvar (a : atom) (c : captureset) :=
-  cset_fvars (AtomSet.F.In a) c.
+  cset_all_fvars (AtomSet.F.In a) c.
 
 Definition cset_references_bvar_dec (k : nat) (c : captureset) :=
   match c with
@@ -178,13 +183,13 @@ Qed.
 
 (** More predicates *)
 Definition empty_cset_bvars (c : captureset) : Prop :=
-  cset_bvars NatSet.F.Empty c.
+  cset_all_bvars NatSet.F.Empty c.
 Definition empty_cset_fvars (c : captureset) : Prop :=
-  cset_fvars AtomSet.F.Empty c.
+  cset_all_fvars AtomSet.F.Empty c.
 
 Definition cset_disjoint_fvars (c1 c2 :captureset) : Prop :=
   match c1 , c2 with
-  | cset_set A1 N1 , cset_set A2 N2 => AtomSet.F.Empty (AtomSet.F.inter A1 A2)
+  | cset_set A1 N1 , cset_set A2 N2 => AtomSet.F.Empty (AtomSet.F.inter A1 A2).
   | _ , _ => True
   end.
 
@@ -217,14 +222,14 @@ Definition cset_remove_fvar (a : atom) (c : captureset) : captureset :=
 
 
 (** Opening a capture set with a bound variable d[k -> c] *)
-Definition open_captureset_bvar (k : nat) (c : captureset) (d : captureset) : captureset :=
+Definition open_cset (k : nat) (c : captureset) (d : captureset) : captureset :=
   if cset_references_bvar_dec k d then 
     cset_union c (cset_remove_bvar k d)
   else 
     d.
 
 (** Substituting a capture set with a free variable d[a -> c] *)
-Definition substitute_captureset_fvar (a : atom) (c : captureset) (d: captureset) : captureset :=
+Definition subst_cset (a : atom) (c : captureset) (d: captureset) : captureset :=
   if cset_references_fvar_dec a d then
     cset_union c (cset_remove_fvar a d)
   else
@@ -308,14 +313,16 @@ Ltac csetdec := repeat (
 Hint Constructors cset_subset_prop : core.
 
 Hint Transparent 
-  cset_vars cset_bvars cset_fvars cset_references_bvar cset_references_fvar
-  cset_remove_bvar cset_remove_fvar open_captureset_bvar substitute_captureset_fvar
+  cset_references_bvar cset_references_fvar
+  cset_remove_bvar cset_remove_fvar open_cset subst_cset
+  disjoint
 : cset_scope.
 
 Hint Unfold 
-  cset_union cset_subset_dec
-  cset_bvars cset_fvars
+  cset_union cset_subset_dec   
   cset_remove_bvar cset_remove_fvar 
-  open_captureset_bvar substitute_captureset_fvar 
+  open_cset subst_cset 
   cset_references_bvar cset_references_fvar
+  cset_all_fvars cset_all_bvars
+  disjoint
 : cset_scope.
