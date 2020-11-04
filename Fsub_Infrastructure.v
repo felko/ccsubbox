@@ -653,7 +653,7 @@ Qed.
 
 Lemma open_ct_rec_capt : forall T j D i C,
   i <> j ->
-  (* TODO change to capt D *)
+  (* can't change this to `capt D` since then D can be universal. *)
   empty_cset_bvars D ->
   (fv_cset C) `disjoint` (fv_cset D) ->
   open_ct_rec j D T = open_ct_rec i C (open_ct_rec j D T) ->
@@ -750,6 +750,9 @@ Qed.
 
 Lemma open_ee_rec_expr_aux : forall e j v u C D i,
   i <> j ->
+  (* Does D _need_ to be a concrete capture set here?
+     open_ct_rec_capt requires this.
+   *)
   empty_cset_bvars D ->
   (fv_cset C) `disjoint` (fv_cset D) ->
   open_ee_rec j v D e = open_ee_rec i u C (open_ee_rec j v D e) ->
@@ -838,33 +841,17 @@ Ltac cset_cleanup :=
   try (f_equal; try fsetdec; try fnsetdec).
 
 Lemma subst_capt_open_rec : forall x k c1 c2 c,
-  empty_cset_bvars c1 ->
+  capt c1 ->
   subst_cset x c1 (open_cset k c2 c) =
   open_cset k (subst_cset x c1 c2)
     (subst_cset x c1 c).
 Proof with eauto*.
-  intros x k c1 c2 c c1empt.
-  (* There really should be a nice proof of this lemma.  Probably
-     wants some automation here. *)
-  csetdec.
-  destruct c eqn:Hc; destruct c1 eqn:Hc1; destruct c2 eqn:Hc2;
-  cset_split; cset_cleanup.
-  (* This is not a good proof.  But it works... *)
-  all: try solve [
-    (* A bunch of cases that are not useful as they assume k is in c1. *)
-    (unfold empty_cset_bvars in *; unfold cset_all_bvars in *;
-      exfalso; assert (~ NatSet.F.In k (NatSet.F.union t2 t0)) by nnotin_solve; 
-      contradict H; eauto*)
-    ||
-    (* An artifact that comes up???? *)
-    (unfold empty_cset_bvars in *; unfold cset_all_bvars in *;
-      fnsetdec)
-  ].
+  intros x k c1 c2 c c1empt.  
+  destruct c eqn:Hc; destruct c1 eqn:Hc1; destruct c2 eqn:Hc2; inversion c1empt; cset_split; cset_cleanup.
 Qed.
 
 Lemma subst_ct_open_rec : forall x k c1 c2 t,
-  (* TODO replace with capt *)
-  empty_cset_bvars c1 ->
+  capt c1 ->
   subst_ct x c1 (open_ct_rec k c2 t) =
   open_ct_rec k (subst_cset x c1 c2) (subst_ct x c1 t).
 Proof with auto.
@@ -880,8 +867,7 @@ Qed.
 
 Lemma subst_ee_open_ee_rec : forall e1 e2 x u c1 c2 k,
   expr u ->
-  (* TODO replace with capt *)
-  empty_cset_bvars c1 ->
+  capt c1 ->
   subst_ee x u c1 (open_ee_rec k e2 c2 e1) =
     open_ee_rec k (subst_ee x u c1 e2) (subst_cset x c1 c2) (subst_ee x u c1 e1).
 Proof with auto using subst_ct_open_rec.
@@ -895,7 +881,7 @@ Qed.
 
 Lemma subst_ee_open_ee : forall e1 e2 x u c1 c2,
   expr u ->
-  empty_cset_bvars c1 ->
+  capt c1 ->
   subst_ee x u c1 (open_ee e1 e2 c2) =
     open_ee (subst_ee x u c1 e1) (subst_ee x u c1 e2) (subst_cset x c1 c2).
 Proof with auto*.
@@ -907,7 +893,7 @@ Qed.
 Lemma subst_ee_open_ee_var : forall (x y:atom) u c e,
   y <> x ->
   expr u ->
-  empty_cset_bvars c ->
+  capt c ->
   open_ee (subst_ee x u c e) y (cset_fvar y) = subst_ee x u c (open_ee e y (cset_fvar y)).
 Proof with auto*.
   intros x y u c e Neq Wu Wc.
@@ -924,7 +910,7 @@ Proof with auto*.
 Qed.
 
 Lemma subst_ct_open_tt_rec : forall c z P t k,
-  empty_cset_bvars c ->
+  capt c ->
   z `notin` fv_et P ->
   subst_ct z c (open_tt_rec k P t) = open_tt_rec k P (subst_ct z c t).
 Proof with eauto.
@@ -932,7 +918,6 @@ Proof with eauto.
   Case "exp_bvar".
     destruct (k === n)... symmetry. apply subst_ct_fresh...
 Qed.
-
 
 Lemma subst_te_open_ee_rec : forall e1 e2 c Z P k,
   type P -> (* Jonathan: I added this here, does this make sense? *)
@@ -963,7 +948,7 @@ Qed.
 
 Lemma subst_ee_open_te_rec : forall e P z u c k,
   expr u ->
-  empty_cset_bvars c ->
+  capt c ->
   z `notin` fv_et P -> (* Jonathan: I added this here, does this make sense? *)
   subst_ee z u c (open_te_rec k P e) = open_te_rec k P (subst_ee z u c e).
 Proof with eauto using subst_ct_open_tt_rec.
@@ -974,7 +959,7 @@ Qed.
 
 Lemma subst_ee_open_te : forall e P z u c,
   expr u ->
-  empty_cset_bvars c ->
+  capt c ->
   z `notin` fv_et P -> (* Jonathan: I added this here, does this make sense? *)
   subst_ee z u c (open_te e P) = open_te (subst_ee z u c e) P.
 Proof with auto*.
@@ -985,7 +970,7 @@ Qed.
 
 Lemma subst_ee_open_te_var : forall z (X:atom) u c e,
   expr u ->
-  empty_cset_bvars c ->
+  capt c ->
   open_te (subst_ee z u c e) X = subst_ee z u c (open_te e X).
 Proof with auto*.
   intros z X u c e Wu Wc.
@@ -1083,7 +1068,7 @@ Lemma open_capt_subst_aux : forall k x z C' C,
   x `notin` fv_cset C ->
   x `notin` fv_cset C' ->
   z <> x ->
-  ~ cset_references_bvar k C' ->
+  capt C' ->
   open_cset k (cset_fvar x) (subst_cset z C' C) =
   subst_cset z C' (open_cset k (cset_fvar x) C).
 Proof.
@@ -1092,7 +1077,7 @@ Proof.
      wants some automation here. *)
   unfold cset_fvar.
   csetdec.
-  destruct C eqn:HC; destruct C' eqn:HC';
+  destruct C eqn:HC; destruct C' eqn:HC'; inversion HkfC';
   cset_split; cset_cleanup.
 Qed.
 
@@ -1119,7 +1104,6 @@ Proof with eauto*.
       (* csetdec; destruct .... should be a tactic at some point .*)
       destruct c... fsetdec. fsetdec.
       destruct C...
-      inversion HCfresh; subst. unfold cset_references_bvar. unfold cset_all_bvars. fnsetdec.
     + apply IHT. split. fsetdec. apply HXfresh.
 Qed.    
 
@@ -1135,7 +1119,6 @@ Qed.
 
 Lemma subst_ct_type : forall T z c,
   type T -> 
-  (* TODO replace with capt *)
   capt c ->
   type (subst_ct z c T).
 Proof with auto.
@@ -1172,13 +1155,10 @@ Qed.
 Lemma subst_ee_expr : forall z e1 e2 c,
   expr e1 ->
   expr e2 ->
-  (* TODO replace with capt *)
-  empty_cset_bvars c ->
+  capt c ->
   expr (subst_ee z e2 c e1).
 Proof with eauto using subst_ct_type.
   intros z e1 e2 c He1 He2 Closed. revert z.
-
-  assert (capt c). { apply capt_from_empty_cset_bvars... }
 
   induction He1; intro z; simpl; auto;
   try solve [
