@@ -70,7 +70,8 @@ Coercion typ_bvar : nat >-> typ.
 Coercion typ_fvar : atom >-> typ.
 Coercion exp_bvar : nat >-> exp.
 Coercion exp_fvar : atom >-> exp.
-
+Coercion cset_bvar : nat >-> captureset.
+Coercion cset_fvar : atom >-> captureset.
 
 (* ********************************************************************** *)
 (** * #<a name="open"></a># Opening terms *)
@@ -137,7 +138,7 @@ Fixpoint open_ct_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
   | typ_arrow T1 T2 => typ_arrow (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
   | typ_all T1 T2 => typ_all (open_ct_rec k c T1) (open_ct_rec k c T2)
   (** We actually need to perform the substitution here. *)
-  | typ_capt C T => typ_capt (open_captureset_bvar k c C) (open_ct_rec k c T)
+  | typ_capt C T => typ_capt (open_cset k c C) (open_ct_rec k c T)
   end.
 
 Fixpoint open_ee_rec (k : nat) (f : exp) (c : captureset) (e : exp)  {struct e} : exp :=
@@ -216,6 +217,11 @@ Definition open_ct T c := open_ct_rec 0 c T.
     below are equivalent to ones that use existential, and hence also
     universal, quantification. *)
 
+Inductive capt : captureset -> Prop :=
+  | capt_universal : capt cset_universal
+  | capt_capturing : forall xs, capt (cset_set xs {}N)
+  .
+
 Inductive type : typ -> Prop :=
   | type_top :
       type typ_top
@@ -223,18 +229,16 @@ Inductive type : typ -> Prop :=
       type (typ_fvar X)
   | type_arrow : forall L T1 T2,
       type T1 ->
-      (forall X : atom, X `notin` L -> type (open_ct T2 (cset_singleton_fvar X))) ->
+      (forall X : atom, X `notin` L -> type (open_ct T2 (cset_fvar X))) ->
       type (typ_arrow T1 T2)
   | type_all : forall L T1 T2,
       type T1 ->
       (forall X : atom, X `notin` L -> type (open_tt T2 X)) ->
       type (typ_all T1 T2)
-  | type_capt_universal : forall T,
+  | type_capt : forall C T,
       type T ->
-      type (typ_capt cset_universal T)
-  | type_capt : forall fvars T,
-      type T ->
-      type (typ_capt (cset_set fvars {}N) T)
+      capt C ->
+      type (typ_capt C T)
 .
 
 Inductive expr : exp -> Prop :=
@@ -242,11 +246,7 @@ Inductive expr : exp -> Prop :=
       expr (exp_fvar x)
   | expr_abs : forall L T e1,
       type T ->
-      (* Jonathan: this looks wrong to me.
-         Shouldn't it be opened with the capture set {x}?
-         Edward: Yeah, I forgot to change it in expr.
-      *)
-      (forall x : atom, x `notin` L -> expr (open_ee e1 x (cset_singleton_fvar x))) ->
+      (forall x : atom, x `notin` L -> expr (open_ee e1 x x)) ->
       expr (exp_abs T e1)
   | expr_app : forall e1 e2,
       expr e1 ->
@@ -261,7 +261,6 @@ Inductive expr : exp -> Prop :=
       type V ->
       expr (exp_tapp e1 V)
 .
-
 
 
 (* ********************************************************************** *)
@@ -417,7 +416,7 @@ Inductive wf_typ : env -> mode -> typ -> Prop :=
       (** NEW: we need to be able to open capture sets.  Capture
           variables can only be opened in covariant positions. *)
       (forall X : atom, X `notin` L ->
-        wf_typ ([(X, bind_typ T1 (polarity_from_mode (neg m)))] ++ E) m (open_ct T2 (cset_singleton_fvar X))) ->
+        wf_typ ([(X, bind_typ T1 (polarity_from_mode (neg m)))] ++ E) m (open_ct T2 X)) ->
        wf_typ E m (typ_arrow T1 T2)
   | wf_typ_all : forall L E m T1 T2,
       wf_typ E (neg m) T1 ->
@@ -523,7 +522,7 @@ Inductive sub : env -> mode -> typ -> typ -> Prop :=
       wf_env E ->
       wf_typ E m S ->
       (** NEW: S can't capture anything *)
-      cv S E empty_cset ->
+      cv S E {}C ->
       sub E m S typ_top
 
   (* Instead of having rules for refl and trans, the original Fsub calculus special cases
@@ -550,8 +549,8 @@ Inductive sub : env -> mode -> typ -> typ -> Prop :=
       sub E (neg m) T1 S1 ->
       (forall x : atom, x `notin` L ->
           sub ([(x, bind_typ T1 (polarity_from_mode (neg m)))] ++ E) m
-            (open_ct S2 (cset_singleton_fvar x)) 
-            (open_ct T2 (cset_singleton_fvar x))) ->
+            (open_ct S2 x) 
+            (open_ct T2 x)) ->
       sub E m (typ_arrow S1 S2) (typ_arrow T1 T2)
 
 (* 
@@ -587,7 +586,7 @@ Inductive cv_free : exp -> captureset -> Prop :=
   | cv_free_bvar : forall n,
                     cv_free (exp_bvar n) {}C
   | cv_free_fvar : forall x,
-                    cv_free (exp_fvar x) (cset_singleton_fvar x)
+                    cv_free (exp_fvar x) (cset_fvar x)
   | cv_free_abs : forall T e1 C,
                     cv_free e1 C ->
                     cv_free (exp_abs T e1) C
@@ -617,11 +616,11 @@ Inductive typing : env -> exp -> typ -> Prop :=
       wf_env E ->
       binds x (bind_typ T dontcare) E ->
       (** NEW: a variable always gets the type {x} T *)
-      typing E (exp_fvar x) (typ_capt (cset_singleton_fvar x) T)
+      typing E (exp_fvar x) (typ_capt x T)
   | typing_abs : forall L E V e1 T1 C,
       (forall x : atom, x `notin` L ->
-        wf_typ ([(x, bind_typ V positive)] ++ E) covariant (open_ct T1 (cset_singleton_fvar x))  /\
-        typing ([(x, bind_typ V dontcare)] ++ E) (open_ee e1 x (cset_singleton_fvar x)) T1) ->
+        wf_typ ([(x, bind_typ V positive)] ++ E) covariant (open_ct T1 x)  /\
+        typing ([(x, bind_typ V dontcare)] ++ E) (open_ee e1 x x) T1) ->
       (** NEW: a function always gets the type C A -> B, where C = fv(body). 
           Formally we do U cv(x) | x free in body, but cv(x) = {x} by the above typing judgement. 
 
