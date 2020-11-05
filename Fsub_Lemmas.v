@@ -742,24 +742,27 @@ Qed.
     The other three hints try outright to solve their respective
     goals. *)
 
-Hint Extern 1 (wf_cset ?E) =>
+Hint Extern 1 (wf_cset ?E ?m) =>
   match goal with
-  | H: subcapt _ _ _ |- _ => apply (proj1 (subcapt_regular _ _ _ H))
+  | H: subcapt _ _ _ _ |- _ => apply (proj1 (subcapt_regular _ _ _ _ H))
   end
 : core.
 
 Hint Extern 1 (wf_env ?E) =>
   match goal with
-  | H: sub _ _ _ |- _ => apply (proj1 (sub_regular _ _ _ H))
+  | H: (forall m0, sub _ m0 _ _) |- _ => apply (proj1 (sub_regular _ _ _ _ (H covariant)))
+  | H: sub _ _ _ _ |- _ => apply (proj1 (sub_regular _ _ _ _ H))
   | H: typing _ _ _ |- _ => apply (proj1 (typing_regular _ _ _ H))
   end
 : core.
 
-Hint Extern 1 (wf_typ ?E ?T) =>
+Hint Extern 1 (wf_typ ?E ?m ?T) =>
   match goal with
   | H: typing E _ T |- _ => apply (proj2 (proj2 (typing_regular _ _ _ H)))
-  | H: sub E T _ |- _ => apply (proj1 (proj2 (sub_regular _ _ _ H)))
-  | H: sub E _ T |- _ => apply (proj2 (proj2 (sub_regular _ _ _ H)))
+  | H: sub E m T _ |- _ => apply (proj1 (proj2 (sub_regular _ _ _ _ H)))
+  | H: sub E m _ T |- _ => apply (proj2 (proj2 (sub_regular _ _ _ _ H)))
+  | H: (forall m0, sub E m0 T _) |- _ => apply (proj1 (proj2 (sub_regular _ _ _ _ (H m))))
+  | H: (forall m0, sub E m0 _ T) |- _ => apply (proj2 (proj2 (sub_regular _ _ _ _ (H m))))
   end
 : core.
 
@@ -767,8 +770,8 @@ Hint Extern 1 (type ?T) =>
   let go E := apply (type_from_wf_typ E); auto in
   match goal with
   | H: typing ?E _ T |- _ => go E
-  | H: sub ?E T _ |- _ => go E
-  | H: sub ?E _ T |- _ => go E
+  | H: sub ?E _ T _ |- _ => go E
+  | H: sub ?E _ _ T |- _ => go E
   | H: wf_typ ?E T |- _ => go E
   end
 : core.
