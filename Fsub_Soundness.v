@@ -18,6 +18,11 @@ Require Export Fsub_Lemmas.
 (* ********************************************************************** *)
 (** * #<a name="subtyping"></a># Properties of subtyping *)
 
+(* used for termination checking *)
+Lemma cheat : forall A, A.
+Proof.
+Admitted.
+
 
 (* ********************************************************************** *)
 (** ** Weakening (2) *)
@@ -112,15 +117,39 @@ Proof with auto using wf_cset_weakening.
   apply captures_weakening...
 Qed.
 
+Lemma captures_strengthening_typ : forall E G X U xs x,
+captures (G ++ [(X, bind_typ U)] ++ E) xs x ->
+captures (G ++ E) xs x.
+Proof with eauto using wf_typ_strengthening, wf_env_strengthening, wf_cset_strengthening, cv_strengthening.
+  intros E G X U xs x H.
+  remember (G ++ [(X, bind_typ U)] ++ E).
+  generalize dependent G.
+  induction H; intros G EQ; subst.
+  - apply captures_in...
+  - eapply captures_var with (ys := ys) (T := T)...
+    + binds_cases H...
+      inversion H3.
+      apply binds_tail...
+      admit.
+    + unfold AtomSet.F.For_all in *. intros.
+      apply H2...
+Admitted.
 
 Lemma subcapt_strengthening_typ : forall x U E F C1 C2,
   subcapt (F ++ [(x, bind_typ U)] ++ E) C1 C2 ->
-  subcapt (F ++ E) C1 C2
-with captures_strengthening_typ : forall E G X U xs x,
-  captures (G ++ [(X, bind_typ U)] ++ E) xs x ->
-  captures (G ++ E) xs x.
-Proof.
-Admitted.
+  subcapt (F ++ E) C1 C2.
+Proof with eauto using wf_typ_strengthening, wf_env_strengthening, wf_cset_strengthening, cv_strengthening.
+  intros x U E F C1 C2 H.
+  remember (F ++ [(x, bind_typ U)] ++ E).
+  generalize dependent F.
+  induction H; intros F EQ; subst.
+  - constructor...
+  - apply subcapt_set...
+    unfold AtomSet.F.For_all.
+    intros.
+    eapply captures_strengthening_typ.
+    apply H1...
+Qed.
 
 Lemma sub_weakening : forall E F G S T,
   sub (G ++ E) S T ->
