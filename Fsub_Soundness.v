@@ -46,22 +46,16 @@ Lemma wf_cset_narrowing : forall F E Z P Q C,
 Proof with auto.
   intros *.
   intros H.
-  remember (F ++ E).
+  remember (F ++ [(Z, bind_sub Q)] ++ E).
   induction H ; subst...  
   constructor.
   unfold allbound_typ in *.
   intros.
   destruct (H x H0) as [ T B ].
   exists T.
-  admit.
-Admitted.
+  binds_cases B...
+Qed.
 
-
-Lemma wf_cset_closed : forall E t,
-  empty_cset_bvars (cset_set t {}N) ->
-  wf_cset E (cset_set t {}N).
-Proof.
-Admitted.
 
 Lemma cv_strengthening : forall x U E G T C,
     cv T (G ++ [(x, bind_typ U)] ++ E) C ->
@@ -193,7 +187,7 @@ Lemma subcapt_reflexivity : forall E C,
   (* We need as a precondition that C is locally closed! *)
   wf_cset E C ->
   subcapt E C C.
-Proof with auto using wf_cset_closed.
+Proof with auto.
   intros E C Ok Closed.
   destruct C...
   assert (t0 = {}N). { inversion Closed... }
@@ -261,7 +255,7 @@ Lemma subcapt_transitivity : forall E C1 C2 C3,
   subcapt E C1 C2 ->
   subcapt E C2 C3 ->
   subcapt E C1 C3.
-Proof with auto using wf_cset_closed.
+Proof with auto.
   intros E C1 C2 C3 Ok Closed H12 H23.
   remember C1.
   remember C2.
@@ -274,9 +268,9 @@ Proof with auto using wf_cset_closed.
     destruct C3. subst...
     assert (t0 = {}N) as cl. { subst. unfold empty_cset_bvars in Closed. csetdec. }
     subst.
-    eapply subcapt_set...
-    unfold AtomSet.F.For_all. intros.
-    inversion H23. subst.
+    inversion H23; subst.
+    eapply subcapt_set...    
+    unfold AtomSet.F.For_all. intros.     
     apply captures_transitivity with (ys := ys)...
 Qed.
 
@@ -466,15 +460,6 @@ Qed.
 Lemma cv_subst_empty : forall S G Z Q E P,
   cv S (G ++ [(Z, bind_sub Q)] ++ E) {}C ->
   cv (subst_tt Z P S) (map (subst_tb Z P) G ++ E) {}C.
-Proof.
-Admitted.
-
-
-Lemma cv_strengthening : forall T G E C,  
-  wf_typ E T ->
-  wf_env (G ++ E) ->
-  cv T (G ++ E) C ->
-  cv T E C.
 Proof.
 Admitted.
 
