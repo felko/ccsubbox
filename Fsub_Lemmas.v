@@ -246,6 +246,7 @@ Qed.
 (*     + binds_cases H0... *)
 (* Qed. *)
 
+
 (** Again, a simpler version which is used more often. *)
 Lemma wf_typ_narrowing : forall V U T E F X,
   wf_typ (F ++ [(X, bind_sub V)] ++ E) T ->
