@@ -248,6 +248,7 @@ Proof with auto.
   - exists xs. exists {}N...
 Qed.
 
+(* Probably not used? *)
 Lemma cv_unique : forall T E C1 C2,
   cv T E C1 ->
   cv T E C2 ->
@@ -319,6 +320,7 @@ Proof with auto using subcapt_reflexivity.
 Qed.
 
 (* Subtyping implies subcapturing *)
+(* Probably not used? *)
 Lemma sub_implies_subcapt : forall E S T C D,
   sub E S T ->
   cv S E C ->
@@ -343,13 +345,26 @@ Proof with auto.
   - admit.
 Admitted.
 
-Lemma captures_narrowing : forall F Z P Q E xs x,
+Lemma captures_narrowing : forall F Z P Q E xs x,  
   wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
+  sub E P Q ->
   captures (F ++ [(Z, bind_sub Q)] ++ E) xs x ->
   captures (F ++ [(Z, bind_sub P)] ++ E) xs x.
-Proof.
+Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
+  intros F Z P Q E xs x Ok Sub H.
+  remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
+  induction H; intros; subst.
+  - apply captures_in...
+  - assert (x <> Z). { 
+      unfold not. intros.
+      binds_cases H.
+      * subst. unfold dom in Fr0. fsetdec.
+      * subst. admit.
+    }
+    apply captures_var with (T := T) (ys := ys)...
+    unfold AtomSet.F.For_all in *. intros.
+    apply H2...
 Admitted.
-
 
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
