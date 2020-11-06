@@ -588,7 +588,21 @@ Lemma captures_through_subst_tt : forall Q E F Z P C x,
   wf_typ E P ->
   captures (F ++ [(Z, bind_sub Q)] ++ E) C x ->
   captures (map (subst_tb Z P) F ++ E) C x.
-Proof.
+Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb.
+  intros Q E F Z P C x Tp H.
+  remember  (F ++ [(Z, bind_sub Q)] ++ E).
+  generalize dependent F.
+  induction H; intros; subst.
+  - constructor...
+  (* that's the same as in captures_narrowing -> TODO refactor *)
+  - assert (x <> Z). { 
+      unfold not. intros.
+      binds_cases H.
+      * subst. unfold dom in Fr0. fsetdec.
+      * subst. admit.
+    }
+    apply captures_var with (T := T) (ys := ys)...
+    admit.
   (* - assert (exists (C3 : captureset), 
       cv (subst_tt X P T) (map (subst_tb X P) G ++ E) C3 /\
       subcapt (map (subst_tb X P) G ++ E) C3 C2
