@@ -732,8 +732,8 @@ Hint Extern 1 (type ?T) =>
   let go E := apply (type_from_wf_typ E); auto in
   match goal with
   | H: typing ?E _ T |- _ => go E
-  | H: sub ?E _ T _ |- _ => go E
-  | H: sub ?E _ _ T |- _ => go E
+  | H: sub ?E T _ |- _ => go E
+  | H: sub ?E _ T |- _ => go E
   | H: wf_typ ?E T |- _ => go E
   end
 : core.
@@ -741,7 +741,6 @@ Hint Extern 1 (type ?T) =>
 Hint Extern 1 (capt ?C) =>
   let go E := apply (capt_from_wf_cset E); auto in
   match goal with
-  | H: typing ?E _ _ C |- _ => go E
   | H: subcapt ?E C _ |- _ => go E
   | H: subcapt ?E _ C |- _ => go E
   end
