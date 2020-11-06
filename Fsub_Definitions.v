@@ -651,6 +651,7 @@ Inductive red : exp -> exp -> Prop :=
       red (exp_tapp e1 V) (exp_tapp e1' V)
   | red_abs : forall T e1 v2 C,
       expr (exp_abs T e1) ->
+      capt C ->
       value v2 ->
       (** NEW: We open the capture set here with the computed capture set
           of the value, aka the free variables of the value.
