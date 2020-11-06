@@ -51,14 +51,14 @@ Proof with auto.
 Qed.
 
 Lemma wf_cset_narrowing : forall F E Z P Q C,
-  wf_cset (F ++ [(Z, bind_sub Q)] ++ E) empty C ->
-  wf_cset (F ++ [(Z, bind_sub P)] ++ E) empty C.
+  wf_cset (F ++ [(Z, bind_sub Q)] ++ E) C ->
+  wf_cset (F ++ [(Z, bind_sub P)] ++ E) C.
 Proof.
 Admitted.
 
 Lemma wf_cset_closed : forall E t,
   empty_cset_bvars (cset_set t {}N) ->
-  wf_cset E empty (cset_set t {}N).
+  wf_cset E (cset_set t {}N).
 Proof.
 Admitted.
 
@@ -91,11 +91,11 @@ Proof with simpl_env; auto using wf_typ_weakening, cv_weakening, subcapt_weakeni
   - Case "sub_arrow".
     pick fresh Y and apply sub_arrow...
     rewrite <- concat_assoc.
-    apply H2...
+    apply H0...
   - Case "sub_all".
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
-    apply H2...
+    apply H0...
 Qed.
 
 (* ********************************************************************** *)
@@ -122,7 +122,8 @@ Lemma open_ct_sub : forall E S T C,
 Proof with auto using open_ct_wf_typ.
   intros E S T C Eok H.
   inversion H ; simpl ; closed_type ; subst...
-Qed.
+  admit.
+Admitted.
 
 
 (* TODO move to CaptureSets. *)
@@ -235,34 +236,12 @@ Lemma sub_reflexivity : forall E T,
 Proof with auto.
   intros E T Ok Wf.
   induction Wf...
-  - apply sub_top...
-    apply wf_typ_top.
   (* eauto and econstructor is still broken... hence we need to proof this manually *)
   - apply sub_refl_tvar... 
     eapply wf_typ_var.
     apply H.
   - apply sub_arrow with (L := L `union` dom E)...
-    (* wellformedness... *)
-    admit.
-    admit.
-    intros.
-    assert (x `notin` L) as Hx. { fsetdec. }
-    specialize (H x Hx).
-    specialize (H0 x Hx Ok).
-    specialize (IHWf Ok).
-    rewrite_env (empty ++ [(x, bind_typ T1)] ++ E).
-    apply sub_weakening...        
-    constructor...
   - apply sub_all with (L := L `union` dom E)...
-    admit.
-    admit.
-    intros.
-    assert (X `notin` L) as Hx. { fsetdec. }
-    specialize (H X Hx).
-    specialize (H0 X Hx).
-    specialize (IHWf Ok).
-    apply H0.
-    apply wf_env_sub...
   - apply sub_capt. 
     (* here we need to show captureset wellformedness
      * @Edward could you look into this?
@@ -357,11 +336,11 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
   Case "sub_arrow".
     pick fresh Y and apply sub_arrow...
     rewrite <- concat_assoc.
-    apply H2...
+    apply H0...
   Case "sub_all".
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
-    apply H2...
+    apply H0...
   Case "sub_capt".
     constructor...
     apply subcapt_narrowing with (Q := Q)...
@@ -372,7 +351,7 @@ Lemma sub_transitivity : forall Q,
 Proof with simpl_env; auto.
   unfold transitivity_on.
   intros Q E S T SsubQ QsubT.
-  assert (W : type Q) by auto.
+  assert (W : type Q). { admit. }
   generalize dependent T.
   generalize dependent S.
   generalize dependent E.
@@ -469,7 +448,7 @@ Proof.
   - exists {}C. apply cv_typ_all.
   - inversion H; subst.
     inversion Hwf_typ; subst.
-    specialize (IHT H6 C2 H4).
+    specialize (IHT H3 C2 H4).
     destruct IHT as [ C0 IHT ].
     exists (cset_union c C0).
     apply cv_typ_capt.
@@ -498,8 +477,9 @@ Proof.
   induction T; intros D Hcv_narrow C Hcv_wide.
   - inversion Hcv_wide; subst.
     inversion Hcv_narrow; subst.
-    apply subcapt_split.
-    apply cset_subset_reflexivity.
+    admit.
+    (* apply subcapt_split.
+    apply cset_subset_reflexivity. *)
   - Case "bvar".
     (* What's going on here, why do I get a bvar? Doesn't this mean that T would be simply ill-formed? *)
     admit.
@@ -507,16 +487,18 @@ Proof.
     admit.
   - inversion Hcv_narrow; subst.
     inversion Hcv_wide; subst.
-    apply subcapt_split.
-    apply cset_subset_reflexivity.
+    admit.
+    (* apply subcapt_split. *)
+    (* apply cset_subset_reflexivity. *)
   - inversion Hcv_narrow; subst.
     inversion Hcv_wide; subst.
-    apply subcapt_split.
-    apply cset_subset_reflexivity.
+    admit.
+    (* apply subcapt_split.
+    apply cset_subset_reflexivity. *)
   - inversion Hwf_typ; subst.
     inversion Hcv_narrow; subst.
     inversion Hcv_wide; subst.
-    specialize (IHT H4 C2 H3 C0 H6).
+    specialize (IHT H2 C2 H5 C0 H6).
     apply correlate_union_cv; trivial.
     apply subcapt_reflexivity.
     apply wf_env_subst_tb with (Q := Q); auto.
@@ -534,8 +516,10 @@ Proof with auto.
   induction H; auto.
   subst.
   binds_cases H...  
+  admit.
+  admit.
   (* In both cases we have to show that `{X0} subset C1` *)
-  - apply subcapt_var with (C2 := C2) (T := T)...
+  (* - apply subcapt_var with (C2 := C) (T := T)...
     + assert (cv T E C2). {
         apply cv_strengthening with (G := G ++ [(X, bind_sub Q)]) ; simpl_env...
         apply wf_typ_from_binds_typ with (x := X0)...
@@ -558,8 +542,8 @@ Proof with auto.
     }
     apply subcapt_var with (C2 := C3) (T := subst_tt X P T)...
     apply subcapt_transitivity with (C2 := C2)...
-    apply wf_env_subst_tb with (Q := Q)...
-Qed.
+    apply wf_env_subst_tb with (Q := Q)... *)
+Admitted.
 
 Lemma sub_through_subst_tt : forall Q E F Z S T P,
   sub (F ++ [(Z, bind_sub Q)] ++ E) S T ->
@@ -582,7 +566,7 @@ Proof with
     SCase "X <> Z".
       apply sub_reflexivity...
       inversion H0; subst.
-      binds_cases H5...
+      binds_cases H3...
       apply (wf_typ_var (subst_tt Z P U))...
   Case "sub_trans_tvar".
     destruct (X == Z); subst.
@@ -623,6 +607,8 @@ Proof with
     rewrite subst_tt_open_tt_var...
     rewrite_env (map (subst_tb Z P) ([(X, bind_sub T1)] ++ G) ++ E).
     apply H0...
+    admit.
+    admit.
   Case "sub_capt".
     apply sub_capt...
     apply subcapt_through_subst_tt with (Q := Q)...
@@ -653,13 +639,16 @@ Proof with simpl_env;
     pick fresh x and apply typing_abs.
     lapply (H x); [intros K | auto].
     rewrite <- concat_assoc.
-    apply (H0 x)...
+    (* apply (H0 x)... *)
+    admit.
+    admit.
+    admit.
   Case "typing_tabs".
     pick fresh X and apply typing_tabs.
     lapply (H X); [intros K | auto].
     rewrite <- concat_assoc.
     apply (H0 X)...
-Qed.
+Admitted.
 
 
 (* ********************************************************************** *)
