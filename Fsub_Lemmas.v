@@ -595,7 +595,7 @@ Proof with eauto*.
     assert (x0 <> x) by fsetdec.
     inversion Htyp; subst.
     * binds_cases H4...
-    * admit
+    * admit.
 Admitted.
 
 Lemma typing_regular : forall E e T,
@@ -624,7 +624,9 @@ Proof with simpl_env; auto*.
       pick fresh x and apply wf_typ_arrow...
       * eauto using type_from_wf_typ, wf_typ_from_wf_env_typ.
       * destruct (H0 x)...
-      * (* Lemma here -- E, x : V |- e : T1 --> cv_free (e) \ x is bound in E *)
+      * (* Lemma here -- E |- e : T --> cv_free(e) \in E *)
+        assert (typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))).
+        { apply typing_abs with (L := L). apply H. apply H1. }
         admit.
   (* typing rule: app *)
   - repeat split...
@@ -648,7 +650,7 @@ Proof with simpl_env; auto*.
       pick fresh X and apply wf_typ_all...
       * eauto using type_from_wf_typ, wf_typ_from_wf_env_sub.
       * destruct (H0 X)...
-      * (* Lemma here -- E, x : V |- e : T1 --> cv_free (e) \ x is bound in E *)
+      * (* Lemma here -- E |- e : T --> cv_free(e) \in E *)
         admit.
   (* typing rule: t-app *)
   - repeat split...
