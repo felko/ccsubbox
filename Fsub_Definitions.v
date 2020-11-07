@@ -591,7 +591,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
           Formally we do U cv(x) | x free in body, but cv(x) = {x} by the above typing judgement. 
 
           In a type-variable-only-land, we'd probably do cv(x) = {T} if x : T in E.*)
-      cv_free e1 C ->
+      cv_free (exp_abs V e1) C ->
       typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))
   | typing_app : forall T1 E e1 e2 T2 Cf Cv,
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
@@ -602,7 +602,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_tabs : forall L E V e1 T1 C,
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
-      cv_free e1 C ->
+      cv_free (exp_tabs V e1) C ->
       (* below is possibly unnecessary, should be deriveable from typing jdgmt precondition *)
       (* wf_typ E covariant (typ_all V T1) -> *)
       typing E (exp_tabs V e1) (typ_capt C (typ_all V T1))
