@@ -566,6 +566,38 @@ Proof with simpl_env; auto*.
     repeat split...
 Qed.
 
+Lemma cv_free_is_bvar_free : forall e C,
+  cv_free e C ->
+  empty_cset_bvars C.
+Proof with eauto*.
+  intros. induction H... 
+  - simpl; fnsetdec...
+  - simpl; fnsetdec...
+  - destruct C1; destruct C2...
+    csethyp. unfold empty_cset_bvars in *. unfold cset_all_bvars in *.
+    fnsetdec.
+Qed.
+
+Lemma typing_cset : forall E x V T e C,
+  wf_env ([(x, bind_typ V)] ++ E) ->
+  typing ([(x, bind_typ V)] ++ E) (open_ee e x x) T ->
+  x `notin` fv_ee e ->
+  x `notin` fv_te e ->
+  cv_free e C ->
+  wf_cset E C.
+Proof with eauto*.
+  intros E x V T e C Henv Htyp Hfresh1 Hfresh2 Hfree.
+  induction Hfree...
+  - constructor. unfold allbound_typ. intros. fsetdec.
+  - constructor. unfold fv_ee in *. unfold fv_te in *. unfold open_ee in *.
+    unfold open_ee_rec in *.
+    unfold allbound_typ. intros. assert (x1 = x0) by fsetdec; subst.
+    assert (x0 <> x) by fsetdec.
+    inversion Htyp; subst.
+    * binds_cases H4...
+    * admit
+Admitted.
+
 Lemma typing_regular : forall E e T,
   typing E e T ->
   wf_env E /\ expr e /\ wf_typ E T.
@@ -636,18 +668,6 @@ Lemma value_regular : forall e,
   expr e.
 Proof.
   intros e H. induction H; auto.
-Qed.
-
-Lemma cv_free_is_bvar_free : forall e C,
-  cv_free e C ->
-  empty_cset_bvars C.
-Proof with eauto*.
-  intros. induction H... 
-  - simpl; fnsetdec...
-  - simpl; fnsetdec...
-  - destruct C1; destruct C2...
-    csethyp. unfold empty_cset_bvars in *. unfold cset_all_bvars in *.
-    fnsetdec.
 Qed.
 
 Lemma red_regular : forall e e',
