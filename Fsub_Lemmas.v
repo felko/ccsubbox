@@ -598,6 +598,65 @@ Proof with eauto*.
     * admit.
 Admitted.
 
+Lemma cv_free_atom : forall (x : atom) C,
+  cv_free x C ->
+  C = x.
+Proof with auto*.
+  intros x C H.
+  inversion H; subst...
+Qed.
+
+Lemma singleton_set_eq : forall (x y : atom),
+  singleton x = singleton y <-> x = y.
+Proof.
+  split; intros.
+  * assert (y `in` singleton x).
+    { rewrite H. fsetdec. }
+    fsetdec.
+  * fsetdec.
+Qed.
+
+Lemma cv_open : forall (x y : atom) e,
+  expr e ->
+  cv_free e x ->
+  cv_free (open_ee e y y) x.
+Proof with eauto*.
+  intros.
+  unfold open_ee.
+  rewrite <- open_ee_rec_expr with (e := e) (k := 0) (u := y) (c := y)...
+Qed.
+
+Lemma typing_atom : forall E (x : atom) T C,
+  typing E x T ->
+  cv_free x C ->
+  wf_cset E C.
+Proof with auto*.
+  intros E x T C Htyp Hfree.
+  assert (C = x). { apply cv_free_atom... } subst.
+  induction Htyp...
+  - assert (x0 = x). { pose proof (cv_free_atom x0 x Hfree). inversion H1.
+                        apply singleton_set_eq... }
+    subst.
+    constructor. unfold allbound_typ. intros. assert (x0 = x) by fsetdec; subst.
+    exists T...
+  - inversion Hfree; subst.
+    pick fresh y. assert (y `notin` L) by fsetdec. specialize (H0 y H2).
+    admit.
+     
+  - admit. 
+Admitted.
+
+Lemma typing_cv : forall E e T C,
+  typing E e T ->
+  cv_free e C ->
+  wf_cset E C.
+Proof with auto*.
+  intros E e T C Htyp Hfree.
+  induction Hfree...
+  - constructor. unfold allbound_typ in *. intros. fsetdec.
+  - admit. 
+Admitted.
+
 Lemma typing_regular : forall E e T,
   typing E e T ->
   wf_env E /\ expr e /\ wf_typ E T.
