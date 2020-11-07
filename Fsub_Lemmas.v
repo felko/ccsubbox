@@ -33,7 +33,9 @@ Require Export Fsub_Infrastructure.
 Lemma capt_from_wf_cset : forall E C,
   wf_cset E C -> capt C.
 Proof with auto.
-Admitted.
+  intros.
+  inversion H...
+Qed.
   
 Lemma type_from_wf_typ : forall E T,
   wf_typ E T -> type T.
@@ -154,32 +156,32 @@ Qed.
 
 
 (* JONATHAN: Maybe those _sub variants are not needed afterall! *)
-Lemma wf_cset_narrowing_sub : forall C1 C2 C E F X,
-  wf_cset (F ++ [(X, bind_sub C1)] ++ E) C ->
-  ok (F ++ [(X, bind_sub C2)] ++ E) ->
-  wf_cset (F ++ [(X, bind_sub C2)] ++ E) C.
+Lemma wf_cset_narrowing_typ : forall C1 C2 C E F X,
+  wf_cset (F ++ [(X, bind_typ C1)] ++ E) C ->
+  ok (F ++ [(X, bind_typ C2)] ++ E) ->
+  wf_cset (F ++ [(X, bind_typ C2)] ++ E) C.
 Proof with simpl_env; eauto.
   intros C1 C2 C E F X Hwf Hok.
-  wf_cset_simpl True.
+  wf_cset_simpl False.
   binds_cases Hexists...
 Qed.
 
-Lemma wf_typ_narrowing_sub : forall C1 C2 T E F X,
-  wf_typ (F ++ [(X, bind_sub C1)] ++ E) T ->
-  ok (F ++ [(X, bind_sub C2)] ++ E) ->
-  wf_typ (F ++ [(X, bind_sub C2)] ++ E) T.
-Proof with simpl_env; eauto using wf_cset_narrowing_sub.
+Lemma wf_typ_narrowing_typ : forall C1 C2 T E F X,
+  wf_typ (F ++ [(X, bind_typ C1)] ++ E) T ->
+  ok (F ++ [(X, bind_typ C2)] ++ E) ->
+  wf_typ (F ++ [(X, bind_typ C2)] ++ E) T.
+Proof with simpl_env; eauto using wf_cset_narrowing_typ.
   intros C1 C2 T E F X Hwf_typ Hok.
-  remember (F ++ [(X, bind_sub C1)] ++ E).
+  remember (F ++ [(X, bind_typ C1)] ++ E).
   generalize dependent F.
   induction Hwf_typ; intros F Hok Heq; subst...
-  Case "wf_typ_var".
+  - Case "wf_typ_var".
     binds_cases H...
-  Case "typ_arrow".
+  - Case "typ_arrow".
     pick fresh Y and apply wf_typ_arrow...
     rewrite <- concat_assoc.
     apply H0...
-  Case "typ_all".
+  - Case "typ_all".
     pick fresh Y and apply wf_typ_all...
     rewrite <- concat_assoc.
     apply H0...
@@ -306,11 +308,11 @@ Proof with eauto 6 using wf_typ_narrowing.
     inversion Wf_env; subst; simpl_env in *...
 Qed.
 
-Lemma wf_env_narrowing_sub : forall V E F U X,
-  wf_env (F ++ [(X, bind_sub V)] ++ E) ->
+Lemma wf_env_narrowing_typ : forall V E F U X,
+  wf_env (F ++ [(X, bind_typ V)] ++ E) ->
   wf_typ E U ->
-  wf_env (F ++ [(X, bind_sub U)] ++ E).
-Proof with eauto 6 using wf_typ_narrowing_sub, wf_cset_narrowing_sub.
+  wf_env (F ++ [(X, bind_typ U)] ++ E).
+Proof with eauto 6 using wf_typ_narrowing_typ, wf_cset_narrowing_typ.
   induction F; intros U X Wf_env Wf;
     inversion Wf_env; subst; simpl_env in *...
 Qed.
@@ -392,7 +394,11 @@ Proof with auto.
   - specialize (IHT1 k). specialize (IHT2 k)...
   - specialize (IHT1 k). specialize (IHT2 k)...
   - notin_simpl. clear IHT H0.
-    revert H. unfold fv_cset. unfold open_cset. cset_split; destruct C eqn:HC; destruct c eqn:Hcd...
+    revert H. 
+
+    (** Sets suck; this should be a tactic *)
+    unfold fv_cset. unfold open_cset. 
+    cset_split; destruct C eqn:HC; destruct c eqn:Hcd...
   - specialize (IHT k)...
 Qed.
 
@@ -539,10 +545,12 @@ Proof with simpl_env; auto*.
       pick fresh Y and apply wf_typ_arrow...
       assert (Y `notin` L) by fsetdec.
       rewrite_env (empty ++ [(Y, bind_typ S1)] ++ E).
-      (*apply wf_typ_narrowing.  *)
-      admit.
+      apply wf_typ_narrowing_typ with (C1 := T1)...
+      apply H1...
     + (* T1 -> T2 wf *)
-      admit.
+      pick fresh Y and apply wf_typ_arrow...
+      assert (Y `notin` L) by fsetdec.
+      apply H1...
   - Case "sub_all".
     repeat split...
     SCase "Second of original three conjuncts".
@@ -556,24 +564,27 @@ Proof with simpl_env; auto*.
   - Case "sub_capt".
     assert (wf_cset E C1 /\ wf_cset E C2). { apply subcapt_regular... }
     repeat split...
-Admitted.
+Qed.
 
 Lemma typing_regular : forall E e T,
   typing E e T ->
   wf_env E /\ expr e /\ wf_typ E T.
 Proof with simpl_env; auto*.
-  intros E e T H; induction H...
+  intros E e T H. induction H...
+  (* typing rule: x : T \in E --> E |- x : {x} T *)
   - repeat split...
     constructor...
     + apply wf_typ_from_binds_typ with (x := x)...
     + constructor...
       unfold allbound_typ. intros. assert (x0 = x) by fsetdec. subst; eauto.
-  - pick fresh X; assert (X `notin` L) by fsetdec...
-    specialize (H X H1) as H4; inversion H4...    
+  (* typing rule: (\x e) has type fv((\x e)) T1 -> T2 *)
+  - pick fresh x; assert (x `notin` L) by fsetdec...
+    specialize (H x H2) as H3; inversion H3...    
     repeat split...
-    admit.
-    admit.
-    admit.
+    (* wf_env *)
+    + admit.
+    + admit.
+    + admit.
     (* repeat split...
     + inversion H4...
     + econstructor...

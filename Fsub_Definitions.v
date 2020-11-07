@@ -586,7 +586,6 @@ Inductive typing : env -> exp -> typ -> Prop :=
       typing E (exp_fvar x) (typ_capt x T)
   | typing_abs : forall L E V e1 T1 C,
       (forall x : atom, x `notin` L ->
-        wf_typ ([(x, bind_typ V)] ++ E) (open_ct T1 x)  /\
         typing ([(x, bind_typ V)] ++ E) (open_ee e1 x x) T1) ->
       (** NEW: a function always gets the type C A -> B, where C = fv(body). 
           Formally we do U cv(x) | x free in body, but cv(x) = {x} by the above typing judgement. 
