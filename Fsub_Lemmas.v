@@ -626,6 +626,8 @@ Proof with eauto*.
   rewrite <- open_ee_rec_expr with (e := e) (k := 0) (u := y) (c := y)...
 Qed.
 
+
+Require Import Coq.Program.Equality.
 Lemma typing_atom : forall E (x : atom) T C,
   typing E x T ->
   cv_free x C ->
@@ -633,28 +635,25 @@ Lemma typing_atom : forall E (x : atom) T C,
 Proof with auto*.
   intros E x T C Htyp Hfree.
   assert (C = x). { apply cv_free_atom... } subst.
-  induction Htyp...
-  - assert (x0 = x). { pose proof (cv_free_atom x0 x Hfree). inversion H1.
-                        apply singleton_set_eq... }
-    subst.
-    constructor. unfold allbound_typ. intros. assert (x0 = x) by fsetdec; subst.
+  (** Use dependent induction when you want to remember the shape of
+      arguments in the typ.  Here we know that x is an atom so the only
+      judgment rules that can show up in the typing judgment is either
+      a lookup rule or a subtyping rule. *)
+  dependent induction Htyp...
+  - constructor. 
+    (** TODO: tactic *)
+    unfold allbound_typ. intros. assert (x0 = x) by fsetdec; subst.
     exists T...
-  - inversion Hfree; subst.
-    pick fresh y. assert (y `notin` L) by fsetdec. specialize (H0 y H2).
-    admit.
-     
-  - admit. 
-Admitted.
+Qed.
 
+(** Is this the right lemma??? *)
 Lemma typing_cv : forall E e T C,
   typing E e T ->
   cv_free e C ->
   wf_cset E C.
 Proof with auto*.
   intros E e T C Htyp Hfree.
-  induction Hfree...
-  - constructor. unfold allbound_typ in *. intros. fsetdec.
-  - admit. 
+  induction Htyp.
 Admitted.
 
 Lemma typing_regular : forall E e T,
