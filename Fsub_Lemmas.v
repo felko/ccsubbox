@@ -238,16 +238,31 @@ Lemma wf_typ_open : forall E U T1 T2,
   ok E ->
   wf_typ E (typ_all T1 T2) ->
   wf_typ E U ->
-  wf_typ E U ->
   wf_typ E (open_tt T2 U).
 Proof with simpl_env; eauto.
-  intros E U T1 T2 O WA WUp WUm.
+  intros E U T1 T2 O WA WU.
   inversion WA; subst.
   pick fresh X.
   rewrite (subst_tt_intro X)...
   rewrite_env (map (subst_tb X U) empty ++ E).
   apply wf_typ_subst_tb with (Q := T1)...
 Qed.
+
+
+Lemma wf_typ_open_capt : forall E C T1 T2,
+  ok E ->
+  wf_typ E (typ_arrow T1 T2) ->
+  wf_cset E C ->
+  wf_typ E (open_ct T2 C).
+Proof with simpl_env; eauto.
+  intros E U T1 T2 O WA WC.
+  inversion WA; subst.
+  pick fresh X.
+  (** Needs new lemmas for opening a type with a capture set;
+      probably wf_typ_subst_eb and subst_ct_intro X *)
+  admit.
+Admitted.
+
 
 (* ********************************************************************** *)
 (** * #<a name="oktwft"></a># Properties of [wf_env] and [wf_typ] *)
@@ -271,6 +286,17 @@ Hint Resolve ok_from_wf_env : core.
 Lemma wf_typ_from_binds_typ : forall x U E,
   wf_env E ->
   binds x (bind_typ U) E ->
+  wf_typ E U.
+Proof with eauto using wf_typ_weaken_head.
+  intros x U E Hwf Hbinds.
+  (* remember m; generalize dependent m. *)
+  induction Hwf; binds_cases Hbinds...
+  inversion H3; subst...
+Qed.
+
+Lemma wf_typ_from_binds_sub : forall x U E,
+  wf_env E ->
+  binds x (bind_sub U) E ->
   wf_typ E U.
 Proof with eauto using wf_typ_weaken_head.
   intros x U E Hwf Hbinds.
@@ -578,26 +604,6 @@ Proof with eauto*.
     fnsetdec.
 Qed.
 
-Lemma typing_cset : forall E x V T e C,
-  wf_env ([(x, bind_typ V)] ++ E) ->
-  typing ([(x, bind_typ V)] ++ E) (open_ee e x x) T ->
-  x `notin` fv_ee e ->
-  x `notin` fv_te e ->
-  cv_free e C ->
-  wf_cset E C.
-Proof with eauto*.
-  intros E x V T e C Henv Htyp Hfresh1 Hfresh2 Hfree.
-  induction Hfree...
-  - constructor. unfold allbound_typ. intros. fsetdec.
-  - constructor. unfold fv_ee in *. unfold fv_te in *. unfold open_ee in *.
-    unfold open_ee_rec in *.
-    unfold allbound_typ. intros. assert (x1 = x0) by fsetdec; subst.
-    assert (x0 <> x) by fsetdec.
-    inversion Htyp; subst.
-    * binds_cases H4...
-    * admit.
-Admitted.
-
 Lemma cv_free_atom : forall (x : atom) C,
   cv_free x C ->
   C = x.
@@ -646,7 +652,8 @@ Proof with auto*.
     exists T...
 Qed.
 
-(** Is this the right lemma??? *)
+(** This should be easily true: free variables
+    are all bound if a term has a type.... *)
 Lemma typing_cv : forall E e T C,
   typing E e T ->
   cv_free e C ->
@@ -654,6 +661,35 @@ Lemma typing_cv : forall E e T C,
 Proof with auto*.
   intros E e T C Htyp Hfree.
   induction Htyp.
+Admitted.
+
+(** The things that the cv relation returns are all well-formed,
+    assuming the type is well formed... *)
+Lemma cv_wf : forall E T C,
+  wf_env E ->
+  wf_typ E T ->
+  cv T E C ->
+  wf_cset E C.
+Proof with simpl_env; eauto*.
+  intros E T C WE WT HC.
+  induction HC...
+  * inversion WT; subst...
+    specialize (IHHC WE H2).
+    inversion IHHC;
+    inversion H3; subst...
+    unfold cset_union...
+    assert (NatSet.F.union {}N {}N = {}N) by fnsetdec; rewrite H0...
+    apply wf_concrete_cset.
+    unfold allbound_typ in *.
+    intros.
+    (** union --> \/ should be simple *)
+    assert (x `in` fvars0 \/ x `in`fvars) by admit.
+    inversion H5. apply H4... apply H...
+  * assert (wf_typ E T) by (apply wf_typ_from_binds_sub with (x := X); eauto*).
+    specialize (IHHC WE H0)...
+  * constructor; unfold allbound_typ; intros; fsetdec.
+  * constructor; unfold allbound_typ; intros; fsetdec.
+  * constructor; unfold allbound_typ; intros; fsetdec.
 Admitted.
 
 Lemma typing_regular : forall E e T,
@@ -685,12 +721,13 @@ Proof with simpl_env; auto*.
       * (* Lemma here -- E |- e : T --> cv_free(e) \in E *)
         assert (typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))).
         { apply typing_abs with (L := L). apply H. apply H1. }
-        admit.
+        apply typing_cv with (e := (exp_abs V e1)) (T := (typ_capt C (typ_arrow V T1)))...
   (* typing rule: app *)
   - repeat split...
     destruct IHtyping1 as [_ [_ K]].
     inversion K...
-    admit.
+    apply wf_typ_open_capt with (T1 := T1)...
+    apply cv_wf with (T := T1)...
   (* typing rule: (/\ X e) has type fv(/\ X e) X <: T1 -> T2 *)
   - pick fresh Y. assert (Y `notin` L) by fsetdec...
     specialize (H0 Y H2) as H3; inversion H3...
@@ -709,7 +746,9 @@ Proof with simpl_env; auto*.
       * eauto using type_from_wf_typ, wf_typ_from_wf_env_sub.
       * destruct (H0 X)...
       * (* Lemma here -- E |- e : T --> cv_free(e) \in E *)
-        admit.
+        assert (typing E (exp_tabs V e1) (typ_capt C (typ_all V T1))).
+        { apply typing_tabs with (L := L). apply H. apply H1. }
+        apply typing_cv with (e := (exp_tabs V e1)) (T := (typ_capt C (typ_all V T1)))...
   (* typing rule: t-app *)
   - repeat split...
     constructor...
@@ -721,7 +760,7 @@ Proof with simpl_env; auto*.
     inversion Hwf_capt; subst...
   - repeat split...
     pose proof (sub_regular E S T H0)...
-Admitted.
+Qed.
 
 Lemma value_regular : forall e,
   value e ->
