@@ -54,7 +54,7 @@ Inductive exp : Type :=
   | exp_bvar : nat -> exp
   | exp_fvar : atom -> exp
   | exp_abs : typ -> exp -> exp
-  | exp_app : exp -> exp -> exp
+  | exp_app : exp -> captureset -> exp -> exp
   | exp_tabs : typ -> exp -> exp
   | exp_tapp : exp -> typ -> exp
 .
@@ -121,7 +121,9 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   | exp_bvar i => exp_bvar i
   | exp_fvar x => exp_fvar x
   | exp_abs V e1 => exp_abs  (open_tt_rec K U V)  (open_te_rec K U e1)
-  | exp_app e1 e2 => exp_app  (open_te_rec K U e1) (open_te_rec K U e2)
+  (** NEW: applications have an explicitly annotated capture set.
+        As capture sets don't mention type variables, C is just carried through *)
+  | exp_app e1 C e2 => exp_app  (open_te_rec K U e1) C (open_te_rec K U e2)
   | exp_tabs V e1 => exp_tabs (open_tt_rec K U V)  (open_te_rec (S K) U e1)
   | exp_tapp e1 V => exp_tapp (open_te_rec K U e1) (open_tt_rec K U V)
   (** Opening a type variable within an expression doesn't affect capture sets....
@@ -146,7 +148,7 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (c : captureset) (e : exp)  {struct e} 
   | exp_bvar i => if k === i then f else (exp_bvar i)
   | exp_fvar x => exp_fvar x
   | exp_abs t e1 => exp_abs (open_ct_rec k c t) (open_ee_rec (S k) f c e1)
-  | exp_app e1 e2 => exp_app (open_ee_rec k f c e1) (open_ee_rec k f c e2)
+  | exp_app e1 C e2 => exp_app (open_ee_rec k f c e1) (open_cset k c C) (open_ee_rec k f c e2)
   | exp_tabs t e1 => exp_tabs (open_ct_rec k c t) (open_ee_rec k f c e1)
   | exp_tapp e1 t => exp_tapp (open_ee_rec k f c e1) (open_ct_rec k c t)
   end.
@@ -248,10 +250,11 @@ Inductive expr : exp -> Prop :=
       type T ->
       (forall x : atom, x `notin` L -> expr (open_ee e1 x x)) ->
       expr (exp_abs T e1)
-  | expr_app : forall e1 e2,
+  | expr_app : forall e1 e2 C,
       expr e1 ->
       expr e2 ->
-      expr (exp_app e1 e2)
+      capt C ->
+      expr (exp_app e1 C e2)
   | expr_tabs : forall L T e1,
       type T ->
       (forall X : atom, X `notin` L -> expr (open_te e1 X)) ->
@@ -548,6 +551,9 @@ Inductive sub : env -> typ -> typ -> Prop :=
 
 (** A helper for computing the free variables of a term in an environment 
     Jonathan: Shouldn't we also compute the free variables in types?
+    No, as we're just using this to determine the type of a lambda.
+
+    NOTE: This definition is awkward to work with.  Maybe we should use another.
 *)
 Inductive cv_free : exp -> captureset -> Prop :=
   | cv_free_bvar : forall n,
@@ -557,10 +563,10 @@ Inductive cv_free : exp -> captureset -> Prop :=
   | cv_free_abs : forall T e1 C,
                     cv_free e1 C ->
                     cv_free (exp_abs T e1) C
-  | cv_free_app : forall e1 e2 C1 C2,
+  | cv_free_app : forall e1 e2 C1 C2 C,
                     cv_free e1 C1 ->
                     cv_free e2 C2 ->
-                    cv_free (exp_app e1 e2) (cset_union C1 C2)
+                    cv_free (exp_app e1 C e2) (cset_union C1 C2)
   | cv_free_tabs : forall T e1 C,
                     cv_free e1 C ->
                     cv_free (exp_tabs T e1) C
@@ -593,12 +599,22 @@ Inductive typing : env -> exp -> typ -> Prop :=
           In a type-variable-only-land, we'd probably do cv(x) = {T} if x : T in E.*)
       cv_free (exp_abs V e1) C ->
       typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))
-  | typing_app : forall T1 E e1 e2 T2 Cf Cv,
+  | typing_app : forall T1 E e1 C e2 T2 Cf Cv Cv' T1',
+      (** What do we want here?
+          I'm guessing
+            E |- f : Cf (T1 -> T2), E |- e : T1', E |- T1' <: T1, E |- C <: cv(E, T1), E |- cv(E, T1') <: C
+          ---------------------------------------------------------------------------------------------------
+              E |- f C e : T2[x /--> C]
+      *)
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
-      typing E e2 T1 ->
+      typing E e2 T1' ->
+      sub E T1 T1' ->
+      cv T1' E Cv' ->
       cv T1 E Cv ->
+      subcapt E Cv' C ->
+      subcapt E C   Cv ->
       (** NEW: function application opens the capture set in the type. *)
-      typing E (exp_app e1 e2) (open_ct T2 Cv)
+      typing E (exp_app e1 C e2) (open_ct T2 C)
   | typing_tabs : forall L E V e1 T1 C,
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
@@ -636,14 +652,14 @@ Inductive value : exp -> Prop :=
 (** * #<a name="reduction"></a># Reduction *)
 
 Inductive red : exp -> exp -> Prop :=
-  | red_app_1 : forall e1 e1' e2,
+  | red_app_1 : forall e1 e1' e2 C,
       expr e2 ->
       red e1 e1' ->
-      red (exp_app e1 e2) (exp_app e1' e2)
-  | red_app_2 : forall e1 e2 e2',
+      red (exp_app e1 C e2) (exp_app e1' C e2)
+  | red_app_2 : forall e1 e2 e2' C,
       value e1 ->
       red e2 e2' ->
-      red (exp_app e1 e2) (exp_app e1 e2')
+      red (exp_app e1 C e2) (exp_app e1 C e2')
   | red_tapp : forall e1 e1' V,
       type V ->
       red e1 e1' ->
@@ -652,13 +668,7 @@ Inductive red : exp -> exp -> Prop :=
       expr (exp_abs T e1) ->
       capt C ->
       value v2 ->
-      (** NEW: We open the capture set here with the computed capture set
-          of the value, aka the free variables of the value.
-
-          WIP: Maybe we shouldn't do this dynamic computation of capture sets,
-          and explicitly write down which capture set we wish to substitute in. *)
-      cv_free v2 C ->
-      red (exp_app (exp_abs T e1) v2) (open_ee e1 v2 C)
+      red (exp_app (exp_abs T e1) C v2) (open_ee e1 v2 C)
   | red_tabs : forall T1 e1 T2,
       expr (exp_tabs T1 e1) ->
       type T2 ->
