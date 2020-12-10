@@ -27,41 +27,6 @@ Admitted.
 (* ********************************************************************** *)
 (** ** Weakening (2) *)
 
-(* TODO this should go to Lemmas *)
-Lemma wf_cset_weakening : forall E F G C,
-    wf_cset (G ++ E) C ->
-    wf_env (G ++ F ++ E) ->
-    wf_cset (G ++ F ++ E) C.
-Proof with auto.
-  intros *.
-  intros Hcset Henv.
-  remember (G ++ E).
-  induction Hcset ; subst...
-  constructor.
-  unfold allbound_typ in *.
-  intros.
-  destruct (H x H0) as [ T B ].
-  exists T.
-  eauto using binds_weaken.
-Qed.
-
-Lemma wf_cset_narrowing : forall F E Z P Q C,
-  wf_cset (F ++ [(Z, bind_sub Q)] ++ E) C ->
-  wf_cset (F ++ [(Z, bind_sub P)] ++ E) C.
-Proof with auto.
-  intros *.
-  intros H.
-  remember (F ++ [(Z, bind_sub Q)] ++ E).
-  induction H ; subst...  
-  constructor.
-  unfold allbound_typ in *.
-  intros.
-  destruct (H x H0) as [ T B ].
-  exists T.
-  binds_cases B...
-Qed.
-
-
 Lemma cv_strengthening : forall x U E G T C,
     cv T (G ++ [(x, bind_typ U)] ++ E) C ->
     cv T (G ++ E) C.
@@ -120,7 +85,7 @@ Qed.
 Lemma captures_strengthening_typ : forall E G X U xs x,
 captures (G ++ [(X, bind_typ U)] ++ E) xs x ->
 captures (G ++ E) xs x.
-Proof with eauto using wf_typ_strengthening, wf_env_strengthening, wf_cset_strengthening, cv_strengthening.
+Proof with eauto using cv_strengthening.
   intros E G X U xs x H.
   remember (G ++ [(X, bind_typ U)] ++ E).
   generalize dependent G.
@@ -136,20 +101,25 @@ Proof with eauto using wf_typ_strengthening, wf_env_strengthening, wf_cset_stren
 Admitted.
 
 Lemma subcapt_strengthening_typ : forall x U E F C1 C2,
+  (** NOT TRUE: what if x in C1? **)
   subcapt (F ++ [(x, bind_typ U)] ++ E) C1 C2 ->
   subcapt (F ++ E) C1 C2.
-Proof with eauto using wf_typ_strengthening, wf_env_strengthening, wf_cset_strengthening, cv_strengthening.
+Proof with eauto using cv_strengthening.
   intros x U E F C1 C2 H.
   remember (F ++ [(x, bind_typ U)] ++ E).
   generalize dependent F.
   induction H; intros F EQ; subst.
   - constructor...
+    admit.
   - apply subcapt_set...
     unfold AtomSet.F.For_all.
     intros.
+    (*
     eapply captures_strengthening_typ.
     apply H1...
-Qed.
+    *)
+    admit.
+Admitted.
 
 Lemma sub_weakening : forall E F G S T,
   sub (G ++ E) S T ->
