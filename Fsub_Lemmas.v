@@ -205,11 +205,10 @@ Lemma wf_typ_subst_tb : forall F Q E Z P T,
   (** NOTE here that P needs to be well formed in both the + and - environments,
       as we're substituting in both places. *)
   wf_typ E P ->
-  wf_typ E P ->
   ok (map (subst_tb Z P) F ++ E) ->
   wf_typ (map (subst_tb Z P) F ++ E) (subst_tt Z P T).
 Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_subst_tb.
-  intros F Q E Z P T HwfT HwfPp HwfPm Hok.
+  intros F Q E Z P T HwfT HwfP Hok.
   remember (F ++ [(Z, bind_sub Q)] ++ E).
   generalize dependent F.
   induction HwfT; intros F EQF Hok; subst; simpl subst_tt...
@@ -248,6 +247,98 @@ Proof with simpl_env; eauto.
   apply wf_typ_subst_tb with (Q := T1)...
 Qed.
 
+(** This should move into infrastructure probably at some point. **)
+(** The next lemma states that opening a term is equivalent to first
+    opening the term with a fresh name and then substituting for the
+    name.  This is actually the strengthened induction hypothesis for
+    the version we use in practice. *)
+
+Lemma subst_ct_intro_rec : forall X T2 C k,
+  X `notin` fv_et T2 ->
+  open_ct_rec k C T2 = subst_ct X C (open_ct_rec k X T2).
+Proof with auto*.
+  induction T2; intros C k Fr; simpl in *; f_equal...
+  - Case "typ_cset".
+    apply subst_capt_cset_swap.
+    csetdec; destruct c...
+Qed.
+
+(** The next lemma is a direct corollary of the immediately preceding
+    lemma---the index is specialized to zero.  *)
+Lemma subst_ct_intro : forall X T2 C,
+  X `notin` fv_et T2 ->
+  open_ct T2 C = subst_ct X C (open_ct T2 X).
+Proof with auto*.
+  intros.
+  unfold open_tt.
+  apply subst_ct_intro_rec...
+Qed.
+
+Definition subst_cb (Z : atom) (C : captureset) (b : binding) : binding :=
+  match b with
+  | bind_sub T => bind_sub (subst_ct Z C T)
+  | bind_typ T => bind_typ (subst_ct Z C T)
+  end.
+Hint Extern 1 (binds _ (?F (subst_ct ?X ?U ?C)) _) =>
+  unsimpl (subst_cb X U (F C)) : core.
+
+  
+Lemma subst_ct_open_ct_rec : forall (X : atom) C1 T C2 k,
+  capt C1 ->
+  ~ cset_references_fvar X C2 ->
+  subst_ct X C1 (open_ct_rec k C2 T) = open_ct_rec k C2 (subst_ct X C1 T).
+Proof with auto*.
+  intros X C1 T C2.
+  induction T ; intros ; simpl; f_equal...
+  admit.
+Admitted.
+
+Lemma subst_ct_open_tt_var : forall (X Y:atom) C T,
+  Y <> X ->
+  capt C ->
+  open_tt (subst_ct X C T) Y = subst_ct X C (open_tt T Y).
+Proof with auto*.
+  intros X Y P T Neq Wu.
+  unfold open_tt.
+  rewrite subst_ct_open_tt_rec...
+Qed.
+
+Lemma wf_typ_subst_cb : forall F Q E Z C T,
+  wf_typ (F ++ [(Z, bind_typ Q)] ++ E) T ->
+  (** NOTE here that P needs to be well formed in both the + and - environments,
+      as we're substituting in both places. *)
+  wf_cset E C ->
+  ok (map (subst_cb Z C) F ++ E) ->
+  wf_typ (map (subst_cb Z C) F ++ E) (subst_ct Z C T).
+Proof  with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_subst_tb.
+  intros F Q E Z C T HwfT HwfC Hok.
+  remember (F ++ [(Z, bind_typ Q)] ++ E).
+  generalize dependent F.
+  induction HwfT; intros F EQF Hok; subst; simpl subst_ct...
+  - Case "wf_typ_var".
+      binds_cases H...
+      apply (wf_typ_var (subst_ct Z C U))...
+  - Case "wf_typ_arrow".
+    pick fresh Y and apply wf_typ_arrow...
+    + SCase "T2".
+      unfold open_ct in *...
+      rewrite <- subst_ct_open_ct_rec...
+      rewrite_env (map (subst_cb Z C) ([(Y, bind_typ T1)] ++ F) ++ E).
+      apply H0...
+      admit.
+      admit.
+  - Case "wf_typ_all".
+    pick fresh Y and apply wf_typ_all...
+    + SCase "T2".
+      unfold open_ct in *...
+      rewrite subst_ct_open_tt_var...
+      rewrite_env (map (subst_cb Z C) ([(Y, bind_sub T1)] ++ F) ++ E).
+      apply H0...
+      admit.
+  - Case "wf_typ_capt".
+    eapply wf_typ_capt...
+    admit.
+Admitted.
 
 Lemma wf_typ_open_capt : forall E C T1 T2,
   ok E ->
@@ -258,10 +349,12 @@ Proof with simpl_env; eauto.
   intros E U T1 T2 O WA WC.
   inversion WA; subst.
   pick fresh X.
+  rewrite (subst_ct_intro X)...
   (** Needs new lemmas for opening a type with a capture set;
       probably wf_typ_subst_eb and subst_ct_intro X *)
-  admit.
-Admitted.
+  rewrite_env (map (subst_cb X U) empty ++ E).
+  apply wf_typ_subst_cb with (Q := T1)...
+Qed.
 
 
 (* ********************************************************************** *)
