@@ -654,10 +654,12 @@ Inductive value : exp -> Prop :=
 Inductive red : exp -> exp -> Prop :=
   | red_app_1 : forall e1 e1' e2 C,
       expr e2 ->
+      capt C ->
       red e1 e1' ->
       red (exp_app e1 C e2) (exp_app e1' C e2)
   | red_app_2 : forall e1 e2 e2' C,
       value e1 ->
+      capt C ->
       red e2 e2' ->
       red (exp_app e1 C e2) (exp_app e1 C e2')
   | red_tapp : forall e1 e1' V,
