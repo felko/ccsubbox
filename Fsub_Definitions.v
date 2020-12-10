@@ -555,6 +555,7 @@ Inductive sub : env -> typ -> typ -> Prop :=
 
     NOTE: This definition is awkward to work with.  Maybe we should use another.
 *)
+(*
 Inductive cv_free : exp -> captureset -> Prop :=
   | cv_free_bvar : forall n,
                     cv_free (exp_bvar n) {}C
@@ -573,7 +574,17 @@ Inductive cv_free : exp -> captureset -> Prop :=
   | cv_free_tapp : forall e1 T C,
                     cv_free e1 C ->
                     cv_free (exp_tapp e1 T) C
-.
+.*)
+Fixpoint free_for_cv (e : exp) : captureset :=
+match e with
+  | exp_bvar i => {}C
+  | exp_fvar x => (cset_fvar x)
+  | exp_abs t e1 => (free_for_cv e1)
+  | exp_app e1 C e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
+  | exp_tabs t e1 => (free_for_cv e1)
+  | exp_tapp e1 t => (free_for_cv e1)
+  end.
+
 
 (** The definition of typing is straightforward.  It uses the [binds]
     relation from the [Environment] library (in the [typing_var] case)
@@ -590,15 +601,14 @@ Inductive typing : env -> exp -> typ -> Prop :=
       binds x (bind_typ T) E ->
       (** NEW: a variable always gets the type {x} T *)
       typing E (exp_fvar x) (typ_capt x T)
-  | typing_abs : forall L E V e1 T1 C,
+  | typing_abs : forall L E V e1 T1,
       (forall x : atom, x `notin` L ->
         typing ([(x, bind_typ V)] ++ E) (open_ee e1 x x) (open_ct T1 x)) ->
       (** NEW: a function always gets the type C A -> B, where C = fv(body). 
           Formally we do U cv(x) | x free in body, but cv(x) = {x} by the above typing judgement. 
 
           In a type-variable-only-land, we'd probably do cv(x) = {T} if x : T in E.*)
-      cv_free (exp_abs V e1) C ->
-      typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))
+      typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
   | typing_app : forall T1 E e1 C e2 T2 Cf Cv Cv' T1',
       (** What do we want here?
           I'm guessing
@@ -615,13 +625,12 @@ Inductive typing : env -> exp -> typ -> Prop :=
       subcapt E C   Cv ->
       (** NEW: function application opens the capture set in the type. *)
       typing E (exp_app e1 C e2) (open_ct T2 C)
-  | typing_tabs : forall L E V e1 T1 C,
+  | typing_tabs : forall L E V e1 T1,
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
-      cv_free (exp_tabs V e1) C ->
       (* below is possibly unnecessary, should be deriveable from typing jdgmt precondition *)
       (* wf_typ E covariant (typ_all V T1) -> *)
-      typing E (exp_tabs V e1) (typ_capt C (typ_all V T1))
+      typing E (exp_tabs V e1) (typ_capt (free_for_cv e1) (typ_all V T1))
   | typing_tapp : forall T1 E e1 T T2 C,
       typing E e1 (typ_capt C (typ_all T1 T2)) ->
       sub E T T1 ->

@@ -685,24 +685,22 @@ Proof with simpl_env; auto*.
     repeat split...
 Qed.
 
-Lemma cv_free_is_bvar_free : forall e C,
-  cv_free e C ->
-  empty_cset_bvars C.
+Lemma cv_free_is_bvar_free : forall e,
+  empty_cset_bvars (free_for_cv e).
 Proof with eauto*.
-  intros. induction H... 
+  intros. induction e... 
   - simpl; fnsetdec...
   - simpl; fnsetdec...
-  - destruct C1; destruct C2...
-    csethyp. unfold empty_cset_bvars in *. unfold cset_all_bvars in *.
-    fnsetdec.
-Qed.
+  - unfold free_for_cv.
+    fold free_for_cv.
+    admit.
+Admitted.
 
-Lemma cv_free_atom : forall (x : atom) C,
-  cv_free x C ->
-  C = x.
+Lemma cv_free_atom : forall (x : atom),
+  free_for_cv x = x.
 Proof with auto*.
-  intros x C H.
-  inversion H; subst...
+  intros.
+  unfold free_for_cv...
 Qed.
 
 Lemma singleton_set_eq : forall (x y : atom),
@@ -714,7 +712,7 @@ Proof.
     fsetdec.
   * fsetdec.
 Qed.
-
+(*
 Lemma cv_open : forall (x y : atom) e,
   expr e ->
   cv_free e x ->
@@ -724,16 +722,14 @@ Proof with eauto*.
   unfold open_ee.
   rewrite <- open_ee_rec_expr with (e := e) (k := 0) (u := y) (c := y)...
 Qed.
-
+*)
 
 Require Import Coq.Program.Equality.
-Lemma typing_atom : forall E (x : atom) T C,
+Lemma typing_atom : forall E (x : atom) T,
   typing E x T ->
-  cv_free x C ->
-  wf_cset E C.
+  wf_cset E (free_for_cv x).
 Proof with auto*.
-  intros E x T C Htyp Hfree.
-  assert (C = x). { apply cv_free_atom... } subst.
+  intros E x T Htyp.
   (** Use dependent induction when you want to remember the shape of
       arguments in the typ.  Here we know that x is an atom so the only
       judgment rules that can show up in the typing judgment is either
@@ -745,15 +741,41 @@ Proof with auto*.
     exists T...
 Qed.
 
+(*
+Inductive cv_free : exp -> captureset -> Prop :=
+  | cv_free_bvar : forall n,
+                    cv_free (exp_bvar n) {}C
+  | cv_free_fvar : forall x,
+                    cv_free (exp_fvar x) (cset_fvar x)
+  | cv_free_abs : forall T e1 C,
+                    cv_free e1 C ->
+                    cv_free (exp_abs T e1) C
+  | cv_free_app : forall e1 e2 C1 C2 C,
+                    cv_free e1 C1 ->
+                    cv_free e2 C2 ->
+                    cv_free (exp_app e1 C e2) (cset_union C1 C2)
+  | cv_free_tabs : forall T e1 C,
+                    cv_free e1 C ->
+                    cv_free (exp_tabs T e1) C
+  | cv_free_tapp : forall e1 T C,
+                    cv_free e1 C ->
+                    cv_free (exp_tapp e1 T) C
+*)
+
 (** This should be easily true: free variables
     are all bound if a term has a type.... *)
-Lemma typing_cv : forall E e T C,
+Lemma typing_cv : forall E e T,
   typing E e T ->
-  cv_free e C ->
-  wf_cset E C.
+  wf_cset E (free_for_cv e).
 Proof with auto*.
-  intros E e T C Htyp Hfree.
+  intros E e T Htyp.
   induction Htyp.
+  - admit.
+  - pick fresh y.
+    assert (y `notin` L) by fsetdec.
+    (* assert (y `notin` (free_for_cv (exp_abs V e1))). *)
+    (* free_for_cv (open_ee e1 y y) = {y} \cup (free_for_cv e1) *)
+    specialize (H0 y H1).
 Admitted.
 
 (** The things that the cv relation returns are all well-formed,
@@ -798,7 +820,7 @@ Proof with simpl_env; auto*.
       unfold allbound_typ. intros. assert (x0 = x) by fsetdec. subst; eauto.
   (* typing rule: (\x e) has type fv((\x e)) T1 -> T2 *)
   - pick fresh y; assert (y `notin` L) by fsetdec...
-    specialize (H0 y H2) as H3; inversion H3 as [Henv [Hexpr Hwf]]...
+    specialize (H0 y H1) as H3; inversion H3 as [Henv [Hexpr Hwf]]...
     repeat split...
     (* wf_env *)
     + inversion Henv...
@@ -812,9 +834,9 @@ Proof with simpl_env; auto*.
       * eauto using type_from_wf_typ, wf_typ_from_wf_env_typ.
       * destruct (H0 x)...
       * (* Lemma here -- E |- e : T --> cv_free(e) \in E *)
-        assert (typing E (exp_abs V e1) (typ_capt C (typ_arrow V T1))).
-        { apply typing_abs with (L := L). apply H. apply H1. }
-        apply typing_cv with (e := (exp_abs V e1)) (T := (typ_capt C (typ_arrow V T1)))...
+        assert (typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))).
+        { apply typing_abs with (L := L). apply H. }
+        apply typing_cv with (e := (exp_abs V e1)) (T := (typ_capt (free_for_cv e1) (typ_arrow V T1)))...
   (* typing rule: app *)
   - destruct IHtyping1 as [Hwf [Hexpr1 HwfF]].
     inversion HwfF...
@@ -825,25 +847,25 @@ Proof with simpl_env; auto*.
     apply wf_typ_open_capt with (T1 := T1)...
   (* typing rule: (/\ X e) has type fv(/\ X e) X <: T1 -> T2 *)
   - pick fresh Y. assert (Y `notin` L) by fsetdec...
-    specialize (H0 Y H2) as H3; inversion H3...
+    specialize (H0 Y H1) as H3; inversion H3...
     repeat split...
     (* wf_env *)
-    + inversion H4...
+    + inversion H2...
     (* expr *)
     + econstructor...
       * apply type_from_wf_typ with (E := E).
         apply wf_typ_from_wf_env_sub with (x := Y)...
       * instantiate (1 := L). intros...
-        specialize (H0 X H6) as H8...
+        specialize (H0 X H5) as H8...
     (* wf_typ *)
     + constructor...
       pick fresh X and apply wf_typ_all...
       * eauto using type_from_wf_typ, wf_typ_from_wf_env_sub.
       * destruct (H0 X)...
       * (* Lemma here -- E |- e : T --> cv_free(e) \in E *)
-        assert (typing E (exp_tabs V e1) (typ_capt C (typ_all V T1))).
-        { apply typing_tabs with (L := L). apply H. apply H1. }
-        apply typing_cv with (e := (exp_tabs V e1)) (T := (typ_capt C (typ_all V T1)))...
+        assert (typing E (exp_tabs V e1) (typ_capt (free_for_cv e1) (typ_all V T1))).
+        { apply typing_tabs with (L := L). apply H. }
+        apply typing_cv with (e := (exp_tabs V e1)) (T := (typ_capt (free_for_cv e1) (typ_all V T1)))...
   (* typing rule: t-app *)
   - repeat split...
     constructor...
