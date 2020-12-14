@@ -285,13 +285,22 @@ Hint Extern 1 (binds _ (?F (subst_ct ?X ?U ?C)) _) =>
   
 Lemma subst_ct_open_ct_rec : forall (X : atom) C1 T C2 k,
   capt C1 ->
+  capt C2 ->
   ~ cset_references_fvar X C2 ->
   subst_ct X C1 (open_ct_rec k C2 T) = open_ct_rec k C2 (subst_ct X C1 T).
 Proof with auto*.
   intros X C1 T C2.
-  induction T ; intros ; simpl; f_equal...
-  admit.
-Admitted.
+  induction T; intros; simpl; f_equal...
+  (** most of the cases go away with some awful automation. *)
+  unfold subst_cset; unfold open_cset;
+    cset_split; cset_cleanup; 
+    destruct C2 eqn:HC2; destruct C1 eqn:HC1; try destruct c eqn:Hc;
+    f_equal; try fsetdec; try fnsetdec...
+  (* the remaining cases are either contradictions in the assumptions
+      that can be discharged using fnsetdec,
+      or just facts about how capture sets behave. *)
+  all: inversion H; inversion H0; subst; fnsetdec.
+Qed.
 
 Lemma subst_ct_open_tt_var : forall (X Y:atom) C T,
   Y <> X ->
@@ -310,7 +319,8 @@ Lemma wf_typ_subst_cb : forall F Q E Z C T,
   wf_cset E C ->
   ok (map (subst_cb Z C) F ++ E) ->
   wf_typ (map (subst_cb Z C) F ++ E) (subst_ct Z C T).
-Proof  with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_subst_tb.
+Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_subst_tb,
+    capt_from_wf_cset.
   intros F Q E Z C T HwfT HwfC Hok.
   remember (F ++ [(Z, bind_typ Q)] ++ E).
   generalize dependent F.
@@ -325,8 +335,8 @@ Proof  with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset
       rewrite <- subst_ct_open_ct_rec...
       rewrite_env (map (subst_cb Z C) ([(Y, bind_typ T1)] ++ F) ++ E).
       apply H0...
-      admit.
-      admit.
+      constructor.
+      simpl. fsetdec.
   - Case "wf_typ_all".
     pick fresh Y and apply wf_typ_all...
     + SCase "T2".
@@ -334,9 +344,10 @@ Proof  with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset
       rewrite subst_ct_open_tt_var...
       rewrite_env (map (subst_cb Z C) ([(Y, bind_sub T1)] ++ F) ++ E).
       apply H0...
-      admit.
   - Case "wf_typ_capt".
     eapply wf_typ_capt...
+    (** This should probably go in another lemma, likely.  It's
+        true though. *)
     admit.
 Admitted.
 
