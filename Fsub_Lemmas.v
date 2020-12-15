@@ -696,16 +696,30 @@ Proof with simpl_env; auto*.
     repeat split...
 Qed.
 
+Lemma cv_free_never_universal : forall e,
+  free_for_cv e <> cset_universal.
+Proof with eauto*.
+  intros. induction e; unfold free_for_cv; try discriminate...
+  fold free_for_cv.
+  unfold cset_union...
+  destruct (free_for_cv e1) eqn:Hfc1;
+    destruct (free_for_cv e2) eqn:Hfc2...
+Qed.
+
 Lemma cv_free_is_bvar_free : forall e,
   empty_cset_bvars (free_for_cv e).
-Proof with eauto*.
+Proof with eauto using cv_free_never_universal.
   intros. induction e... 
   - simpl; fnsetdec...
   - simpl; fnsetdec...
-  - unfold free_for_cv.
-    fold free_for_cv.
-    admit.
-Admitted.
+  - unfold empty_cset_bvars in *.
+    unfold cset_all_bvars in *.
+    simpl in *.
+    destruct (free_for_cv e1) eqn:Hc1;
+    destruct (free_for_cv e2) eqn:Hc2...
+    unfold cset_union.
+    fnsetdec...
+Qed.
 
 Lemma cv_free_atom : forall (x : atom),
   free_for_cv x = x.
@@ -773,24 +787,130 @@ Inductive cv_free : exp -> captureset -> Prop :=
                     cv_free (exp_tapp e1 T) C
 *)
 
+
+Lemma free_for_cv_open : forall e k (y : atom),
+  cset_subset_prop (free_for_cv e) (free_for_cv (open_ee_rec k y y e)).
+Proof with eauto*.
+  intros e.
+  induction e; intros; simpl...
+  - destruct (k === n); constructor; fsetdec...
+  - constructor...
+  - specialize (IHe1 k y).
+    specialize (IHe2 k y).
+    inversion IHe1; inversion IHe2; subst; constructor...
+    fsetdec.
+    fnsetdec.
+Qed.
+
+(** argh *)
+Lemma empty_over_union : forall N1 N2,
+  {}N = NatSet.F.union N1 N2 ->
+  {}N = N1 /\ {}N = N2.
+Proof.
+  intros.
+  assert (NatSet.F.Empty (NatSet.F.union N1 N2)) by (rewrite <- H; fnsetdec).
+  split; fnsetdec.
+Qed.
+
+Lemma allbound_over_union : forall E T1 T2,
+  allbound_typ E (AtomSet.F.union T1 T2) ->
+  allbound_typ E T1 /\ allbound_typ E T2.
+Proof with eauto*.
+  intros.
+  unfold allbound_typ in *.
+  split; intros; assert (x `in` (T1 `union` T2)) by fsetdec...
+Qed.
+
+Lemma wf_cset_over_union : forall E C1 C2,
+  C1 <> cset_universal ->
+  C2 <> cset_universal ->
+  wf_cset E (cset_union C1 C2) <->
+  wf_cset E C1 /\ wf_cset E C2.
+Proof with eauto*.
+  intros; split; intros; destruct C1 eqn:HC1;
+                         destruct C2 eqn:HC2;
+                         unfold cset_union in *...
+  + inversion H1; subst...
+    apply empty_over_union in H5; inversion H5.
+    apply allbound_over_union in H4; inversion H4.
+    subst.
+    split; constructor...
+  + destruct H1 as [Hwf1 Hwf2].
+    inversion Hwf1; inversion Hwf2; subst...
+    (** this should really be a lemma... *)
+    assert (NatSet.F.union {}N {}N = {}N) by fnsetdec; rewrite H1.
+    constructor.
+    unfold allbound_typ in *...
+    intros.
+    apply AtomSetFacts.union_iff in H2...
+Qed.
+
+Lemma cset_references_fvar_over_union : forall C1 C2 x,
+  cset_references_fvar x (cset_union C1 C2) <->
+  cset_references_fvar x C1 \/ cset_references_fvar x C2.
+Proof.
+Admitted.
+
+Lemma free_for_cv_bound : forall E e (x : atom),
+  wf_cset E (free_for_cv e) ->
+  cset_references_fvar x (free_for_cv e) ->
+  exists T, binds x (bind_typ T) E.
+Proof with eauto using wf_cset_over_union, cv_free_never_universal.
+  intros E e.
+  induction e; intros; simpl in *; try fsetdec...
+  - assert (x = a) by fsetdec; subst...
+    inversion H; subst...
+  - apply wf_cset_over_union in H...
+    apply cset_references_fvar_over_union in H0...
+    inversion H0.
+    + apply IHe1... apply H.
+    + apply IHe2... apply H.
+Qed.
+
+
 (** This should be easily true: free variables
     are all bound if a term has a type.... *)
 Lemma typing_cv : forall E e T,
   typing E e T ->
   wf_cset E (free_for_cv e).
-Proof with eauto*.
+Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
   intros E e T Htyp.
-  induction Htyp.
+  induction Htyp; simpl...
   - simpl. constructor.
     unfold allbound_typ. intros.
     assert (x = x0) by fsetdec.
     subst. exists T...
   - pick fresh y.
     assert (y `notin` L) by fsetdec.
-    
-    (* assert (y `notin` (free_for_cv (exp_abs V e1))). *)
-    (* free_for_cv (open_ee e1 y y) = {y} \cup (free_for_cv e1) *)
-    specialize (H0 y H1).
+    assert (~ cset_references_fvar y (free_for_cv e1)).
+    {
+      admit.
+    }
+    simpl.
+    specialize (H0 y H1)...
+    pose proof (free_for_cv_open e1 0 y)...
+    pose proof (cv_free_never_universal).
+    pose proof (cv_free_is_bvar_free e1).
+    csethyp.
+    destruct (free_for_cv e1) eqn:Hfcv1...
+    unfold open_ee in *.
+    inversion H0; subst...
+    inversion H3; subst...
+    rewrite <- H6 in H10. inversion H10; subst...
+    assert (t0 = {}N) by fnsetdec; subst...
+    constructor...
+    unfold allbound_typ in *.
+    intros.
+    destruct (x == y)...
+    assert (x `in` fvars) by fsetdec.
+    specialize (H8 x H9).
+    inversion H8 as [T Hbinds]; subst...
+    exists T.
+    binds_cases Hbinds...
+  - simpl...
+    apply wf_cset_over_union...
+  - simpl...
+    admit.
 Admitted.
 
 (** The things that the cv relation returns are all well-formed,
