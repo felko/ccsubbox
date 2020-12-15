@@ -778,12 +778,16 @@ Inductive cv_free : exp -> captureset -> Prop :=
 Lemma typing_cv : forall E e T,
   typing E e T ->
   wf_cset E (free_for_cv e).
-Proof with auto*.
+Proof with eauto*.
   intros E e T Htyp.
   induction Htyp.
-  - admit.
+  - simpl. constructor.
+    unfold allbound_typ. intros.
+    assert (x = x0) by fsetdec.
+    subst. exists T...
   - pick fresh y.
     assert (y `notin` L) by fsetdec.
+    
     (* assert (y `notin` (free_for_cv (exp_abs V e1))). *)
     (* free_for_cv (open_ee e1 y y) = {y} \cup (free_for_cv e1) *)
     specialize (H0 y H1).
