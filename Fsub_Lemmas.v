@@ -802,6 +802,19 @@ Proof with eauto*.
     fnsetdec.
 Qed.
 
+Lemma free_for_cv_open_type : forall e k (y : atom),
+  cset_subset_prop (free_for_cv e) (free_for_cv (open_te_rec k y e)).
+Proof with eauto*.
+  intros e; induction e; intros; simpl...
+  - constructor; fsetdec...
+  - constructor; fsetdec...
+  - specialize (IHe1 k y).
+    specialize (IHe2 k y).
+    inversion IHe1; inversion IHe2; subst; constructor...
+    fsetdec.
+    fnsetdec.
+Qed.
+
 (** argh *)
 Lemma empty_over_union : forall N1 N2,
   {}N = NatSet.F.union N1 N2 ->
@@ -891,6 +904,8 @@ Lemma typing_cv : forall E e T,
 Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
   intros E e T Htyp.
   induction Htyp; simpl...
+  (** TODO: merge the abs/t-abs case somehow (maybe a match to decide what
+      gets posed? )*)
   - simpl. constructor.
     unfold allbound_typ. intros.
     assert (x = x0) by fsetdec.
@@ -936,7 +951,26 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     }
     simpl.
     specialize (H0 y H1)...
-Admitted.
+    pose proof (free_for_cv_open_type e1 0 y).
+    pose proof (cv_free_never_universal).
+    pose proof (cv_free_is_bvar_free e1).
+    csethyp.
+    destruct (free_for_cv e1) eqn:Hfcv1...
+    unfold open_te in *.
+    inversion H0; subst...
+    inversion H3; subst...
+    rewrite <- H6 in H10. inversion H10; subst...
+    assert (t0 = {}N) by fnsetdec; subst...
+    constructor...
+    unfold allbound_typ in *.
+    intros.
+    destruct (x == y)...
+    assert (x `in` fvars) by fsetdec.
+    specialize (H8 x H9).
+    inversion H8 as [T Hbinds]; subst...
+    exists T.
+    binds_cases Hbinds...
+Qed.
 
 (** The things that the cv relation returns are all well-formed,
     assuming the type is well formed... *)
