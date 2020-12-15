@@ -867,6 +867,21 @@ Proof with eauto using wf_cset_over_union, cv_free_never_universal.
     + apply IHe2... apply H.
 Qed.
 
+Lemma free_for_cv_is_free_ee : forall e,
+  cset_subset_prop (free_for_cv e) (cset_set (fv_ee e) {}N).
+Proof with eauto using cv_free_never_universal; eauto*.
+  intros e.
+  (** gah why doesn't eauto pick this up. *)
+  pose proof (cv_free_never_universal).
+  induction e; try destruct (free_for_cv e) eqn:Hcve; 
+    subst; simpl; try rewrite Hcve; try constructor; try inversion IHe;
+    try fsetdec; try fnsetdec.
+  - unfold cset_union in *;
+    destruct (free_for_cv e1) eqn:Hcve1;
+    destruct (free_for_cv e2) eqn:Hcve2...
+    inversion IHe1; inversion IHe2; subst...
+    constructor; try fsetdec; try fnsetdec...
+Qed.
 
 (** This should be easily true: free variables
     are all bound if a term has a type.... *)
@@ -884,7 +899,9 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     assert (y `notin` L) by fsetdec.
     assert (~ cset_references_fvar y (free_for_cv e1)).
     {
-      admit.
+      pose proof (free_for_cv_is_free_ee e1)...
+      inversion H2; subst...
+      simpl...
     }
     simpl.
     specialize (H0 y H1)...
@@ -909,8 +926,16 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     binds_cases Hbinds...
   - simpl...
     apply wf_cset_over_union...
-  - simpl...
-    admit.
+  - pick fresh y.
+    assert (y `notin` L) by fsetdec.
+    assert (~ cset_references_fvar y (free_for_cv e1)).
+    {
+      pose proof (free_for_cv_is_free_ee e1)...
+      inversion H2; subst...
+      simpl...
+    }
+    simpl.
+    specialize (H0 y H1)...
 Admitted.
 
 (** The things that the cv relation returns are all well-formed,
