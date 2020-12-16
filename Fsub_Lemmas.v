@@ -859,10 +859,19 @@ Proof with eauto*.
 Qed.
 
 Lemma cset_references_fvar_over_union : forall C1 C2 x,
-  cset_references_fvar x (cset_union C1 C2) <->
+  cset_references_fvar x (cset_union C1 C2) ->
   cset_references_fvar x C1 \/ cset_references_fvar x C2.
-Proof.
-Admitted.
+Proof with eauto*.
+  intros C1 C2 x H.
+  unfold cset_references_fvar in H.
+  unfold cset_all_fvars in H.
+  destruct (cset_union C1 C2) eqn:Hunion...
+  unfold cset_union in *.
+  destruct C1 eqn:HC1; destruct C2 eqn:HC2; subst...
+  inversion Hunion...
+  assert (x `in` (t1 `union` t3)) by (rewrite H1; eauto*)...
+  apply AtomSetFacts.union_iff in H0; inversion H0; subst...
+Qed.
 
 Lemma free_for_cv_bound : forall E e (x : atom),
   wf_cset E (free_for_cv e) ->
