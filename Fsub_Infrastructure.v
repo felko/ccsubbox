@@ -1186,12 +1186,11 @@ Lemma capt_subst : forall z c1 c2,
   capt c1 ->
   capt c2 ->
   capt (subst_cset z c1 c2).
-Proof.
+Proof with eauto*.
   intros z c1 c2 Hc1 Hc2.
-  destruct Hc1;  destruct Hc2...
-  econstructor...
-  - 
-Admitted.
+  destruct Hc1;  destruct Hc2; unfold subst_cset; cset_split...
+  - assert (NatSet.F.union {}N {}N = {}N) by fnsetdec. rewrite H...
+Qed.
 
 (* TODO clean up the proof here *)
 Lemma subst_ee_expr : forall z e1 e2 c,
