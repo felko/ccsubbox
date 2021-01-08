@@ -350,9 +350,24 @@ Proof with eauto*.
         specialize (H6 x H5).
         inversion H6 as [T H7].
         binds_cases H7; subst...
-        - admit.
-        - admit.  
-Admitted.
+        - contradict H2.
+          assert (x `notin` fvars). {
+            intro. specialize (H x H2)...
+            inversion H as [T' H7]...
+            (** Clearly true as x \in fvars0, x \notin fvars \cup (x - fvars0)*)
+            apply fresh_mid_tail in HokZ...
+            apply binds_In in H7...
+          }
+          fsetdec.
+        - exists (subst_ct Z (cset_set fvars {}N) T).
+          eauto*.
+    * 
+      specialize (H6 x H2).
+      inversion H6 as [T H7].
+      binds_cases H7; subst...
+      - exists (subst_ct Z (cset_set fvars {}N) T).
+        eauto*.   
+Qed.
 
 Lemma wf_typ_subst_cb : forall F Q E Z C T,
   wf_typ (F ++ [(Z, bind_typ Q)] ++ E) T ->
