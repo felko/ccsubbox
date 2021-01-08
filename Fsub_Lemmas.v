@@ -349,7 +349,9 @@ Proof with eauto*.
       **
         specialize (H6 x H5).
         inversion H6 as [T H7].
-        admit.
+        binds_cases H7; subst...
+        - admit.
+        - admit.  
 Admitted.
 
 Lemma wf_typ_subst_cb : forall F Q E Z C T,
@@ -358,10 +360,11 @@ Lemma wf_typ_subst_cb : forall F Q E Z C T,
       as we're substituting in both places. *)
   wf_cset E C ->
   ok (map (subst_cb Z C) F ++ E) ->
+  ok (F ++ [(Z, bind_typ Q)] ++ E) ->
   wf_typ (map (subst_cb Z C) F ++ E) (subst_ct Z C T).
 Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_subst_tb,
     capt_from_wf_cset.
-  intros F Q E Z C T HwfT HwfC Hok.
+  intros F Q E Z C T HwfT HwfC Hok HokZ.
   remember (F ++ [(Z, bind_typ Q)] ++ E).
   generalize dependent F.
   induction HwfT; intros F EQF Hok; subst; simpl subst_ct...
