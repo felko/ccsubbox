@@ -543,6 +543,24 @@ Inductive sub : env -> typ -> typ -> Prop :=
       sub E T1 T2 ->
       subcapt E C1 C2 ->
       sub E (typ_capt C1 T1) (typ_capt C2 T2)
+
+  | sub_anycapt : forall E C T1 T2,
+      sub E T1 T2 ->
+      wf_cset E C ->
+      sub E T1 (typ_capt C T2)
+
+  (* | sub_nocapt_capt : forall E C1 C2 T1 T2, *)
+  (*     sub E T1 T2 -> *)
+  (*     cv E T1 C1 -> *)
+  (*     subcapt E C1 C2 -> *)
+  (*     sub E T1 (typ_capt C T2) *)
+
+  (* | sub_union_capt : forall E C1 C2 C3 T1 T2, *)
+  (*     sub E T1 T2 -> *)
+  (*     subcapt E C1 C3 -> *)
+  (*     subcapt E C2 C2 -> *)
+  (*     sub E (typ_capt C1 (typ_capt C2 T1)) (typ_capt C3 T2) *)
+
 .
 
 

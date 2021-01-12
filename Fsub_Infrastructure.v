@@ -147,6 +147,11 @@ Definition subst_tb (Z : atom) (P : typ) (b : binding) : binding :=
   | bind_typ T => bind_typ (subst_tt Z P T)
   end.
 
+Definition subst_cb (Z : atom) (c : captureset) (b : binding) : binding :=
+  match b with
+  | bind_sub T => bind_sub (subst_ct Z c T)
+  | bind_typ T => bind_typ (subst_ct Z c T)
+  end.
 
 (* ********************************************************************** *)
 (** * #<a name="pick_fresh"></a># The "[pick fresh]" tactic *)
@@ -1241,6 +1246,8 @@ Hint Resolve subst_tt_type subst_te_expr subst_ee_expr : core.
 Hint Extern 1 (binds _ (?F (subst_tt ?X ?U ?T)) _) =>
   unsimpl (subst_tb X U (F T)) : core.
 
+Hint Extern 1 (binds _ (?F (subst_ct ?X ?U ?C)) _) =>
+  unsimpl (subst_cb X U (F C)) : core.
 
 (** Tactic that matches the goal for `open_ct ?T ?C` and tries 
     to prove that `type ?T`. *)

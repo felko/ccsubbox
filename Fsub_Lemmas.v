@@ -274,15 +274,6 @@ Proof with auto*.
   apply subst_ct_intro_rec...
 Qed.
 
-Definition subst_cb (Z : atom) (C : captureset) (b : binding) : binding :=
-  match b with
-  | bind_sub T => bind_sub (subst_ct Z C T)
-  | bind_typ T => bind_typ (subst_ct Z C T)
-  end.
-Hint Extern 1 (binds _ (?F (subst_ct ?X ?U ?C)) _) =>
-  unsimpl (subst_cb X U (F C)) : core.
-
-  
 Lemma subst_ct_open_ct_rec : forall (X : atom) C1 T C2 k,
   capt C1 ->
   capt C2 ->

@@ -718,11 +718,55 @@ Admitted.
 (************************************************************************ *)
 (** ** Substitution preserves typing (8) *)
 
+Lemma wf_env_disallows_self_ref : forall F E x T C,
+    wf_env (F ++ [(x, bind_typ T)] ++ E) ->
+    eq (subst_ct x C T) T.
+Proof.
+  (* Plan: *)
+  (*   - fv(T) subset E *)
+  (*   - therefore x not in fv(t) *)
+  (*   - therefore subst idempotent *)
+  admit.
+Admitted.
+
+Lemma wf_env_subst_cb : forall Q C x E F,
+  wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
+  wf_cset E C ->
+  wf_env (map (subst_cb x C) F ++ E).
+Proof
+  (* with eauto 6 using wf_typ_subst_tb *)
+  .
+  admit.
+  (* induction F; intros Wf_env WP; simpl_env; *)
+  (*   inversion Wf_env; simpl_env in *; simpl subst_tb... *)
+Admitted.
+
+Lemma wf_cset_from_cv : forall E T C,
+    wf_env E ->
+    cv E T C ->
+    wf_cset E C.
+Proof.
+Admitted.
+
+(* Not tested to work. *)
+Hint Extern 1 (wf_cset ?E ?C) =>
+match goal with
+| H1: cv ?E _ ?C, H2 : wf_env ?E |- _ => apply (wf_cset_from_cv _ _ _ H2 H1)
+end : core.
+
+Lemma wf_env_strengthening : forall F E,
+    wf_env (F ++ E) ->
+    wf_env E.
+Proof.
+  (* induction on F? *)
+  admit.
+Admitted.
+
 Lemma typing_through_subst_ee : forall U E F x T C e u,
   typing (F ++ [(x, bind_typ U)] ++ E) e T ->
   typing E u U ->
   cv E U C ->
-  typing (F ++ E) (subst_ee x u C e) (subst_ct x C U).
+  typing (map (subst_cb x C) F ++ E) (subst_ee x u C e) (subst_ct x C T).
 (* begin show *)
 
 (** We provide detailed comments for the following proof, mainly to
@@ -771,15 +815,30 @@ Proof with simpl_env;
             rewrite_env tactic, described in the Environment library,
             is one way to perform this rewriting. *)
 
-      rewrite_env (empty ++ F ++ E).
+      rewrite_env (empty ++ map (subst_cb x C) F ++ E).
       apply typing_weakening...
+      * simpl.
+        replace (subst_cset x C x) with C.
+        assert (eq (subst_ct x C U) U) as Heq. {
+          eapply wf_env_disallows_self_ref.
+          apply H.
+        }
+        rewrite Heq...
+        apply typing_sub with (S := U)...
+        apply sub_capt
+
+      apply wf_env_subst_cb with (Q := U)...
+      assert (wf_env E) as HwfE. {
+        eauto using wf_env_strengthening.
+      }
+      eauto using wf_cset_from_cv.
 
     (** In the case where x0<>x, the result follows by an exhaustive
         case analysis on exactly where x0 is bound in the environment.
         We perform this case analysis by using the binds_cases tactic,
         described in the Environment library. *)
 
-    SCase "x0 <> x".
+    + SCase "x0 <> x".
       binds_cases H0.
         eauto using wf_env_strengthening.
         eauto using wf_env_strengthening.
