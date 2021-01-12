@@ -1042,7 +1042,7 @@ Qed.
 Lemma cv_wf : forall E T C,
   wf_env E ->
   wf_typ E T ->
-  cv T E C ->
+  cv E T C ->
   wf_cset E C.
 Proof with simpl_env; eauto*.
   intros E T C WE WT HC.

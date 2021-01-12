@@ -28,8 +28,8 @@ Admitted.
 (** ** Weakening (2) *)
 
 Lemma cv_strengthening : forall x U E G T C,
-    cv T (G ++ [(x, bind_typ U)] ++ E) C ->
-    cv T (G ++ E) C.
+    cv (G ++ [(x, bind_typ U)] ++ E) T C ->
+    cv (G ++ E) T C.
 Proof with auto.
   intros x U E G T C HCv.
   remember (G ++ [(x, bind_typ U)] ++ E).
@@ -39,9 +39,9 @@ Proof with auto.
 Qed.
 
 Lemma cv_weakening : forall E F G T C,
-    cv T (G ++ E) C ->
+    cv (G ++ E) T C ->
     wf_env (G ++ F ++ E) ->
-    cv T (G ++ F ++ E) C.
+    cv (G ++ F ++ E) T C.
 Proof with auto.
   intros E F G T C HCv Hwf2.
   remember (G ++ E).
@@ -81,45 +81,6 @@ Proof with auto using wf_cset_weakening.
   intros.
   apply captures_weakening...
 Qed.
-
-Lemma captures_strengthening_typ : forall E G X U xs x,
-captures (G ++ [(X, bind_typ U)] ++ E) xs x ->
-captures (G ++ E) xs x.
-Proof with eauto using cv_strengthening.
-  intros E G X U xs x H.
-  remember (G ++ [(X, bind_typ U)] ++ E).
-  generalize dependent G.
-  induction H; intros G EQ; subst.
-  - apply captures_in...
-  - eapply captures_var with (ys := ys) (T := T)...
-    + binds_cases H...
-      inversion H3.
-      apply binds_tail...
-      admit.
-    + unfold AtomSet.F.For_all in *. intros.
-      apply H2...
-Admitted.
-
-Lemma subcapt_strengthening_typ : forall x U E F C1 C2,
-  (** NOT TRUE: what if x in C1? **)
-  subcapt (F ++ [(x, bind_typ U)] ++ E) C1 C2 ->
-  subcapt (F ++ E) C1 C2.
-Proof with eauto using cv_strengthening.
-  intros x U E F C1 C2 H.
-  remember (F ++ [(x, bind_typ U)] ++ E).
-  generalize dependent F.
-  induction H; intros F EQ; subst.
-  - constructor...
-    admit.
-  - apply subcapt_set...
-    unfold AtomSet.F.For_all.
-    intros.
-    (*
-    eapply captures_strengthening_typ.
-    apply H1...
-    *)
-    admit.
-Admitted.
 
 Lemma sub_weakening : forall E F G S T,
   sub (G ++ E) S T ->
@@ -220,8 +181,8 @@ Qed.
 
 (* Probably not used? *)
 Lemma cv_unique : forall T E C1 C2,
-  cv T E C1 ->
-  cv T E C2 ->
+  cv E T C1 ->
+  cv E T C2 ->
   C1 = C2.
 Proof.
 Admitted.
@@ -293,8 +254,8 @@ Qed.
 (* Probably not used? *)
 Lemma sub_implies_subcapt : forall E S T C D,
   sub E S T ->
-  cv S E C ->
-  cv T E D ->
+  cv E S C ->
+  cv E T D ->
   subcapt E C D.
 Proof.
 Admitted.
@@ -304,8 +265,8 @@ Admitted.
 
 Lemma cv_narrowing : forall S G Z Q E P C,
   sub E P Q ->
-  cv S (G ++ [(Z, bind_sub Q)] ++ E) C ->
-  cv S (G ++ [(Z, bind_sub P)] ++ E) C.
+  cv (G ++ [(Z, bind_sub Q)] ++ E) S C ->
+  cv (G ++ [(Z, bind_sub P)] ++ E) S C.
 Proof with auto.
   intros S G Z Q E P C HSub HCv.
   remember (G ++ [(Z, bind_sub Q)] ++ E). generalize dependent G.
@@ -344,14 +305,18 @@ Proof with eauto using wf_cset_narrowing, captures_narrowing, wf_env_narrowing.
   intros F E Z P Q C1 C2 SubPQ SubCap.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
   induction SubCap ; intros ; subst...
-  apply subcapt_set...
-  unfold AtomSet.F.For_all.
-  intros.
-  unfold AtomSet.F.For_all in H1.
-  specialize (H1 x H2).
-  (* requires captures regularity *)
-  assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)). { admit. }
-  eapply captures_narrowing...
+  (** Alex: eauto seems to not solve some goals it solved previously? *)
+  - admit.
+  - apply subcapt_set...
+    + admit.
+    + admit.
+    + unfold AtomSet.F.For_all.
+      intros.
+      unfold AtomSet.F.For_all in H1.
+      specialize (H1 x H2).
+      (* requires captures regularity *)
+      assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)). { admit. }
+      eapply captures_narrowing...
 Admitted.
 
 Definition transitivity_on Q := forall E S T,
@@ -472,18 +437,18 @@ Qed.
 (** ** Type substitution preserves subtyping (10) *)
 
 Lemma cv_subst_empty : forall S G Z Q E P,
-  cv S (G ++ [(Z, bind_sub Q)] ++ E) {}C ->
-  cv (subst_tt Z P S) (map (subst_tb Z P) G ++ E) {}C.
+  cv (G ++ [(Z, bind_sub Q)] ++ E) S {}C ->
+  cv (map (subst_tb Z P) G ++ E) (subst_tt Z P S){}C.
 Proof.
 Admitted.
 
 Lemma re_cv_through_subst_tt : forall X P Q T E G C,
   wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
   wf_typ (G ++ [(X, bind_sub Q)] ++ E) T ->
-  cv T (G ++ [(X, bind_sub Q)] ++ E) C ->
+  cv (G ++ [(X, bind_sub Q)] ++ E) T C ->
   sub E P Q ->
   exists D : captureset,
-    cv (subst_tt X P T) (map (subst_tb X P) G ++ E) D.
+    cv (map (subst_tb X P) G ++ E) (subst_tt X P T) D.
 Proof.
   intros until 0. intros Hwf_env Hwf_typ H Hsub.
   generalize dependent C.
@@ -514,8 +479,8 @@ Admitted.
 Lemma cv_through_subst_tt : forall X P Q T E G C D,
   wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
   wf_typ (G ++ [(X, bind_sub Q)] ++ E) T ->
-  cv T (G ++ [(X, bind_sub Q)] ++ E) C ->
-  cv (subst_tt X P T) (map (subst_tb X P) G ++ E) D ->
+  cv (G ++ [(X, bind_sub Q)] ++ E) T C ->
+  cv (map (subst_tb X P) G ++ E) (subst_tt X P T) D ->
   sub E P Q ->
   subcapt (map (subst_tb X P) G ++ E) D C.
 Proof.
@@ -702,47 +667,21 @@ Proof with simpl_env;
   - Case "typing_abs".
     pick fresh X and apply typing_abs...
     lapply (H X); [intros K | auto].
-    destruct K.    
-    split...
-    rewrite <- concat_assoc.
-    apply wf_typ_weakening...
-    rewrite <- concat_assoc.
+    admit.
+    (* destruct K.     *)
+    (* split... *)
+    (* rewrite <- concat_assoc. *)
+    (* apply wf_typ_weakening... *)
+    (* rewrite <- concat_assoc. *)
+    (* admit. *)
+  - Case "typing_app".
     admit.
   - Case "typing_arrow".
     pick fresh X and apply typing_tabs.
     lapply (H X); [intros K | auto].
     rewrite <- concat_assoc.
     apply (H0 X)...
-    trivial.
 Admitted.
-
-
-(* ********************************************************************** *)
-(** ** Strengthening (6) *)
-
-Lemma sub_strengthening : forall x U E F S T,
-  sub (F ++ [(x, bind_typ U)] ++ E) S T ->
-  sub (F ++ E) S T.
-Proof with eauto using wf_typ_strengthening, 
-                       wf_env_strengthening,
-                       subcapt_strengthening_typ,
-                       cv_strengthening.
-  intros x U E F S T SsubT.
-  remember (F ++ [(x, bind_typ U)] ++ E).
-  generalize dependent F.
-  induction SsubT; intros F EQ; subst...  
-  - Case "sub_trans_tvar".
-    apply (sub_trans_tvar U0)...
-    binds_cases H...
-  - Case "sub_arrow".
-    pick fresh X and apply sub_arrow...
-    rewrite <- concat_assoc.
-    apply H0...
-  - Case "sub_all".
-    pick fresh X and apply sub_all...
-    rewrite <- concat_assoc.
-    apply H0...
-Qed.
 
 
 (************************************************************************ *)
@@ -762,25 +701,28 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
   - Case "typing_abs".
     pick fresh y and apply typing_abs.
     rewrite <- concat_assoc.    
-    destruct (H y)...
-    split...
-    eapply wf_typ_narrowing with Q...
     admit.
-    trivial.
+    (* destruct (H y)... *)
+    (* split... *)
+    (* eapply wf_typ_narrowing with Q... *)
+    (* admit. *)
+    (* trivial. *)
+  - Case "typing_app".
+    admit.
   - Case "typing_tabs".
     pick fresh Y and apply typing_tabs.
     rewrite <- concat_assoc.
     apply H0...
 Admitted.
 
-
 (************************************************************************ *)
 (** ** Substitution preserves typing (8) *)
 
-Lemma typing_through_subst_ee : forall U E F x T e u,
+Lemma typing_through_subst_ee : forall U E F x T C e u,
   typing (F ++ [(x, bind_typ U)] ++ E) e T ->
   typing E u U ->
-  typing (F ++ E) (subst_ee x u e) T.
+  cv E U C ->
+  typing (F ++ E) (subst_ee x u C e) (subst_ct x C U).
 (* begin show *)
 
 (** We provide detailed comments for the following proof, mainly to
@@ -793,24 +735,23 @@ Lemma typing_through_subst_ee : forall U E F x T e u,
     e.g., "apply typing_weakening...". *)
 
 Proof with simpl_env;
-           eauto 4 using wf_typ_strengthening,
-                         wf_env_strengthening,
-                         sub_strengthening.
+           eauto 4.
 
   (** The proof proceeds by induction on the given typing derivation
       for e.  We use the remember tactic, along with generalize
       dependent, to ensure that the goal is properly strengthened
       before we use induction. *)
 
-  intros U E F x T e u TypT TypU.
+  intros *.
+  intros HtypT HcvU HtypU.
   remember (F ++ [(x, bind_typ U)] ++ E).
   generalize dependent F.
-  induction TypT; intros F EQ; subst; simpl subst_ee...
+  induction HtypT; intros F EQ; subst; simpl subst_ee...
 
   (** The typing_var case involves a case analysis on whether the
       variable is the same as the one being substituted for. *)
 
-  Case "typing_var".
+  - Case "typing_var".
     destruct (x0 == x); subst.
 
     (** In the case where x0=x, we first observe that hypothesis H0
@@ -820,18 +761,18 @@ Proof with simpl_env;
         the Environment library, with H0 to obtain the fact that
         T=U. *)
 
-    SCase "x0 = x".
+    + SCase "x0 = x".
       binds_get H0.
-        inversion H2; subst.
+      inversion H2; subst.
 
-        (** In order to apply typing_weakening, we need to rewrite the
+      (** In order to apply typing_weakening, we need to rewrite the
             environment so that it has the right shape.  (We could
             also prove a corollary of typing_weakening.)  The
             rewrite_env tactic, described in the Environment library,
             is one way to perform this rewriting. *)
 
-        rewrite_env (empty ++ F ++ E).
-        apply typing_weakening...
+      rewrite_env (empty ++ F ++ E).
+      apply typing_weakening...
 
     (** In the case where x0<>x, the result follows by an exhaustive
         case analysis on exactly where x0 is bound in the environment.

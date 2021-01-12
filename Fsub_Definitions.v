@@ -425,24 +425,24 @@ Inductive wf_env : env -> Prop :=
       wf_env ([(x, bind_typ T)] ++ E).
 
 (** Dealing with cv -- as a fixpoint is problematic. *)
-Inductive cv : typ -> env -> captureset -> Prop :=
+Inductive cv : env -> typ -> captureset -> Prop :=
   (** C T has cv C cup cv T *)
   | cv_typ_capt : forall T E C1 C2,
-    cv T E C2 ->
-    cv (typ_capt C1 T) E (cset_union C1 C2)
+    cv E T C2 ->
+    cv E (typ_capt C1 T) (cset_union C1 C2)
   (** Looking up in the environment *)
   | cv_typ_var : forall (X : atom) T E C,
     binds X (bind_sub T) E ->
-    cv T E C ->
-    cv (typ_fvar X) E C
+    cv E T C ->
+    cv E (typ_fvar X) C
   (** Function types and arrow types are just {} *)
   | cv_typ_arrow : forall T1 T2 E,
-    cv (typ_arrow T1 T2) E {}C
+    cv E (typ_arrow T1 T2) {}C
   | cv_typ_all : forall T1 T2 E,
-    cv (typ_all T1 T2) E {}C
+    cv E (typ_all T1 T2) {}C
   (** Maybe: a capture-environment irrelevance term? *)
   | cv_top : forall E,
-      cv typ_top E {}C
+      cv E typ_top {}C
 .
 
 
@@ -458,7 +458,7 @@ Inductive captures : env -> atoms -> atom -> Prop :=
   (* xs captures x if it includes its capture set (cv) *)
   | captures_var : forall E T x xs ys,      
       binds x (bind_typ T) E ->
-      cv T E (cset_set ys {}N) ->
+      cv E T (cset_set ys {}N) ->
       AtomSet.F.For_all (captures E xs) ys ->
       captures E xs x
 .
@@ -490,7 +490,7 @@ Inductive sub : env -> typ -> typ -> Prop :=
       wf_env E ->
       wf_typ E S ->
       (** NEW: S can't capture anything *)
-      cv S E {}C ->
+      cv E S {}C ->
       sub E S typ_top
 
   (* Instead of having rules for refl and trans, the original Fsub calculus special cases
@@ -619,8 +619,8 @@ Inductive typing : env -> exp -> typ -> Prop :=
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
       typing E e2 T1' ->
       sub E T1 T1' ->
-      cv T1' E Cv' ->
-      cv T1 E Cv ->
+      cv E T1' Cv' ->
+      cv E T1 Cv ->
       subcapt E Cv' C ->
       subcapt E C   Cv ->
       (** NEW: function application opens the capture set in the type. *)
