@@ -368,58 +368,59 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
     apply subcapt_narrowing with (Q := Q)...
 Qed.
 
+(* S <: Q    ->    Q <: T    ->    S <: T*)
 Lemma sub_transitivity : forall Q,
   transitivity_on Q.
 Proof with simpl_env; auto.
   unfold transitivity_on.
   intros Q E S T SsubQ QsubT.
   assert (W : type Q) by auto.
+  
   generalize dependent T.
-  generalize dependent S.
+  generalize dependent S. 
   generalize dependent E.
-  remember Q as Q' in |-.
+  remember Q as Q' in |-.  
   generalize dependent Q'.
-  induction W;
-    intros Q' EQ E S SsubQ;
-    induction SsubQ; try discriminate; inversion EQ; subst;
-    intros T' QsubT;
-    inversion QsubT; subst.
-  (* is there a better way than repeating the tactic 14 times? *)
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  (* crashes with depth 2 *)
-  admit.
-  admit.
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  Case "sub_all / sub_top".
-    assert (sub E (typ_all S1 S2) (typ_all T1 T2)).
-      SCase "proof of assertion".
-      pick fresh y and apply sub_all...
-    auto.
-  Case "sub_all / sub_all".
-    pick fresh Y and apply sub_all.
-    SCase "bounds".
-      eauto.
-    SCase "bodies".
-      lapply (H0 Y); [ intros K | auto ].
-      apply (K (open_tt T2 Y))...
-      rewrite_env (empty ++ [(Y, bind_sub T0)] ++ E).
-      apply (sub_narrowing_aux T1)...
-      unfold transitivity_on.
-      auto using (IHW T1).
-  eauto 4 using sub_trans_tvar.
-  eauto 4 using sub_trans_tvar.
-  admit.
-  admit.
+  
+  induction W; intros Q'' EQ E' S' SsubQ.
+  
+  Ltac inductionThenInversion Rel1 Rel2 := 
+      induction Rel1; try discriminate; inversion EQ; subst; intros T' Rel2; inversion Rel2; subst.
+
+  (* type_top *)
+  - inductionThenInversion SsubQ QsubT; eauto.
+  (* type_var *)
+  - inductionThenInversion SsubQ QsubT; eauto.
+  (* type_arrow *)
+  - inductionThenInversion SsubQ QsubT.
+    + eauto using sub_trans_tvar.
+    + eauto.
+    + admit.
+    + admit. 
+  (* type_all. *)
+  - inductionThenInversion SsubQ QsubT.
+    + eauto.
+    + eauto.
+    + assert (sub E (typ_all S1 S2) (typ_all T1 T2)). {
+        pick fresh y and apply sub_all...
+      }
+      auto.
+    + pick fresh Y and apply sub_all.
+      SCase "bounds".
+        eauto.
+      SCase "bodies".
+        lapply (H0 Y); [ intros K | auto ].
+        apply (K (open_tt T2 Y))...
+        rewrite_env (empty ++ [(Y, bind_sub T0)] ++ E).
+        apply (sub_narrowing_aux T1)...
+        unfold transitivity_on.
+        auto using (IHW T1).
+  (* type_capt *)
+  - inductionThenInversion SsubQ QsubT.
+    + eauto.
+    + eauto.
+    + admit.
+    + admit.
 Admitted.
 
 Lemma sub_narrowing : forall Q E F Z P S T,
