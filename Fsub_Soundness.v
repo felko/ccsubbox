@@ -276,6 +276,20 @@ Proof with auto.
   - admit.
 Admitted.
 
+(* needed for sub_narrowing_typ *)
+Lemma cv_narrowing_typ : forall S G x Q E P C,
+  sub E P Q ->
+  cv (G ++ [(x, bind_typ Q)] ++ E) S C ->
+  cv (G ++ [(x, bind_typ P)] ++ E) S C.
+Proof with auto.
+  intros S G x Q E P C HSub HCv.
+  remember (G ++ [(x, bind_typ Q)] ++ E). generalize dependent G.
+  induction HCv ; intros ; subst...
+  destruct (X == x) ; subst.
+  - admit.
+  - admit.
+Admitted.
+
 Lemma captures_narrowing : forall F Z P Q E xs x,  
   wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
   sub E P Q ->
@@ -317,6 +331,14 @@ Proof with eauto using wf_cset_narrowing, captures_narrowing, wf_env_narrowing.
       (* requires captures regularity *)
       assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)). { admit. }
       eapply captures_narrowing...
+Admitted.
+
+
+Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
+  sub E P Q ->
+  subcapt (F ++ [(x, bind_typ Q)] ++ E) C1 C2 ->
+  subcapt (F ++ [(x, bind_typ P)] ++ E) C1 C2.
+Proof.
 Admitted.
 
 Definition transitivity_on Q := forall E S T,
@@ -378,30 +400,76 @@ Admitted.
 Lemma empty_subcapt_implies_empty_cset : forall E C,
   subcapt E C {}C ->
   C = {}C.
-Proof.
-Admitted.
-(* inversion H0; subst.
-(* universal, can't be *)
-+ exfalso. inversion H11.
-(* ys = {} *)
-+ inversion H13; subst.          
+Proof with auto.
+  intros.
+  inversion H; subst.
   assert (xs = {}). { apply (empty_cset_implies_no_captures E)... }
   subst...
-} *)
+Qed.
+
+Lemma empty_cset_union : forall C1 C2,
+  cset_union C1 C2 = {}C ->
+  C1 = {}C /\ C2 = {}C.
+Proof with eauto.
+  intros.
+  destruct C1; destruct C2; simpl in H; try discriminate.
+  inversion H.
+  unfold empty_cset.
+  split; f_equal.
+  (* by fsetdec and fnsetdec -- however it crashes at the moment... *)
+Admitted.
 
 Lemma subtyping_preserves_empty_cv : forall E S T,
   sub E S T ->
   cv E T {}C ->
   cv E S {}C.
-Proof.
-Admitted.
+Proof with eauto.
+  intros.
+  induction H...  
+  - assert (C1 = {}C). { 
+      assert (C2 = {}C). { inversion H0. destruct (empty_cset_union _ _ H6); subst... }
+      subst.
+      apply (empty_subcapt_implies_empty_cset E C1)...
+    }
+    assert (cv E T1 {}C). { 
+      apply IHsub.
+      inversion H0.
+      destruct (empty_cset_union _ _ H7); subst...
+      replace (cset_union {}C {}C) with {}C...
+    }
+    replace {}C with (cset_union {}C {}C). subst. econstructor...
+    eauto.
+    unfold cset_union. simpl. 
+    rewrite elim_empty_nat_set.
+    replace ({} `union` {}) with {}...
+    fsetdec.
+Qed.
 
-Lemma sub_typ_narrowing : forall E F x P Q S T,    
+Lemma sub_narrowing_typ_aux : forall Q F E x P S T,
+  transitivity_on Q ->
   sub (F ++ [(x, bind_typ Q)] ++ E) S T ->
   sub E P Q ->
   sub (F ++ [(x, bind_typ P)] ++ E) S T.
-Proof.
-Admitted.
+Proof with simpl_env; eauto using wf_typ_narrowing_typ, wf_env_narrowing_typ.
+  intros Q F E x P S T TransQ SsubT PsubQ.
+  remember (F ++ [(x, bind_typ Q)] ++ E). generalize dependent F.
+  induction SsubT; intros F EQ; subst...
+  - apply sub_top...
+    apply cv_narrowing_typ with (Q := Q)...
+  - apply sub_refl_tvar...
+  - apply sub_trans_tvar with (U := U)...
+    binds_cases H.
+    + apply binds_tail. apply binds_tail... auto.
+    + apply binds_head...
+  - pick fresh Y and apply sub_arrow...
+    rewrite <- concat_assoc.
+    apply H0...
+  - pick fresh Y and apply sub_all...
+    rewrite <- concat_assoc.
+    apply H0...
+  - constructor...
+    apply subcapt_narrowing_typ with (Q := Q)...
+Qed.
 
 (* S <: Q    ->    Q <: T    ->    S <: T*)
 Lemma sub_transitivity : forall Q,
@@ -440,7 +508,9 @@ Proof with simpl_env; auto.
         lapply (H0 Y); [ intros K | auto ].
         apply (K (open_ct T2 Y))...
         rewrite_env (empty ++ [(Y, bind_typ T0)] ++ E).
-        apply sub_typ_narrowing with (Q := T1)...
+        apply sub_narrowing_typ_aux with (Q := T1)...
+        unfold transitivity_on.
+        auto using (IHW T1).
   (* type_all. *)
   - inductionThenInversion SsubQ QsubT.
     + eauto.
@@ -498,6 +568,15 @@ Proof.
   apply sub_transitivity.
 Qed.
 
+Lemma sub_narrowing_typ : forall E F x P Q S T,
+  sub (F ++ [(x, bind_typ Q)] ++ E) S T ->
+  sub E P Q ->
+  sub (F ++ [(x, bind_typ P)] ++ E) S T.
+Proof with eauto using wf_typ_narrowing_typ.
+  intros.
+  eapply sub_narrowing_typ_aux; eauto.
+  apply sub_transitivity.
+Qed.
 
 (* ********************************************************************** *)
 (** ** Type substitution preserves subtyping (10) *)
