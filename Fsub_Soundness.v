@@ -368,6 +368,41 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
     apply subcapt_narrowing with (Q := Q)...
 Qed.
 
+Lemma empty_cset_implies_no_captures : forall E xs,
+  wf_cset E (cset_set xs {}N) ->
+  AtomSet.F.For_all (captures E {}) xs ->
+  xs = {}.
+Proof.
+Admitted.
+
+Lemma empty_subcapt_implies_empty_cset : forall E C,
+  subcapt E C {}C ->
+  C = {}C.
+Proof.
+Admitted.
+(* inversion H0; subst.
+(* universal, can't be *)
++ exfalso. inversion H11.
+(* ys = {} *)
++ inversion H13; subst.          
+  assert (xs = {}). { apply (empty_cset_implies_no_captures E)... }
+  subst...
+} *)
+
+Lemma subtyping_preserves_empty_cv : forall E S T,
+  sub E S T ->
+  cv E T {}C ->
+  cv E S {}C.
+Proof.
+Admitted.
+
+Lemma sub_typ_narrowing : forall E F x P Q S T,    
+  sub (F ++ [(x, bind_typ Q)] ++ E) S T ->
+  sub E P Q ->
+  sub (F ++ [(x, bind_typ P)] ++ E) S T.
+Proof.
+Admitted.
+
 (* S <: Q    ->    Q <: T    ->    S <: T*)
 Lemma sub_transitivity : forall Q,
   transitivity_on Q.
@@ -395,8 +430,17 @@ Proof with simpl_env; auto.
   - inductionThenInversion SsubQ QsubT.
     + eauto using sub_trans_tvar.
     + eauto.
-    + admit.
-    + admit. 
+    + apply sub_top...
+      (* wf_typ typ_arrow *)
+      admit.
+    + pick fresh Y and apply sub_arrow.
+      SCase "bounds".
+        eauto.
+      SCase "bodies".
+        lapply (H0 Y); [ intros K | auto ].
+        apply (K (open_ct T2 Y))...
+        rewrite_env (empty ++ [(Y, bind_typ T0)] ++ E).
+        apply sub_typ_narrowing with (Q := T1)...
   (* type_all. *)
   - inductionThenInversion SsubQ QsubT.
     + eauto.
@@ -419,8 +463,29 @@ Proof with simpl_env; auto.
   - inductionThenInversion SsubQ QsubT.
     + eauto.
     + eauto.
-    + admit.
-    + admit.
+    (* typ_capt <: typ_top *)
+    + apply sub_top...
+      (* wf_typ typ_capt *)
+      admit.
+      (* from H3 we know: cv T = {}, C = {} *)
+      inversion H3; subst.
+      assert (C2 = {}C). { admit. (* by csetdec magic *) }
+      assert (C = {}C). { admit. (* by csetdec magic *) }
+      subst.
+
+      (* We have to show that C1 is {} *)
+      assert (C1 = {}C). { apply (empty_subcapt_implies_empty_cset E)... }
+      subst.
+
+      (* And that cv T1 = {} *)
+      assert (cv E T1 {}C). { apply (subtyping_preserves_empty_cv E T1 T)... }      
+      eapply cv_typ_capt...
+    (* typ_capt <: typ_capt *)
+    + apply sub_capt.
+      apply (IHW T)...
+      eapply subcapt_transitivity with (C2 := C)...
+      (* empty_cset_bvars C2 *)
+      admit.      
 Admitted.
 
 Lemma sub_narrowing : forall Q E F Z P S T,
