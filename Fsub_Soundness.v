@@ -263,17 +263,55 @@ Admitted.
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
 
-Lemma cv_narrowing : forall S G Z Q E P C,
+(** Note: this lemma as currently stated is wrong.  There's probably a subcapturing lemma
+    that holds under narrowing but it can't be proven this way.
+    
+    cv recurses into type variables, and hence can shrink when a bound shrinks.  *)
+Lemma cv_narrowing : forall S G Z Q E P C1 C2,
   sub E P Q ->
-  cv (G ++ [(Z, bind_sub Q)] ++ E) S C ->
-  cv (G ++ [(Z, bind_sub P)] ++ E) S C.
+  cv (G ++ [(Z, bind_sub Q)] ++ E) S C2 ->
+  cv (G ++ [(Z, bind_sub P)] ++ E) S C1 ->
+  subcapt E C1 C2.
 Proof with auto.
-  intros S G Z Q E P C HSub HCv.
-  remember (G ++ [(Z, bind_sub Q)] ++ E). generalize dependent G.
-  induction HCv ; intros ; subst...
-  destruct (X == Z) ; subst.
-  - admit.
-  - admit.
+  intros S G Z Q E P C1 C2 HSub HCv2 HCv1.
+  (*remember (G ++ [(Z, bind_sub Q)] ++ E).*)
+  generalize dependent C1.
+  generalize dependent C2. 
+  generalize dependent G. 
+  induction HSub; intros; subst...
+  - (* C1 = {}, trivial *)
+    admit.
+  - (* C1 = C2, trivial. *)
+    admit.
+  - 
+    (* Given a valid capture set derivation, we can construct another
+        one when we weaken the environment.
+        
+        Probably should be a lemma.*)  
+    assert (exists C3, cv (G ++ [(Z, bind_sub U)] ++ E) S C3). {
+      admit.
+    }
+    inversion H0 as [C3 H1].
+    (* Needs subcapt-transitivity -- C1 <: C3 <: C2 *)
+    admit.
+  - (*by definition. *)  
+    admit.
+  - (*by defininition. *)
+    admit.
+  - (* inductively use T1 <: T2 *)
+    admit.
+  - 
+    (** Now we need show that there is a C3 such that
+       cv (G ++ [(Z, bind_sub T2)] ++ E) S C3 *)
+    assert (exists C3, cv (G ++ [(Z, bind_sub T2)] ++ E) S C3). {
+      admit.
+    }
+    inversion H0 as [C3 H1].
+    (* inductively, use subtyping judgement. *) 
+    specialize (IHHSub G C3 H1 C1 HCv1).
+    (* now we need to show that C3 <: C2 and apply subcapt_transitivity,
+      as cv (type_capt C T2) = C \cup cv T2 *)
+    admit.
 Admitted.
 
 (* needed for sub_narrowing_typ *)
@@ -296,12 +334,13 @@ Proof with auto.
     + apply binds_head... 
 Qed.
 
+(** Again, probably not true, due to cv looking into type bindings. *)
 Lemma captures_narrowing : forall F Z P Q E xs x,  
   wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
   sub E P Q ->
   captures (F ++ [(Z, bind_sub Q)] ++ E) xs x ->
   captures (F ++ [(Z, bind_sub P)] ++ E) xs x.
-Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
+Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
   intros F Z P Q E xs x Ok Sub H.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
   induction H; intros; subst.
@@ -314,14 +353,15 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
     }
     apply captures_var with (T := T) (ys := ys)...
     unfold AtomSet.F.For_all in *. intros.
-    apply H2...
+    admit.
+    (*apply H2...*)
 Admitted.
 
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
   subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(Z, bind_sub P)] ++ E) C1 C2.
-Proof with eauto using wf_cset_narrowing, captures_narrowing, wf_env_narrowing.
+Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
   intros F E Z P Q C1 C2 SubPQ SubCap.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
   induction SubCap ; intros ; subst...
@@ -336,7 +376,7 @@ Proof with eauto using wf_cset_narrowing, captures_narrowing, wf_env_narrowing.
       specialize (H1 x H2).
       (* requires captures regularity *)
       assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)). { admit. }
-      eapply captures_narrowing...
+      admit.
 Admitted.
 
 
