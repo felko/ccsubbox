@@ -357,6 +357,42 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
     (*apply H2...*)
 Admitted.
 
+Lemma captures_narrowing_typ : forall F X P Q E xs x,  
+  wf_env (F ++ [(X, bind_typ P)] ++ E) ->
+  sub E P Q ->
+  captures (F ++ [(X, bind_typ Q)] ++ E) xs x ->
+  captures (F ++ [(X, bind_typ P)] ++ E) xs x.
+Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing_typ.
+  intros F X P Q E xs x Ok Sub H.
+  remember (F ++ [(X, bind_typ Q)] ++ E). generalize dependent F.
+  induction H; intros; subst.
+  - apply captures_in...
+  - assert (cv (F ++ [(X, bind_typ P)] ++ E) T (cset_set ys {}N))...
+    eapply captures_var with (T := T).
+    { destruct (x == X).
+      + (* x == X *)
+        binds_cases H.
+        * apply binds_tail.
+          apply binds_tail...
+          trivial.
+        * inversion H4; subst.
+          apply binds_tail.
+          (* ohoh, and now? *)
+          admit.
+          trivial.
+        * apply binds_head...
+      + (* x <> X *)
+        binds_cases H.
+        * apply binds_tail.
+          apply binds_tail...
+          trivial.
+        * apply binds_head...
+    }
+    apply H3.
+    unfold AtomSet.F.For_all in *. intros.
+    apply H2...
+Admitted.
+
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
   subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
@@ -382,10 +418,20 @@ Admitted.
 
 Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
   sub E P Q ->
+  wf_env (F ++ [(x, bind_typ P)] ++ E) ->
   subcapt (F ++ [(x, bind_typ Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(x, bind_typ P)] ++ E) C1 C2.
-Proof.
-Admitted.
+Proof with eauto using wf_cset_narrowing_typ.
+  intros F E x P Q C1 C2 PsubQ Ok C1subC2.
+  remember (F ++ [(x, bind_typ Q)] ++ E). generalize dependent F.
+  induction C1subC2 ; intros ; subst...
+  - econstructor... 
+    unfold AtomSet.F.For_all. 
+    intros.
+    unfold AtomSet.F.For_all in H1.
+    specialize (H1 x0 H2).
+    eapply captures_narrowing_typ...
+Qed.
 
 Definition transitivity_on Q := forall E S T,
   sub E S Q -> sub E Q T -> sub E S T.
