@@ -328,9 +328,26 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing
   induction H; intros; subst.
   - apply captures_in...
   - assert (cv (F ++ [(X, bind_typ P)] ++ E) T (cset_set ys {}N))...
-    eapply captures_var.
-    (* TODO This seems problematic *)
-    admit.
+    eapply captures_var with (T := T).
+    { destruct (x == X).
+      + (* x == X *)
+        binds_cases H.
+        * apply binds_tail.
+          apply binds_tail...
+          trivial.
+        * inversion H4; subst.
+          apply binds_tail.
+          (* ohoh, and now? *)
+          admit.
+          trivial.
+        * apply binds_head...
+      + (* x <> X *)
+        binds_cases H.
+        * apply binds_tail.
+          apply binds_tail...
+          trivial.
+        * apply binds_head...
+    }
     apply H3.
     unfold AtomSet.F.For_all in *. intros.
     apply H2...
