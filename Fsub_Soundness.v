@@ -286,8 +286,11 @@ Proof with auto.
   remember (G ++ [(x, bind_typ Q)] ++ E). generalize dependent G.
   induction HCv ; intros ; subst...
   destruct (X == x) ; subst.
-  - admit.
-  - admit.
+  - (* this can't happen, x is a variable not a type. *)
+    admit. 
+  - apply cv_typ_var with (T := T)...
+    (* X <>x, bindings unchanged. *)
+    admit.
 Admitted.
 
 Lemma captures_narrowing : forall F Z P Q E xs x,  
