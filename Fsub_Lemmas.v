@@ -1175,7 +1175,7 @@ Qed.
     The other three hints try outright to solve their respective
     goals. *)
 
-Hint Extern 1 (wf_cset ?E) =>
+Hint Extern 1 (wf_cset ?E ?C) =>
   match goal with
   | H: subcapt _ _ _ |- _ => apply (proj1 (subcapt_regular _ _ _ H))
   end

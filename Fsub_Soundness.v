@@ -584,15 +584,32 @@ Proof with simpl_env; auto.
 
   (* type_top *)
   - inductionThenInversion SsubQ QsubT; eauto.
+    econstructor...
+    (*  HERE `sub E S T2` is now missing! *)
+    admit.
+
   (* type_var *)
   - inductionThenInversion SsubQ QsubT; eauto.
   (* type_arrow *)
   - inductionThenInversion SsubQ QsubT.
     + eauto using sub_trans_tvar.
     + eauto.
+    + econstructor... trivial.
     + apply sub_top...
       (* wf_typ typ_arrow *)
-      admit.
+      pick fresh X and apply wf_typ_arrow...
+      assert (X `notin` L0)...
+      specialize (H1 X H6).
+      (* by regularity *)
+      assert (wf_typ ([(X, bind_typ T1)] ++ E) (open_ct S2 X))...
+      rewrite_env (empty ++ [(X, bind_typ S1)] ++ E).
+      eapply wf_typ_narrowing_typ with (C1 := T1).
+      trivial.
+      assert (wf_env (empty ++ [(X, bind_typ T1)] ++ E)). { auto. }
+      pose proof (ok_from_wf_env _ H8).
+      inversion H9.
+      simpl_env.
+      econstructor...
     + pick fresh Y and apply sub_arrow.
       SCase "bounds".
         eauto.
@@ -603,8 +620,11 @@ Proof with simpl_env; auto.
         apply sub_narrowing_typ_aux with (Q := T1)...
         unfold transitivity_on.
         auto using (IHW T1).
+    + apply sub_anycapt...
+      admit. (* Now also broken... *) 
   (* type_all. *)
   - inductionThenInversion SsubQ QsubT.
+    + eauto.
     + eauto.
     + eauto.
     + assert (sub E (typ_all S1 S2) (typ_all T1 T2)). {
@@ -621,18 +641,20 @@ Proof with simpl_env; auto.
         apply (sub_narrowing_aux T1)...
         unfold transitivity_on.
         auto using (IHW T1).
+    + admit. (* broken *)
   (* type_capt *)
   - inductionThenInversion SsubQ QsubT.
     + eauto.
     + eauto.
+    + eauto.
     (* typ_capt <: typ_top *)
     + apply sub_top...
-      (* wf_typ typ_capt *)
-      admit.
+      assert (wf_typ E T1)...
+      pose proof (subcapt_regular _ _ _ H0) as [WfCset H5].
+      assert (wf_cset E C1)...
       (* from H3 we know: cv T = {}, C = {} *)
       inversion H3; subst.
-      assert (C2 = {}C). { admit. (* by csetdec magic *) }
-      assert (C = {}C). { admit. (* by csetdec magic *) }
+      destruct (empty_cset_union _ _ H11).
       subst.
 
       (* We have to show that C1 is {} *)
@@ -646,8 +668,12 @@ Proof with simpl_env; auto.
     + apply sub_capt.
       apply (IHW T)...
       eapply subcapt_transitivity with (C2 := C)...
-      (* empty_cset_bvars C2 *)
-      admit.      
+      pose proof (subcapt_regular _ _ _ H6) as [_ Wf].
+      inversion Wf.
+      (* What? cset_universal cannot have free bvars! *)
+      admit.
+      simpl.
+      fnsetdec.
 Admitted.
 
 Lemma sub_narrowing : forall Q E F Z P S T,
