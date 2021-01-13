@@ -279,19 +279,22 @@ Admitted.
 (* needed for sub_narrowing_typ *)
 Lemma cv_narrowing_typ : forall S G x Q E P C,
   sub E P Q ->
+  ok (G ++ [(x, bind_typ Q)] ++ E) ->
   cv (G ++ [(x, bind_typ Q)] ++ E) S C ->
   cv (G ++ [(x, bind_typ P)] ++ E) S C.
 Proof with auto.
-  intros S G x Q E P C HSub HCv.
+  intros S G x Q E P C HSub Ok HCv.
   remember (G ++ [(x, bind_typ Q)] ++ E). generalize dependent G.
   induction HCv ; intros ; subst...
   destruct (X == x) ; subst.
   - (* this can't happen, x is a variable not a type. *)
-    admit. 
+    binds_get H.
   - apply cv_typ_var with (T := T)...
     (* X <>x, bindings unchanged. *)
-    admit.
-Admitted.
+    binds_cases H.
+    + apply binds_tail. apply binds_tail... trivial.
+    + apply binds_head... 
+Qed.
 
 Lemma captures_narrowing : forall F Z P Q E xs x,  
   wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
