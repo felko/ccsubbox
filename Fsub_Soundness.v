@@ -317,6 +317,28 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
     apply H2...
 Admitted.
 
+Lemma captures_narrowing_typ : forall F Z P Q E xs x,  
+  wf_env (F ++ [(Z, bind_typ P)] ++ E) ->
+  sub E P Q ->
+  captures (F ++ [(Z, bind_typ Q)] ++ E) xs x ->
+  captures (F ++ [(Z, bind_typ P)] ++ E) xs x.
+Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
+  intros F Z P Q E xs x Ok Sub H.
+  remember (F ++ [(Z, bind_typ Q)] ++ E). generalize dependent F.
+  induction H; intros; subst.
+  - apply captures_in...
+  - admit.
+   (* assert (x <> Z). { 
+      unfold not. intros.
+      binds_cases H.
+      * subst. unfold dom in Fr0. fsetdec.
+      * subst. admit.
+    }
+    apply captures_var with (T := T) (ys := ys)...
+    unfold AtomSet.F.For_all in *. intros.
+    apply H2... *)
+Admitted.
+
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
   subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
@@ -342,10 +364,20 @@ Admitted.
 
 Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
   sub E P Q ->
+  wf_env (F ++ [(x, bind_typ P)] ++ E) ->
   subcapt (F ++ [(x, bind_typ Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(x, bind_typ P)] ++ E) C1 C2.
-Proof.
-Admitted.
+Proof with eauto using wf_cset_narrowing_typ.
+  intros F E x P Q C1 C2 PsubQ Ok C1subC2.
+  remember (F ++ [(x, bind_typ Q)] ++ E). generalize dependent F.
+  induction C1subC2 ; intros ; subst...
+  - econstructor... 
+    unfold AtomSet.F.For_all. 
+    intros.
+    unfold AtomSet.F.For_all in H1.
+    specialize (H1 x0 H2).
+    eapply captures_narrowing_typ...
+Qed.
 
 Definition transitivity_on Q := forall E S T,
   sub E S Q -> sub E Q T -> sub E S T.
