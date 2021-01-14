@@ -223,12 +223,14 @@ Proof with eauto.
     constructor...
 Admitted.
 
-(* Probably not used? *)
+(* Probably not used? Useful in sub implies subcapt *)
 Lemma cv_unique : forall T E C1 C2,
+  wf_env E ->
   cv E T C1 ->
   cv E T C2 ->
   C1 = C2.
-Proof.
+Proof with eauto.
+  intros T E C1 C2 Hwf Hcv1 Hcv2.
 Admitted.
 
 Lemma captures_transitivity : forall E xs ys x,
@@ -301,6 +303,10 @@ Lemma sub_implies_subcapt : forall E S T C D,
   cv E T D ->
   subcapt E C D.
 Proof.
+  intros E S T C D Hsub HcvC HcvD.
+  induction Hsub...
+  (** needs cv_unique *)
+  admit.
 Admitted.
 
 (* ********************************************************************** *)
@@ -328,6 +334,10 @@ Proof with auto.
         
         Probably should be a lemma.*)  
     assert (exists C3, cv (G ++ [(Z, bind_sub U)] ++ E) S C3). {
+      apply cv_exists...
+      (** two wellformedness conditions.  Probably need to strengthen
+          conditions. *)
+      admit.
       admit.
     }
     inversion H0 as [C3 H1].
@@ -343,6 +353,10 @@ Proof with auto.
     (** Now we need show that there is a C3 such that
        cv (G ++ [(Z, bind_sub T2)] ++ E) S C3 *)
     assert (exists C3, cv (G ++ [(Z, bind_sub T2)] ++ E) S C3). {
+      apply cv_exists...
+      (** two wellformedness conditions.  Probably need to strengthen
+          conditions. *)
+      admit.
       admit.
     }
     inversion H0 as [C3 H1].
