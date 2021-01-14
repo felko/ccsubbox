@@ -179,6 +179,49 @@ Proof with auto.
   - exists xs. exists {}N...
 Qed.
 
+Lemma cv_exists : forall E T,
+  wf_env E ->
+  wf_typ E T ->
+  exists C, cv E T C.
+Proof with eauto.
+  intros E.
+  induction E; intros T; induction T; intros; try inversion H0; try inversion H; subst...
+  - inversion H3...
+  - specialize (IHT H H4) as [C' H'].
+    exists (cset_union c C'); constructor...
+  - simpl_env in *.
+    binds_cases H3...
+    + assert (wf_typ E a0) by (apply wf_typ_var with (U := U); eauto).
+      specialize (IHE a0 H6 H2) as [C' H'].
+      inversion H'; subst...
+      exists C'.
+      eapply cv_typ_var with (T := T0)...
+      (** need cv_weaken step here. *)
+      admit.
+    + specialize (IHE T H6 H7) as [C' H'].
+      exists C'.
+      apply cv_typ_var with (T := T)...
+      (** need cv_weaken step here. *)
+      admit.
+  - simpl_env in *.
+    binds_cases H3...
+    assert (wf_typ E a0) by (apply wf_typ_var with (U := U); eauto).
+    specialize (IHE a0 H6 H2) as [C' H'].
+    inversion H'; subst...
+    exists C'.
+    apply cv_typ_var with (T := T0)...
+    (** need cv_weaken step here *)
+    admit.
+  - simpl_env in *.
+    specialize (IHT H H4) as [C' H'].
+    exists (cset_union c C').
+    constructor...
+  - simpl_env in *.
+    specialize (IHT H H4) as [C' H'].
+    exists (cset_union c C').
+    constructor...
+Admitted.
+
 (* Probably not used? *)
 Lemma cv_unique : forall T E C1 C2,
   cv E T C1 ->
