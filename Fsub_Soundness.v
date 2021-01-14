@@ -101,7 +101,8 @@ Proof with simpl_env; auto using wf_typ_weakening, cv_weakening, subcapt_weakeni
     pick fresh Y and apply sub_all...
     rewrite <- concat_assoc.
     apply H0...
-Qed.
+  - admit.
+Admitted.
 
 (* ********************************************************************** *)
 (** ** Reflexivity (1) *)
@@ -251,7 +252,6 @@ Proof with auto using subcapt_reflexivity.
 Qed.
 
 (* Subtyping implies subcapturing *)
-(* Probably not used? *)
 Lemma sub_implies_subcapt : forall E S T C D,
   sub E S T ->
   cv E S C ->
@@ -263,10 +263,6 @@ Admitted.
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
 
-(** Note: this lemma as currently stated is wrong.  There's probably a subcapturing lemma
-    that holds under narrowing but it can't be proven this way.
-    
-    cv recurses into type variables, and hence can shrink when a bound shrinks.  *)
 Lemma cv_narrowing : forall S G Z Q E P C1 C2,
   sub E P Q ->
   cv (G ++ [(Z, bind_sub Q)] ++ E) S C2 ->
@@ -357,7 +353,7 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
     (*apply H2...*)
 Admitted.
 
-Lemma captures_narrowing_typ : forall F X P Q E xs x,  
+Lemma captures_narrowing_typ : forall F X P Q E xs x,
   wf_env (F ++ [(X, bind_typ P)] ++ E) ->
   sub E P Q ->
   captures (F ++ [(X, bind_typ Q)] ++ E) xs x ->
@@ -447,7 +443,10 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
   induction SsubT; intros F EQ; subst...
   Case "sub_top".
     apply sub_top...
-    apply cv_narrowing with (Q := Q)...
+    (* Alex: here we have a CV in the old env, not in the new one. Really seems
+    like we need to existentially quantify the result of the lemma, no? *)
+    (* apply cv_narrowing with (Q := Q)... *)
+    admit.
   Case "sub_refl_tvar".
     apply sub_refl_tvar...
   Case "sub_trans_tvar".
@@ -480,7 +479,8 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing.
   Case "sub_capt".
     constructor...
     apply subcapt_narrowing with (Q := Q)...
-Qed.
+  admit. (* new subtyping case *)
+Admitted.
 
 Lemma empty_cset_implies_no_captures : forall E xs,
   wf_cset E (cset_set xs {}N) ->
@@ -535,7 +535,8 @@ Proof with eauto.
     rewrite elim_empty_nat_set.
     replace ({} `union` {}) with {}...
     fsetdec.
-Qed.
+  - admit.
+Admitted.
 
 Lemma sub_narrowing_typ_aux : forall Q F E x P S T,
   transitivity_on Q ->
@@ -561,7 +562,8 @@ Proof with simpl_env; eauto using wf_typ_narrowing_typ, wf_env_narrowing_typ.
     apply H0...
   - constructor...
     apply subcapt_narrowing_typ with (Q := Q)...
-Qed.
+  - admit.
+Admitted.
 
 (* S <: Q    ->    Q <: T    ->    S <: T*)
 Lemma sub_transitivity : forall Q,
@@ -736,7 +738,7 @@ Lemma correlate_union_cv : forall E C1 C2 D1 D2,
   subcapt E D1 D2 ->
   subcapt E (cset_union C1 D1) (cset_union C2 D2).
 Proof.
-  (* Somehow by transivity. *)
+  (* Somehow by transitivity. *)
 Admitted.
 
 Lemma cv_through_subst_tt : forall X P Q T E G C D,
@@ -981,9 +983,10 @@ Admitted.
 (************************************************************************ *)
 (** ** Substitution preserves typing (8) *)
 
+
 Lemma wf_env_disallows_self_ref : forall F E x T C,
-    wf_env (F ++ [(x, bind_typ T)] ++ E) ->
-    eq (subst_ct x C T) T.
+  wf_env (F ++ [(x, bind_typ T)] ++ E) ->
+  eq (subst_ct x C T) T.
 Proof.
   (* Plan: *)
   (*   - fv(T) subset E *)
@@ -1005,17 +1008,17 @@ Proof
 Admitted.
 
 Lemma wf_cset_from_cv : forall E T C,
-    wf_env E ->
-    cv E T C ->
-    wf_cset E C.
+  wf_env E ->
+  cv E T C ->
+  wf_cset E C.
 Proof.
 Admitted.
 
 (* Not tested to work. *)
 Hint Extern 1 (wf_cset ?E ?C) =>
-match goal with
-| H1: cv ?E _ ?C, H2 : wf_env ?E |- _ => apply (wf_cset_from_cv _ _ _ H2 H1)
-end : core.
+  match goal with
+  | H1: cv ?E _ ?C, H2 : wf_env ?E |- _ => apply (wf_cset_from_cv _ _ _ H2 H1)
+  end : core.
 
 Lemma wf_env_strengthening : forall F E,
     wf_env (F ++ E) ->
@@ -1025,12 +1028,27 @@ Proof.
   admit.
 Admitted.
 
+Lemma cset_subst_self : forall C x,
+    subst_cset x C x = C.
+Proof.
+  trivial.
+  admit.
+Admitted.
+
+Lemma sub_through_subst_ct : forall E F x U C S T,
+  sub (F ++ [(x, bind_typ U)] ++ E) S T ->
+  cv E U C ->
+  sub (map (subst_cb x C) F ++ E) (subst_ct x C S) (subst_ct x C T).
+Proof.
+  trivial.
+  admit.
+Admitted.
+
 Lemma typing_through_subst_ee : forall U E F x T C e u,
   typing (F ++ [(x, bind_typ U)] ++ E) e T ->
   typing E u U ->
   cv E U C ->
   typing (map (subst_cb x C) F ++ E) (subst_ee x u C e) (subst_ct x C T).
-(* begin show *)
 
 (** We provide detailed comments for the following proof, mainly to
     point out several useful tactics and proof techniques.
@@ -1051,6 +1069,9 @@ Proof with simpl_env;
 
   intros *.
   intros HtypT HcvU HtypU.
+  assert (wf_env E) as HwfE. {
+    apply wf_env_strengthening with (F := (F ++ [(x, bind_typ U)]))...
+  }
   remember (F ++ [(x, bind_typ U)] ++ E).
   generalize dependent F.
   induction HtypT; intros F EQ; subst; simpl subst_ee...
@@ -1078,84 +1099,120 @@ Proof with simpl_env;
             rewrite_env tactic, described in the Environment library,
             is one way to perform this rewriting. *)
 
+
       rewrite_env (empty ++ map (subst_cb x C) F ++ E).
       apply typing_weakening...
       * simpl.
-        replace (subst_cset x C x) with C.
+        assert (subst_cset x C x = C) as HeqCset by apply cset_subst_self.
+        rewrite HeqCset...
         assert (eq (subst_ct x C U) U) as Heq. {
           eapply wf_env_disallows_self_ref.
           apply H.
         }
         rewrite Heq...
         apply typing_sub with (S := U)...
-        apply sub_capt
-
-      apply wf_env_subst_cb with (Q := U)...
-      assert (wf_env E) as HwfE. {
-        eauto using wf_env_strengthening.
-      }
-      eauto using wf_cset_from_cv.
-
+        apply sub_anycapt...
+        apply sub_reflexivity...
+      * eapply wf_env_subst_cb...
     (** In the case where x0<>x, the result follows by an exhaustive
         case analysis on exactly where x0 is bound in the environment.
         We perform this case analysis by using the binds_cases tactic,
         described in the Environment library. *)
 
     + SCase "x0 <> x".
+
       binds_cases H0.
-        eauto using wf_env_strengthening.
-        eauto using wf_env_strengthening.
+      * assert ((typ_capt x0 T) = (subst_ct x C (typ_capt x0 T))) as Heq. {
+          apply subst_ct_fresh.
+          (* somehow by larger env being wf *)
+          admit.
+        }
+        rewrite <- Heq.
+        rewrite_env (empty ++ map (subst_cb x C) F ++ E).
+        apply typing_weakening...
+        eapply wf_env_subst_cb...
+      * simpl.
+        assert ((x0 : captureset) = subst_cset x C x0) as Heq. {
+          apply subst_cset_fresh.
+          (* somehow by x0 <> x *)
+          admit.
+        }
+        rewrite <- Heq.
+        apply typing_var.
+        eapply wf_env_subst_cb...
+        assert (binds x0 (bind_typ (subst_ct x C T)) (map (subst_cb x C) F)). {
+          unsimpl (subst_cb x C (bind_typ T)).
+          apply binds_map.
+          trivial.
+        }
+        rewrite <- concat_nil.
+        rewrite -> concat_assoc.
+        apply binds_weaken.
+        ** rewrite -> concat_nil...
+        ** rewrite -> concat_nil...
+           assert (wf_env (map (subst_cb x C) F ++ E))... {
+             eapply wf_env_subst_cb...
+           }
 
   (** Informally, the typing_abs case is a straightforward application
       of the induction hypothesis, which is called H0 here. *)
 
-  Case "typing_abs".
+  - Case "typing_abs".
 
     (** We use the "pick fresh and apply" tactic to apply the rule
         typing_abs without having to calculate the appropriate finite
         set of atoms. *)
 
-    pick fresh y and apply typing_abs.
+    (* seems like for some reason the substitution isn't properly propagated? *)
+    admit.
+(*     pick fresh y and apply typing_abs. *)
 
-    (** We cannot apply H0 directly here.  The first problem is that
-        the induction hypothesis has (subst_ee open_ee), whereas in
-        the goal we have (open_ee subst_ee).  The lemma
-        subst_ee_open_ee_var lets us swap the order of these two
-        operations. *)
+(*     (** We cannot apply H0 directly here.  The first problem is that *)
+(*         the induction hypothesis has (subst_ee open_ee), whereas in *)
+(*         the goal we have (open_ee subst_ee).  The lemma *)
+(*         subst_ee_open_ee_var lets us swap the order of these two *)
+(*         operations. *) *)
 
-    rewrite subst_ee_open_ee_var...
+(*     rewrite subst_ee_open_ee_var... *)
 
-    (** The second problem is how the concatenations are associated in
-        the environments.  In the goal, we currently have
+(*     (** The second problem is how the concatenations are associated in *)
+(*         the environments.  In the goal, we currently have *)
 
-<<       ([(y, bind_typ V)] ++ F ++ E),
->>
-        where concatenation associates to the right.  In order to
-        apply the induction hypothesis, we need
+(* <<       ([(y, bind_typ V)] ++ F ++ E), *)
+(* >> *)
+(*         where concatenation associates to the right.  In order to *)
+(*         apply the induction hypothesis, we need *)
 
-<<        (([(y, bind_typ V)] ++ F) ++ E).
->>
-        We can use the rewrite_env tactic to perform this rewriting,
-        or we can rewrite directly with an appropriate lemma from the
-        Environment library. *)
+(* <<        (([(y, bind_typ V)] ++ F) ++ E). *)
+(* >> *)
+(*         We can use the rewrite_env tactic to perform this rewriting, *)
+(*         or we can rewrite directly with an appropriate lemma from the *)
+(*         Environment library. *) *)
 
-    rewrite <- concat_assoc.
+(*     rewrite <- concat_assoc. *)
 
-    (** Now we can apply the induction hypothesis. *)
+(*     (** Now we can apply the induction hypothesis. *) *)
 
-    apply H0...
+(*     apply H0... *)
 
   (** The remaining cases in this proof are straightforward, given
       everything that we have pointed out above. *)
 
-  Case "typing_tabs".
-    pick fresh Y and apply typing_tabs.
-    rewrite subst_ee_open_te_var...
-    rewrite <- concat_assoc.
-    apply H0...
-Qed.
-(* end show *)
-
+  - Case "typing_app".
+    admit.
+  - Case "typing_tabs".
+    admit.
+    (* pick fresh Y and apply typing_tabs. *)
+    (* rewrite subst_ee_open_te_var... *)
+    (* rewrite <- concat_assoc. *)
+    (* apply H0... *)
+  - Case "typing_tapp".
+    admit.
+  - Case "typing_sub".
+    eapply typing_sub.
+    + apply IHHtypT...
+    + eapply sub_through_subst_ct...
+Admitted.
 
 (************************************************************************ *)
 (** ** Type substitution preserves typing (11) *)
@@ -1168,21 +1225,23 @@ Proof with simpl_env;
            eauto 6 using wf_env_subst_tb,
                          wf_typ_subst_tb,
                          sub_through_subst_tt.
-  intros Q E F Z e T P Typ PsubQ.
+  intros *.
+  intros Typ PsubQ.
   remember (F ++ [(Z, bind_sub Q)] ++ E).
   generalize dependent F.
   induction Typ; intros F EQ; subst;
     simpl subst_te in *; simpl subst_tt in *...
-  Case "typing_var".
+  - Case "typing_var".
     apply typing_var...
       rewrite (map_subst_tb_id E Z P);
         [ | auto | eapply fresh_mid_tail; eauto ].
       binds_cases H0...
-  Case "typing_abs".
-    pick fresh y and apply typing_abs.
-    rewrite subst_te_open_ee_var...
-    rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E).
-    apply H0...
+  - Case "typing_abs".
+    admit.
+    (* pick fresh y and apply typing_abs. *)
+    (* rewrite subst_te_open_ee_var... *)
+    (* rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E). *)
+    (* apply H0... *)
   Case "typing_tabs".
     pick fresh Y and apply typing_tabs.
     rewrite subst_te_open_te_var...

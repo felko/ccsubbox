@@ -833,7 +833,7 @@ Proof with auto*.
   - apply open_ct_rec_type...
 Qed.
 
-Lemma subst_captureset_fresh : forall x c C,
+Lemma subst_cset_fresh : forall x c C,
   x `notin` fv_cset c  ->
   c = subst_cset x C c.
 Proof with auto*.
@@ -848,7 +848,7 @@ Qed.
 Lemma subst_ct_fresh : forall (x: atom) c t,
   x `notin` fv_et t ->
   t = subst_ct x c t.
-Proof with eauto using subst_captureset_fresh.
+Proof with eauto using subst_cset_fresh.
   intros x c t. induction t; intro H ; simpl in *; f_equal...
 Qed.
 
@@ -861,7 +861,7 @@ Proof with auto using subst_ct_fresh.
     destruct (a==x)...
     contradict H; fsetdec.
   - Case "exp_app".
-    apply subst_captureset_fresh...
+    apply subst_cset_fresh...
 Qed.
 
 Lemma subst_capt_open_rec : forall x k c1 c2 c,
