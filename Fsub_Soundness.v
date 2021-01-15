@@ -1075,6 +1075,8 @@ Proof
   (*   inversion Wf_env; simpl_env in *; simpl subst_tb... *)
 Admitted.
 
+(* Alex: on a second look, this is just a mangled version of cv regularity *)
+(* cv regularity is fine as well, potentially also necessary when doing recursion on cv *)
 Lemma wf_cset_from_cv : forall E T C,
   wf_env E ->
   cv E T C ->
@@ -1082,7 +1084,6 @@ Lemma wf_cset_from_cv : forall E T C,
 Proof.
 Admitted.
 
-(* Not tested to work. *)
 Hint Extern 1 (wf_cset ?E ?C) =>
   match goal with
   | H1: cv ?E _ ?C, H2 : wf_env ?E |- _ => apply (wf_cset_from_cv _ _ _ H2 H1)
@@ -1097,7 +1098,7 @@ Proof.
 Admitted.
 
 Lemma cset_subst_self : forall C x,
-    subst_cset x C x = C.
+    subst_cset x C (cset_fvar x) = C.
 Proof.
   trivial.
   admit.
@@ -1110,6 +1111,71 @@ Lemma sub_through_subst_ct : forall E F x U C S T,
 Proof.
   trivial.
   admit.
+Admitted.
+
+Lemma subst_ct_open_ct_var : forall (x y:atom) c t,
+  y <> x ->
+  (* doesn't seem necessary by analogy to subst_ct_open_tt_var *)
+  (* type t -> *)
+  capt c ->
+  (open_ct (subst_ct x c t) (cset_fvar y)) = (subst_ct x c (open_ct t (cset_fvar y))).
+Proof with auto*.
+  admit.
+Admitted.
+
+Lemma subst_ct_open_ct : forall x c1 t c2,
+  capt c1 ->
+  subst_ct x c1 (open_ct t c2) = (open_ct (subst_ct x c1 t) (subst_cset x c1 c2)).
+Proof with auto*.
+  intros.
+  admit.
+Admitted.
+
+Lemma cv_through_subst_c : forall F x U E C T D,
+    cv (F ++ [(x, bind_typ U)] ++ E) T C ->
+    cv E U D ->
+    cv (map (subst_cb x D) F ++ E) (subst_ct x D T) (subst_cset x D C).
+Proof.
+  admit.
+Admitted.
+
+Lemma subcapt_through_subst_cset : forall F x U E C1 C2 D,
+    subcapt (F ++ [(x, bind_typ U)] ++ E) C1 C2 ->
+    cv E U D ->
+    subcapt (map (subst_cb x D) F ++ E) (subst_cset x D C1) (subst_cset x D C2).
+Proof.
+  admit.
+Admitted.
+
+Lemma subst_ct_open_tt : forall x c t1 t2,
+  capt c ->
+  subst_ct x c (open_tt t1 t2) = (open_tt (subst_ct x c t1) (subst_ct x c t2)).
+Proof with auto*.
+  intros.
+  admit.
+Admitted.
+
+Lemma cset_union_empty_idempotent : forall C,
+    cset_union C {}C = C.
+Proof.
+  admit.
+Admitted.
+
+Lemma value_therefore_fv_is_cv : forall E t T C,
+  value t ->
+  typing E t T ->
+  cv E T C ->
+  (free_for_cv t) = C.
+Proof.
+  intros *.
+  intros Hv Htyp Hcv.
+  destruct Hv.
+  + inversion Htyp; subst.
+    inversion Hcv; subst.
+    inversion H5; subst.
+    admit.
+    admit.
+  + admit.
 Admitted.
 
 Lemma typing_through_subst_ee : forall U E F x T C e u,
@@ -1231,51 +1297,54 @@ Proof with simpl_env;
         typing_abs without having to calculate the appropriate finite
         set of atoms. *)
 
-    (* seems like for some reason the substitution isn't properly propagated? *)
-    admit.
-(*     pick fresh y and apply typing_abs. *)
-
-(*     (** We cannot apply H0 directly here.  The first problem is that *)
-(*         the induction hypothesis has (subst_ee open_ee), whereas in *)
-(*         the goal we have (open_ee subst_ee).  The lemma *)
-(*         subst_ee_open_ee_var lets us swap the order of these two *)
-(*         operations. *) *)
-
-(*     rewrite subst_ee_open_ee_var... *)
-
-(*     (** The second problem is how the concatenations are associated in *)
-(*         the environments.  In the goal, we currently have *)
-
-(* <<       ([(y, bind_typ V)] ++ F ++ E), *)
-(* >> *)
-(*         where concatenation associates to the right.  In order to *)
-(*         apply the induction hypothesis, we need *)
-
-(* <<        (([(y, bind_typ V)] ++ F) ++ E). *)
-(* >> *)
-(*         We can use the rewrite_env tactic to perform this rewriting, *)
-(*         or we can rewrite directly with an appropriate lemma from the *)
-(*         Environment library. *) *)
-
-(*     rewrite <- concat_assoc. *)
-
-(*     (** Now we can apply the induction hypothesis. *) *)
-
-(*     apply H0... *)
-
-  (** The remaining cases in this proof are straightforward, given
-      everything that we have pointed out above. *)
-
+    simpl subst_ct.
+    destruct (AtomSet.F.mem x (cset_fvars (free_for_cv e1))) eqn:EqMem.
+    + SCase "x in fv e1".
+      admit.
+    + SCase "x not in fv e1".
+      assert ((subst_cset x C (free_for_cv e1)) = (free_for_cv (subst_ee x u C e1))) as Heq. {
+        (* true b/c of subcase assumption, though probably will need to be shown in multiple steps. *)
+        admit.
+      }
+      rewrite Heq.
+      pick fresh y and apply typing_abs.
+      rewrite subst_ee_open_ee_var...
+      rewrite subst_ct_open_ct_var...
+      rewrite_env (map (subst_cb x C) ([(y, (bind_typ V))] ++ F) ++ E).
+      apply H0...
   - Case "typing_app".
-    admit.
+    rewrite subst_ct_open_ct...
+    eapply typing_app.
+    + simpl subst_ct in IHHtypT1.
+      apply IHHtypT1...
+    + apply IHHtypT2...
+    + eapply sub_through_subst_ct...
+    + eapply cv_through_subst_c...
+    + eapply cv_through_subst_c...
+    + eapply subcapt_through_subst_cset...
+    + eapply subcapt_through_subst_cset...
   - Case "typing_tabs".
-    admit.
-    (* pick fresh Y and apply typing_tabs. *)
-    (* rewrite subst_ee_open_te_var... *)
-    (* rewrite <- concat_assoc. *)
-    (* apply H0... *)
+    simpl subst_ct.
+    destruct (AtomSet.F.mem x (cset_fvars (free_for_cv e1))) eqn:EqMem.
+    + SCase "x in fv e1".
+      admit.
+    + SCase "x not in fv e1".
+      assert ((subst_cset x C (free_for_cv e1)) = (free_for_cv (subst_ee x u C e1))) as Heq. {
+        (* see above. *)
+        admit.
+      }
+      rewrite Heq.
+      pick fresh y and apply typing_tabs.
+      rewrite subst_ee_open_te_var...
+      rewrite subst_ct_open_tt_var...
+      rewrite_env (map (subst_cb x C) ([(y, (bind_sub V))] ++ F) ++ E).
+      apply H0...
   - Case "typing_tapp".
-    admit.
+    rewrite subst_ct_open_tt...
+    eapply typing_tapp.
+    + simpl subst_ct in IHHtypT.
+      apply IHHtypT...
+    + eapply sub_through_subst_ct...
   - Case "typing_sub".
     eapply typing_sub.
     + apply IHHtypT...

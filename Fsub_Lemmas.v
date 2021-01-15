@@ -1211,6 +1211,7 @@ Hint Extern 1 (capt ?C) =>
   match goal with
   | H: subcapt ?E C _ |- _ => go E
   | H: subcapt ?E _ C |- _ => go E
+  | H: cv ?E _ C |- _ => go E
   end
 : core.
 
