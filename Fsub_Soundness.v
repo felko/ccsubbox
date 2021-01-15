@@ -49,7 +49,6 @@ Proof with auto.
   apply cv_typ_var with (T := T)...
 Qed.
 
-
 Lemma captures_weakening : forall E F G xs x,
   captures (G ++ E) xs x ->
   wf_env (G ++ F ++ E) ->
@@ -421,29 +420,51 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing
   induction H; intros; subst.
   - apply captures_in...
   - assert (cv (F ++ [(X, bind_typ P)] ++ E) T (cset_set ys {}N))...
-    eapply captures_var with (T := T).
     { destruct (x == X).
       + (* x == X *)
         binds_cases H.
-        * apply binds_tail.
-          apply binds_tail...
-          trivial.
-        * inversion H4; subst.
+        * eapply captures_var with (T := T).
           apply binds_tail.
-          (* ohoh, and now? *)
-          admit.
-          trivial.
-        * apply binds_head...
-      + (* x <> X *)
-        binds_cases H.
-        * apply binds_tail.
           apply binds_tail...
           trivial.
-        * apply binds_head...
+          apply H3.
+          unfold AtomSet.F.For_all in *. intros.
+          apply H2...
+        * inversion H4; subst.
+          (* here we could choose our own captureset ys, as long as
+             ys <= x
+           *)
+          eapply captures_var.
+          apply binds_tail.
+          apply binds_head...
+          trivial.
+          (* then use sub_implies_subcapt *)
+          destruct (cv_exists E P) as [C CV]...
+          { destruct C.
+            ** (* universal *)
+                exfalso. admit.
+            ** admit.
+          }
+          (* apply H3. *)
+          unfold AtomSet.F.For_all in *. intros.
+          apply H2...
+        * eapply captures_var with (T := T). 
+          apply binds_head...
+          apply H3.
+          unfold AtomSet.F.For_all in *. intros.
+          apply H2...
+      + (* x <> X *)
+        eapply captures_var with (T := T). 
+        { binds_cases H.
+          * apply binds_tail.
+            apply binds_tail...
+            trivial.
+          * apply binds_head...
+        }
+        apply H3.
+        unfold AtomSet.F.For_all in *. intros.
+        apply H2...
     }
-    apply H3.
-    unfold AtomSet.F.For_all in *. intros.
-    apply H2...
 Admitted.
 
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
