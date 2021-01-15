@@ -255,6 +255,7 @@ Proof with eauto*.
 Qed.
 
 (** NEW: Opening with a type and capture variable commute... *)
+(*
 Lemma open_tt_rec_capt_aux : forall T j C i S,
   open_ct_rec j C T = open_tt_rec i S (open_ct_rec j C T) ->
   T = open_tt_rec i S T.
@@ -293,30 +294,61 @@ Ltac cset_cleanup :=
   eauto*;
   try (f_equal; try fsetdec; try fnsetdec).
 
+Lemma natset_inclusion_lemma : forall (A B : nats),
+  B = NatSet.F.union A B ->
+  NatSet.F.Subset A B.
+Proof.
+  intros. unfold NatSet.F.Subset. intros.
+  rewrite H. fnsetdec.
+Qed.
+
+Lemma atomset_inclusion_lemma : forall (A B : atoms),
+  B = AtomSet.F.union A B ->
+  AtomSet.F.Subset A B.
+Proof.
+  intros. unfold AtomSet.F.Subset. intros.
+  rewrite H. fsetdec.
+Qed.
+
 Lemma open_tt_rec_capt_aux : forall T j (X : atom) i S,
   X `notin` ((fv_et T) `union` (fv_et S)) ->
   open_ct_rec j X T = open_tt_rec i S (open_ct_rec j X T) ->
   T = open_tt_rec i S T.
 Proof with eauto*.
-  induction T; intros j X i S Hfresh H; simpl in *; inversion H; f_equal.
+  induction T; intros j X i S Hfresh H; simpl in *; f_equal.
   - Case "typ_bvar".
     destruct (i === n)...
     unfold merge_cset_with_type in *.
     destruct S eqn:HS...
-    inversion H1; subst...
+    inversion H; subst...
     assert ((cset_union c0 c) = c). {
       unfold fv_et in *.
       (** Case 1 : j \notin C, so we have c0 union c = c as a hyp.
           Case 2: j is in C, so we hvae that c0 union (c - j + X) = (c - j + X)
           Now, X is not in c0, so c0 union (c - j) = c - j
       *)
-      destruct (cset_references_bvar_dec j c) eqn:Hj.
-      + admit. 
-      + unfold cset_union in *; destruct c0 eqn:Hc0; destruct c eqn:Hc...
-      unfold open_cset in *.
-      admit.
-      (* cset_split; cset_cleanup; unfold cset_fvar in *; destruct c0 eqn:Hc0; destruct c eqn:Hc; subst...
-      admit. *)
+
+      (** OK, we really need to make this a tactic. *)
+      destruct (cset_references_bvar_dec j c) eqn:Hj...
+      + unfold open_cset in *; rewrite Hj in *;
+        unfold cset_union in *; unfold cset_fvar in *;
+        unfold fv_cset in *;
+        unfold cset_remove_bvar in *; destruct c0 eqn:Hc0; 
+        destruct c eqn:Hc...
+        
+        inversion H1...
+        assert (X `notin` t) by fsetdec.
+        f_equal...
+        * assert (AtomSet.F.Subset t (singleton X `union` t1)).
+          apply atomset_inclusion_lemma...
+          fsetdec.
+        * assert (forall N, NatSet.F.union {}N N = N). { intro. fnsetdec. }
+          rewrite H4 in H3.
+          assert (NatSet.F.Subset t0 (NatSet.F.remove j t2)).
+          apply natset_inclusion_lemma...
+          fnsetdec.
+      + unfold cset_union in *; destruct c0 eqn:Hc0; destruct c eqn:Hc;
+        unfold open_cset in *; rewrite Hj in *; subst...
     }
     rewrite -> H0.
     trivial.
@@ -324,7 +356,7 @@ Proof with eauto*.
   - apply IHT2 with (j := (Datatypes.S j)) (X := X)...
   - apply IHT1 with (j := j) (X := X)...
   - apply IHT2 with (j := j) (X := X)...
-Admitted.
+Qed.
 
 (** Opening a locally closed term is the identity.  This lemma depends
     on the immediately preceding lemma. *)
