@@ -44,23 +44,21 @@ Definition fv_cset (c : captureset) : atoms :=
 (* These are the TYPE variables in types *)
 Fixpoint fv_tt (T : typ) {struct T} : atoms :=
   match T with
-  | typ_top => {}
-  | typ_bvar J => {}
-  | typ_fvar X => singleton X
-  | typ_arrow T1 T2 => (fv_tt T1) `union` (fv_tt T2)
-  | typ_all T1 T2 => (fv_tt T1) `union` (fv_tt T2)
-  | typ_capt C T => fv_tt T
+  | typ_top C => {}
+  | typ_bvar C J => {}
+  | typ_fvar C X => singleton X
+  | typ_arrow C T1 T2 => (fv_tt T1) `union` (fv_tt T2)
+  | typ_all C T1 T2 => (fv_tt T1) `union` (fv_tt T2)
   end.
 
 (* Only in TERM variables in types should capture sets be mentioned *)
 Fixpoint fv_et (T : typ) {struct T} : atoms :=
   match T with
-  | typ_top => {}
-  | typ_bvar J => {}
-  | typ_fvar X => {}
-  | typ_arrow T1 T2 => (fv_et T1) `union` (fv_et T2)
-  | typ_all T1 T2 => (fv_et T1) `union` (fv_et T2)
-  | typ_capt C T => (fv_cset C) `union` (fv_et T)
+  | typ_top C => fv_cset C
+  | typ_bvar C J => fv_cset C
+  | typ_fvar C X => fv_cset C
+  | typ_arrow C T1 T2 => (fv_cset C) `union` (fv_et T1) `union` (fv_et T2)
+  | typ_all C T1 T2 => (fv_cset C) `union` (fv_et T1) `union` (fv_et T2)
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
@@ -103,12 +101,11 @@ Fixpoint fv_ee (e : exp) {struct e} : atoms :=
 
 Fixpoint subst_tt (Z : atom) (U : typ) (T : typ) {struct T} : typ :=
   match T with
-  | typ_top => typ_top
-  | typ_bvar J => typ_bvar J
-  | typ_fvar X => if X == Z then U else T
-  | typ_arrow T1 T2 => typ_arrow (subst_tt Z U T1) (subst_tt Z U T2)
-  | typ_all T1 T2 => typ_all (subst_tt Z U T1) (subst_tt Z U T2)
-  | typ_capt C T1 => typ_capt C (subst_tt Z U T1)
+  | typ_top C => typ_top C
+  | typ_bvar C J => typ_bvar C J
+  | typ_fvar C X => if X == Z then (merge_cset_with_type C U) else T
+  | typ_arrow C T1 T2 => typ_arrow C (subst_tt Z U T1) (subst_tt Z U T2)
+  | typ_all C T1 T2 => typ_all C (subst_tt Z U T1) (subst_tt Z U T2)
   end.
 
 Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
@@ -123,12 +120,11 @@ Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
 
 Fixpoint subst_ct (z : atom) (c : captureset) (T : typ) {struct T} : typ :=
   match T with
-  | typ_top => typ_top
-  | typ_bvar J => typ_bvar J
-  | typ_fvar X => typ_fvar X
-  | typ_arrow T1 T2 => typ_arrow (subst_ct z c T1) (subst_ct z c T2)
-  | typ_all T1 T2 => typ_all (subst_ct z c T1) (subst_ct z c T2)
-  | typ_capt C T1 => typ_capt (subst_cset z c C) (subst_ct z c T1)
+  | typ_top C => typ_top (subst_cset z c C)
+  | typ_bvar C J => typ_bvar (subst_cset z c C) J
+  | typ_fvar C X => typ_fvar (subst_cset z c C) X
+  | typ_arrow C T1 T2 => typ_arrow (subst_cset z c C) (subst_ct z c T1) (subst_ct z c T2)
+  | typ_all C T1 T2 => typ_all (subst_cset z c C) (subst_ct z c T1) (subst_ct z c T2)
   end.
 
 Fixpoint subst_ee (z : atom) (u : exp) (c : captureset) (e : exp) {struct e} : exp :=
@@ -264,7 +260,71 @@ Lemma open_tt_rec_capt_aux : forall T j C i S,
   T = open_tt_rec i S T.
 Proof with eauto*.
   induction T; intros j C i S H; simpl in *; inversion H; f_equal...
+  Case "typ_bvar".
+    destruct (i === n)...
+    unfold merge_cset_with_type in *.
+    destruct S...
+    assert (open_cset j C c = c). { admit. }
+    rewrite <- H0.
+    auto.
 Qed.
+*)
+
+
+(** TODO: move these tactics into CaptureSet.v *)
+Ltac cset_split := repeat (
+  try csethyp;
+  match goal with
+  | H : _ |- context R [(cset_references_bvar_dec ?I ?C)] =>
+    idtac "Destructing" I "in" C; let H_destruct := fresh "H_destruct" in case_eq (cset_references_bvar_dec I C); 
+      intro H_destruct; try rewrite H_destruct in *
+  | H : _ |- context R [(cset_references_fvar_dec ?I ?C)] =>
+    idtac "Destructing" I "in" C; let H_destruct := fresh "H_destruct" in case_eq (cset_references_fvar_dec I C);
+      intro H_destruct; try rewrite H_destruct in *
+  end
+).
+
+Ltac cset_cleanup :=
+  try rewrite cset_references_bvar_eq in *;
+  try rewrite cset_references_fvar_eq in *;
+  try rewrite cset_not_references_fvar_eq in *;
+  try rewrite cset_not_references_bvar_eq in *;
+  csetdec;
+  eauto*;
+  try (f_equal; try fsetdec; try fnsetdec).
+
+Lemma open_tt_rec_capt_aux : forall T j (X : atom) i S,
+  X `notin` ((fv_et T) `union` (fv_et S)) ->
+  open_ct_rec j X T = open_tt_rec i S (open_ct_rec j X T) ->
+  T = open_tt_rec i S T.
+Proof with eauto*.
+  induction T; intros j X i S Hfresh H; simpl in *; inversion H; f_equal.
+  - Case "typ_bvar".
+    destruct (i === n)...
+    unfold merge_cset_with_type in *.
+    destruct S eqn:HS...
+    inversion H1; subst...
+    assert ((cset_union c0 c) = c). {
+      unfold fv_et in *.
+      (** Case 1 : j \notin C, so we have c0 union c = c as a hyp.
+          Case 2: j is in C, so we hvae that c0 union (c - j + X) = (c - j + X)
+          Now, X is not in c0, so c0 union (c - j) = c - j
+      *)
+      destruct (cset_references_bvar_dec j c) eqn:Hj.
+      + admit. 
+      + unfold cset_union in *; destruct c0 eqn:Hc0; destruct c eqn:Hc...
+      unfold open_cset in *.
+      admit.
+      (* cset_split; cset_cleanup; unfold cset_fvar in *; destruct c0 eqn:Hc0; destruct c eqn:Hc; subst...
+      admit. *)
+    }
+    rewrite -> H0.
+    trivial.
+  - apply IHT1 with (j := j) (X := X)...
+  - apply IHT2 with (j := (Datatypes.S j)) (X := X)...
+  - apply IHT1 with (j := j) (X := X)...
+  - apply IHT2 with (j := j) (X := X)...
+Admitted.
 
 (** Opening a locally closed term is the identity.  This lemma depends
     on the immediately preceding lemma. *)
@@ -276,11 +336,11 @@ Proof with auto*.
   intros T U k Htyp. revert k.
   induction Htyp; intros k; simpl; f_equal...
   (** NEW: Just dealing with the case when we open a capture set in the -> constructor. *)
-  Case "typ_arrow".
+  - Case "typ_arrow".
     unfold open_ct in *.
     pick fresh X.
     apply (open_tt_rec_capt_aux T2 0 X)...
-  Case "typ_all".
+  - Case "typ_all".
     unfold open_tt in *.
     pick fresh X.
     apply (open_tt_rec_type_aux T2 0 X)...
@@ -312,9 +372,11 @@ Proof with auto*.
   induction T1; intros k; simpl; f_equal...
   Case "typ_bvar".
     destruct (k === n); subst...
+    admit.
   Case "typ_fvar".
     destruct (a == X); subst... apply open_tt_rec_type...
-Qed.
+    admit.
+Admitted.
 
 (** The next lemma is a direct corollary of the immediately preceding
     lemma---the index is specialized to zero. *)
@@ -353,14 +415,15 @@ Qed.
 
 Lemma subst_tt_intro_rec : forall X T2 U k,
   X `notin` fv_tt T2 ->
-  open_tt_rec k U T2 = subst_tt X U (open_tt_rec k (typ_fvar X) T2).
+  open_tt_rec k U T2 = subst_tt X U (open_tt_rec k (typ_fvar {}C X) T2).
 Proof with auto*.
   induction T2; intros U k Fr; simpl in *; f_equal...
   Case "typ_bvar".
     destruct (k === n)... simpl. destruct (X == X)...
+    admit.
   Case "typ_fvar".
     destruct (a == X)... contradict Fr; fsetdec.
-Qed.
+Admitted.
 
 (** The next lemma is a direct corollary of the immediately preceding
     lemma---the index is specialized to zero.  *)
@@ -547,27 +610,6 @@ Proof with eauto*.
   * rewrite cset_not_references_bvar_eq in H. intuition.
 Qed.
 
-(** TODO: move these tactics into CaptureSet.v *)
-Ltac cset_split := repeat (
-  try csethyp;
-  match goal with
-  | H : _ |- context R [(cset_references_bvar_dec ?I ?C)] =>
-    idtac "Destructing" I "in" C; let H_destruct := fresh "H_destruct" in case_eq (cset_references_bvar_dec I C); 
-      intro H_destruct; try rewrite H_destruct in *
-  | H : _ |- context R [(cset_references_fvar_dec ?I ?C)] =>
-    idtac "Destructing" I "in" C; let H_destruct := fresh "H_destruct" in case_eq (cset_references_fvar_dec I C);
-      intro H_destruct; try rewrite H_destruct in *
-  end
-).
-
-Ltac cset_cleanup :=
-  try rewrite cset_references_bvar_eq in *;
-  try rewrite cset_references_fvar_eq in *;
-  try rewrite cset_not_references_fvar_eq in *;
-  try rewrite cset_not_references_bvar_eq in *;
-  csetdec;
-  eauto*;
-  try (f_equal; try fsetdec; try fnsetdec).
 
 Lemma cset_open_unused_bvar : forall i C c,
   ~ (cset_references_bvar i c) ->
