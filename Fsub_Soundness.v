@@ -84,24 +84,39 @@ Qed.
 Lemma sub_weakening : forall E F G S T,
   sub (G ++ E) S T ->
   wf_env (G ++ F ++ E) ->
-  sub (G ++ F ++ E) S T.
-Proof with simpl_env; auto using wf_typ_weakening, cv_weakening, subcapt_weakening, wf_cset_weakening.
+  sub (G ++ F ++ E) S T
+with sub_pre_weakening : forall E F G S T,
+  sub_pre (G ++ E) S T ->
+  wf_env (G ++ F ++ E) ->
+  sub_pre (G ++ F ++ E) S T.
+Proof with simpl_env; auto using wf_typ_weakening, wf_pretyp_weakening, cv_weakening, subcapt_weakening, wf_cset_weakening.
+------
   intros E F G S T Sub Ok.
   remember (G ++ E).
   generalize dependent G.
-  induction Sub; intros G Ok EQ; subst...
-  - Case "sub_top".
-    apply sub_top with (C1 := C1)...
+  induction Sub; intros G Ok EQ; subst.
+  - Case "sub_refl_tvar".
+    apply sub_refl_tvar...
   - Case "sub_trans_tvar".
     apply (sub_trans_tvar U)...
+  - apply sub_capt...
+------
+  intros E F G S T Sub Ok.
+  remember (G ++ E).
+  generalize dependent G.
+  induction Sub; intros G Ok EQ; subst.
+  - Case "sub_top".
+    apply sub_top...
   - Case "sub_arrow".
-    pick fresh Y and apply sub_arrow...
+    pick fresh Y and apply sub_arrow.
+    apply cheat.
     rewrite <- concat_assoc.
-    apply H1...
+    apply sub_weakening...
   - Case "sub_all".
-    pick fresh Y and apply sub_all...
+    pick fresh Y and apply sub_all.
+    apply cheat.
     rewrite <- concat_assoc.
-    apply H1...
+    apply sub_weakening...
 Qed.
 
 (* ********************************************************************** *)
