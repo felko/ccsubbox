@@ -1462,6 +1462,13 @@ Hint Extern 1 (wf_typ ?E ?T) =>
   end
 : core.
 
+Hint Extern 1 (wf_pretyp ?E ?T) =>
+  match goal with
+  | H: sub_pre E T _ |- _ => apply (proj1 (proj2 (sub_pre_regular _ _ _ H)))
+  | H: sub_pre E _ T |- _ => apply (proj2 (proj2 (sub_pre_regular _ _ _ H)))
+  end
+: core.
+
 Hint Extern 1 (type ?T) =>
   let go E := apply (type_from_wf_typ E); auto in
   match goal with
@@ -1469,6 +1476,15 @@ Hint Extern 1 (type ?T) =>
   | H: sub ?E T _ |- _ => go E
   | H: sub ?E _ T |- _ => go E
   | H: wf_typ ?E T |- _ => go E
+  end
+: core.
+
+Hint Extern 1 (pretype ?T) =>
+  let go E := apply (pretype_from_wf_pretyp E); auto in
+  match goal with
+  | H: sub_pre ?E T _ |- _ => go E
+  | H: sub_pre ?E _ T |- _ => go E
+  | H: wf_pretyp ?E T |- _ => go E
   end
 : core.
 

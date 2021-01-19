@@ -44,7 +44,9 @@ Require Import Coq.Program.Wf.
 
 (exc: E) => ... [X <: Any] => (x: X) => [Y <: {exc} X] *)
 Inductive typ : Type :=
+  (* C P *)
   | typ_capt : captureset -> pretyp -> typ
+  (* X *)
   | typ_bvar : nat -> typ
   | typ_fvar : atom -> typ  
 with pretyp : Type :=
