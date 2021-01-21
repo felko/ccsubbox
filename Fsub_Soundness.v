@@ -1071,8 +1071,6 @@ Proof with simpl_env;
     (* apply wf_typ_weakening... *)
     (* rewrite <- concat_assoc. *)
     (* admit. *)
-  - Case "typing_app".
-    admit.
   - Case "typing_arrow".
     pick fresh X and apply typing_tabs.
     lapply (H X); [intros K | auto].
@@ -1097,14 +1095,10 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
     binds_cases H0...
   - Case "typing_var".
     binds_cases H0...
-  - Case "typing_var".
-    binds_cases H0...
   - Case "typing_abs".
     pick fresh y and apply typing_abs.
     rewrite <- concat_assoc.
     apply H0...
-  - Case "typing_app".
-    eapply typing_app_mono...
   - Case "typing_tabs".
     pick fresh Y and apply typing_tabs.
     rewrite <- concat_assoc.
@@ -1322,7 +1316,7 @@ Proof with simpl_env;
       replace (subst_cset x C x0) with (cset_fvar x0).
 
       binds_cases H0.
-      * apply typing_var_poly.
+      * apply typing_var.
         (* wf_env *)
         admit.
         apply binds_tail.

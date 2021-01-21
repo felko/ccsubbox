@@ -604,14 +604,10 @@ Inductive typing : env -> exp -> typ -> Prop :=
       wf_env E ->
       binds x (bind_typ (typ_fvar X)) E ->
       typing E (exp_fvar x) (typ_fvar X)
-  | typing_var_poly : forall E x P,
+  | typing_var : forall E x P,
       wf_env E ->
       binds x (bind_typ (typ_capt cset_universal P)) E ->
       typing E (exp_fvar x) (typ_capt x P)
-  | typing_var_mono : forall E x xs P,
-      wf_env E ->
-      binds x (bind_typ (typ_capt (cset_set xs {}N) P)) E ->
-      typing E (exp_fvar x) (typ_capt (cset_set xs {}N) P)
   | typing_abs : forall L E V e1 T1,
       (forall x : atom, x `notin` L ->
         typing ([(x, bind_typ V)] ++ E) (open_ee e1 x x) (open_ct T1 x)) ->
@@ -620,19 +616,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
 
           In a type-variable-only-land, we'd probably do cv(x) = {T} if x : T in E.*)
       typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
-  | typing_app_mono : forall T1 E e1 C e2 T2 Cf Cv Cv' T1',
-      typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
-      typing E e2 T1' ->
-      sub E T1 T1' ->
-      cv E T1' Cv' ->
-      cv E T1 Cv ->
-      subcapt E Cv' C ->
-      subcapt E C   Cv ->
-      (* TODO this is NOT in line with wf of arrow where we alwasy open the body  
-         we should really have two different abstractions and applications...
-      *)
-      typing E (exp_app e1 C e2) (open_ct T2 C)
-  | typing_app_poly : forall P P' E e1 C C' e2 T Cf,
+  | typing_app : forall P P' E e1 C C' e2 T Cf,
       typing E e1 (typ_capt Cf (typ_arrow (typ_capt cset_universal P) T)) ->
       typing E e2 (typ_capt C' P') ->
       sub E (typ_capt C' P') (typ_capt C P) ->
@@ -709,4 +693,4 @@ Inductive red : exp -> exp -> Prop :=
 
 Hint Constructors type pretype expr capt wf_typ wf_pretyp wf_env value red cv sub captures subcapt typing wf_cset : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
-Hint Resolve typing_var_tvar typing_var_poly typing_var_mono typing_app_mono typing_app_poly typing_tapp typing_sub : core.
+Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
