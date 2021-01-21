@@ -1224,22 +1224,30 @@ Proof.
   admit.
 Admitted.
 
-Lemma value_therefore_fv_is_cv : forall E t T C,
+Lemma value_therefore_fv_subcapt_cv : forall E t T C,
   value t ->
   typing E t T ->
   cv E T C ->
-  (free_for_cv t) = C.
-Proof.
+  subcapt E (free_for_cv t) C.
+Proof with subst; simpl; auto.
   intros *.
   intros Hv Htyp Hcv.
-  destruct Hv.
-  + inversion Htyp; subst.
-    inversion Hcv; subst.
-    inversion H; subst.
-    admit.
-    admit.
-  + admit.
-Admitted.
+  generalize dependent C.
+  pose proof (typing_regular _ _ _ Htyp) as [P1 [P2 P3]].
+  induction Htyp.
+  all: intros C0 Hcv.
+  all: try solve [ inversion Hv ].
+  - inversion Hcv...
+    apply subcapt_reflexivity...
+  - inversion Hcv.
+    apply subcapt_reflexivity...
+  - epose proof (cv_exists E S P1 _ ) as [D HcvS].
+    pose proof (sub_implies_subcapt _ _ _ _ _ H HcvS Hcv).
+    epose proof (IHHtyp Hv _ _ _ D HcvS)...
+    apply subcapt_transitivity with (C2 := D)...
+    Unshelve.
+    all: auto.
+Qed.
 
 Lemma typing_through_subst_ee : forall U E F x T C e u,
   typing (F ++ [(x, bind_typ U)] ++ E) e T ->
