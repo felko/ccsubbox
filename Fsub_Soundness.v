@@ -1243,7 +1243,11 @@ Proof with subst; simpl; auto.
   - inversion Hcv.
     apply subcapt_reflexivity...
   - epose proof (cv_exists E S P1 _ ) as [D HcvS].
-    pose proof (sub_implies_subcapt _ _ _ _ _ H HcvS Hcv).
+    (** Edward: Hints are not working for me here.  Which version of
+        Coq are people using?  I'm using 8.10.2 *)
+    epose proof (cv_wf E S D _ _ _).
+    epose proof (cv_wf E T C0 _ _ _).
+    pose proof (sub_implies_subcapt _ _ _ _ _ H H0 H1).
     epose proof (IHHtyp Hv _ _ _ D HcvS)...
     apply subcapt_transitivity with (C2 := D)...
     Unshelve.
@@ -1491,25 +1495,29 @@ Proof with simpl_env;
   induction Typ; intros F EQ; subst;
     simpl subst_te in *; simpl subst_tt in *...
   - Case "typing_var".
-    apply typing_var...
+  (*
+    apply typing_var.
       rewrite (map_subst_tb_id E Z P);
         [ | auto | eapply fresh_mid_tail; eauto ].
-      binds_cases H0...
+      binds_cases H0... *)
+    admit.
   - Case "typing_abs".
     admit.
     (* pick fresh y and apply typing_abs. *)
     (* rewrite subst_te_open_ee_var... *)
     (* rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E). *)
     (* apply H0... *)
-  Case "typing_tabs".
+  - Case "typing_tabs".
+  (*
     pick fresh Y and apply typing_tabs.
     rewrite subst_te_open_te_var...
     rewrite subst_tt_open_tt_var...
     rewrite_env (map (subst_tb Z P) ([(Y, bind_sub V)] ++ F) ++ E).
     apply H0...
   Case "typing_tapp".
-    rewrite subst_tt_open_tt...
-Qed.
+    rewrite subst_tt_open_tt... *)
+  admit.
+Admitted.
 
 
 (* ********************************************************************** *)
@@ -1521,11 +1529,14 @@ Qed.
 
 Lemma typing_inv_abs : forall E S1 e1 T,
   typing E (exp_abs S1 e1) T ->
-  forall U1 U2, sub E T (typ_arrow U1 U2) ->
+  forall U1 U2 C, sub E T (typ_capt C (typ_arrow U1 U2)) ->
      sub E U1 S1
   /\ exists S2, exists L, forall x, x `notin` L ->
-     typing ([(x, bind_typ S1)] ++ E) (open_ee e1 x) S2 /\ sub E S2 U2.
+     typing ([(x, bind_typ S1)] ++ E) (open_ee e1 x x) S2 /\ sub E S2 U2.
 Proof with auto.
+  admit.
+Admitted.
+(*
   intros E S1 e1 T Typ.
   remember (exp_abs S1 e1).
   generalize dependent e1.
@@ -1537,16 +1548,18 @@ Proof with auto.
     exists T1. exists L...
   Case "typing_sub".
     auto using (sub_transitivity T).
-Qed.
+Qed. *)
 
 Lemma typing_inv_tabs : forall E S1 e1 T,
   typing E (exp_tabs S1 e1) T ->
-  forall U1 U2, sub E T (typ_all U1 U2) ->
+  forall U1 U2 C, sub E T (typ_capt C (typ_all U1 U2)) ->
      sub E U1 S1
   /\ exists S2, exists L, forall X, X `notin` L ->
      typing ([(X, bind_sub U1)] ++ E) (open_te e1 X) (open_tt S2 X)
      /\ sub ([(X, bind_sub U1)] ++ E) (open_tt S2 X) (open_tt U2 X).
 Proof with simpl_env; auto.
+  Admitted.
+(*
   intros E S1 e1 T Typ.
   remember (exp_tabs S1 e1).
   generalize dependent e1.
@@ -1564,7 +1577,7 @@ Proof with simpl_env; auto.
   Case "typing_sub".
     auto using (sub_transitivity T).
 Qed.
-
+*)
 
 
 (* ********************************************************************** *)
@@ -1580,21 +1593,23 @@ Proof with simpl_env; eauto.
   Case "typing_app".
     inversion Red; subst...
     SCase "red_abs".
-      destruct (typing_inv_abs _ _ _ _ Typ1 T1 T2) as [P1 [S2 [L P2]]].
+      destruct (typing_inv_abs _ _ _ _ Typ1 T1 T2 Cf) as [P1 [S2 [L P2]]].
         apply sub_reflexivity...
       pick fresh x.
       destruct (P2 x) as [? ?]...
       rewrite (subst_ee_intro x)...
       rewrite_env (empty ++ E).
+      admit.
+      (*
       apply (typing_through_subst_ee T).
         apply (typing_sub S2)...
           rewrite_env (empty ++ [(x, bind_typ T)] ++ E).
           apply sub_weakening...
-        eauto.
+        eauto. *)
   Case "typing_tapp".
     inversion Red; subst...
     SCase "red_tabs".
-      destruct (typing_inv_tabs _ _ _ _ Typ T1 T2) as [P1 [S2 [L P2]]].
+      destruct (typing_inv_tabs _ _ _ _ Typ T1 T2 C) as [P1 [S2 [L P2]]].
         apply sub_reflexivity...
       pick fresh X.
       destruct (P2 X) as [? ?]...
@@ -1602,7 +1617,7 @@ Proof with simpl_env; eauto.
       rewrite (subst_tt_intro X)...
       rewrite_env (map (subst_tb X T) empty ++ E).
       apply (typing_through_subst_te T1)...
-Qed.
+Admitted.
 
 
 (* ********************************************************************** *)
@@ -1612,37 +1627,40 @@ Qed.
 (* ********************************************************************** *)
 (** ** Canonical forms (14) *)
 
-Lemma canonical_form_abs : forall e U1 U2,
+Lemma canonical_form_abs : forall e U1 U2 C,
   value e ->
-  typing empty e (typ_arrow U1 U2) ->
+  typing empty e (typ_capt C (typ_arrow U1 U2)) ->
   exists V, exists e1, e = exp_abs V e1.
 Proof.
-  intros e U1 U2 Val Typ.
+  intros e U1 U2 C Val Typ.
   remember empty.
   remember (typ_arrow U1 U2).
-  revert U1 U2 Heqt Heql.
+  revert U1 U2 Heqp Heql.
   induction Typ; intros U1 U2 EQT EQE; subst;
     try solve [ inversion Val | inversion EQT | eauto ].
   Case "typing_sub".
+  (*
     inversion H; subst; eauto.
-    inversion H0.
-Qed.
+    inversion H0. *)
+    admit.
+Admitted.
 
-Lemma canonical_form_tabs : forall e U1 U2,
+Lemma canonical_form_tabs : forall e U1 U2 C,
   value e ->
-  typing empty e (typ_all U1 U2) ->
+  typing empty e (typ_capt C (typ_all U1 U2)) ->
   exists V, exists e1, e = exp_tabs V e1.
 Proof.
-  intros e U1 U2 Val Typ.
+  intros e U1 U2 C Val Typ.
   remember empty.
   remember (typ_all U1 U2).
-  revert U1 U2 Heqt Heql.
+  revert U1 U2 Heqp Heql.
   induction Typ; intros U1 U2 EQT EQE; subst;
     try solve [ inversion Val | inversion EQT | eauto ].
   Case "typing_sub".
-    inversion H; subst; eauto.
-    inversion H0.
-Qed.
+    (*inversion H; subst; eauto.
+    inversion H0.*)
+    admit.
+Admitted.
 
 
 
@@ -1660,19 +1678,20 @@ Proof with eauto.
   Case "typing_var".
     inversion H0.
   Case "typing_app".
-    right.
+    inversion H0.
     destruct IHTyp1 as [Val1 | [e1' Rede1']]...
     SCase "Val1".
       destruct IHTyp2 as [Val2 | [e2' Rede2']]...
       SSCase "Val2".
-        destruct (canonical_form_abs _ _ _ Val1 Typ1) as [S [e3 EQ]].
+        destruct (canonical_form_abs _ _ _ _ Val1 Typ1) as [S [e3 EQ]].
         subst.
-        exists (open_ee e3 e2)...
+        right.
+        exists (open_ee e3 e2 C)...
   Case "typing_tapp".
     right.
     destruct IHTyp as [Val1 | [e1' Rede1']]...
     SCase "Val1".
-      destruct (canonical_form_tabs _ _ _ Val1 Typ) as [S [e3 EQ]].
+      destruct (canonical_form_tabs _ _ _ _ Val1 Typ) as [S [e3 EQ]].
       subst.
       exists (open_te e3 T)...
 Qed.
