@@ -237,6 +237,7 @@ Lemma cv_unique : forall T E C1 C2,
   C1 = C2.
 Proof with eauto.
   intros T E C1 C2 Hwf Hcv1 Hcv2.
+  induction Hcv1; inversion Hcv2; subst.
 Admitted.
 
 Lemma captures_transitivity : forall E xs ys x,
@@ -316,15 +317,25 @@ Qed.
 (* Subtyping implies subcapturing *)
 Lemma sub_implies_subcapt : forall E S T C D,
   sub E S T ->
+  wf_cset E C ->
+  wf_cset E D ->
   cv E S C ->
   cv E T D ->
   subcapt E C D.
-Proof.
-  intros E S T C D Hsub HcvC HcvD.
-  induction Hsub...
-  (** needs cv_unique *)
-  admit.
-Admitted.
+Proof with eauto using subcapt_reflexivity.
+  intros E S T C D Hsub WfC WfD HcvC HcvD.
+
+  induction Hsub; destruct C; destruct D; try solve [inversion HcvC; inversion HcvD; eauto].  
+  - pose proof (cv_unique _ _ _ _ H HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ H HcvC HcvD) as Eq; inversion Eq...
+  (* TODO factor into lemma binds_unique *)
+  - inversion HcvC; subst. inversion H1. inversion H. rewrite H4 in H2. inversion H2; subst.
+    apply IHHsub...
+  - inversion HcvC; subst. inversion H1. inversion H. rewrite H4 in H2. inversion H2; subst.
+    apply IHHsub...
+  - inversion HcvC; subst. inversion HcvD; subst...
+  - inversion HcvC; subst. inversion HcvD; subst...
+Qed.
 
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)

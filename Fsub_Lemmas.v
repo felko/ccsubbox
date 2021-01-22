@@ -1418,7 +1418,8 @@ Qed.
 
 Hint Extern 1 (wf_cset ?E ?C) =>
   match goal with
-  | H: subcapt _ _ _ |- _ => apply (proj1 (subcapt_regular _ _ _ H))
+  | H: subcapt _ C _ |- _ => apply (proj1 (subcapt_regular _ _ _ H))
+  | H: subcapt _ _ C |- _ => apply (proj2 (subcapt_regular _ _ _ H))
   end
 : core.
 
