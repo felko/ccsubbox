@@ -1105,10 +1105,9 @@ Admitted.
 (************************************************************************ *)
 (** ** Substitution preserves typing (8) *)
 
-
-Lemma wf_env_disallows_self_ref : forall F E x P C,
-  wf_env (F ++ [(x, bind_typ (typ_capt cset_universal P))] ++ E) ->
-  P = subst_cpt x C P.
+Lemma self_subst_idempotent : forall F E x T D,
+  wf_env (F ++ [(x, bind_typ T)] ++ E) ->
+  subst_ct x D T = T.
 Proof.
   (* Plan: *)
   (*   - fv(T) subset E *)
@@ -1268,9 +1267,15 @@ Proof with simpl_env;
   assert (wf_env E) as HwfE. {
     apply wf_env_strengthening with (F := (F ++ [(x, bind_typ U)]))...
   }
+  (* assert (wf_env (F ++ [(x, bind_typ U)] ++ E)) as HwfFxE by auto. *)
+  (* assert (wf_env (map (subst_cb x C) F ++ E)) as HwfsubstFE. { *)
+  (*   (* rewrite_env (map (subst_cb x C) F ++ E). *) *)
+  (*   eapply wf_env_subst_cb... *)
+  (* } *)
   remember (F ++ [(x, bind_typ U)] ++ E).
   generalize dependent F.
   induction HtypT; intros F EQ; subst; simpl subst_ee...
+  (* induction HtypT; intros F EQ HwfsubstFE; subst; simpl subst_ee... *)
 
   (** The typing_var case involves a case analysis on whether the
       variable is the same as the one being substituted for. *)
@@ -1293,121 +1298,23 @@ Proof with simpl_env;
         replace (bind_typ X) with (subst_cb x C (bind_typ X))...
   - Case "typing_var".
     destruct (x0 == x); subst.
-    + binds_get H0.
-      inversion H2; inversion HtypU; subst.
-      rewrite_env (empty ++ map (subst_cb x C) F ++ E).
-      apply typing_weakening...
-      unfold subst_ct. fold subst_cpt.
-      (* by simpl. *)
-      replace (subst_cset x cset_universal x) with cset_universal.
-      (* since x not in P *)
-      replace (subst_cpt x cset_universal P) with P.
-      trivial.
-      eapply wf_env_disallows_self_ref.
-      apply H.
-      admit.
-      admit.
-    + simpl subst_ct.
-      replace (subst_cset x C x0) with (cset_fvar x0).
-
-      binds_cases H0.
-      * apply typing_var.
-        (* wf_env *)
-        admit.
-        apply binds_tail.
-      replace (bind_typ (typ_capt cset_universal (subst_cpt x C P))) with (subst_cb x C (bind_typ (typ_capt cset_universal P))).
-      apply binds_map.
-
-      * assert ((typ_capt x0 T) = (subst_ct x C (typ_capt x0 T))) as Heq. {
-          apply subst_ct_fresh.
-          (* somehow by larger env being wf *)
-          admit.
-        }
-        rewrite <- Heq.
-        rewrite_env (empty ++ map (subst_cb x C) F ++ E).
-        apply typing_weakening...
-        eapply wf_env_subst_cb...
-      * simpl.
-        assert ((x0 : captureset) = subst_cset x C x0) as Heq. {
-          apply subst_cset_fresh.
-          (* somehow by x0 <> x *)
-          admit.
-        }
-        rewrite <- Heq.
-        apply typing_var.
-        eapply wf_env_subst_cb...
-        assert (binds x0 (bind_typ (subst_ct x C T)) (map (subst_cb x C) F)). {
-          unsimpl (subst_cb x C (bind_typ T)).
-          apply binds_map.
-          trivial.
-        }
-        rewrite <- concat_nil.
-        rewrite -> concat_assoc.
-        apply binds_weaken.
-        ** rewrite -> concat_nil...
-        ** rewrite -> concat_nil...
-          assert (wf_env (map (subst_cb x C) F ++ E))... {
-            eapply wf_env_subst_cb...
-          }
-
-
-      simpl.
-        binds_cases H0...
-        * rewrite_env (empty ++ map (subst_cb x C) F ++ E).
-          apply typing_weakening...
-          eapply wf_env_subst_cb...
-        * apply typing_var_tvar...
-          eapply wf_env_subst_cb...
-          apply binds_head.
-          replace (bind_typ X) with (subst_cb x C (bind_typ X))...
-  - Case "typing_var".
-    destruct (x0 == x); subst.
-
-    (** In the case where x0=x, we first observe that hypothesis H0
-        implies that T=U, since x can only be bound once in the
-        environment.  The conclusion then follows from hypothesis TypU
-        and weakening.  We can use the binds_get tactic, described in
-        the Environment library, with H0 to obtain the fact that
-        T=U. *)
-
     + SCase "x0 = x".
       binds_get H0.
       inversion H2; subst.
-
-      (** In order to apply typing_weakening, we need to rewrite the
-            environment so that it has the right shape.  (We could
-            also prove a corollary of typing_weakening.)  The
-            rewrite_env tactic, described in the Environment library,
-            is one way to perform this rewriting. *)
-
-
       rewrite_env (empty ++ map (subst_cb x C) F ++ E).
       apply typing_weakening...
-
+      * inversion HtypU; subst.
+        simpl.
+        rewrite cset_subst_self.
+        pose proof (self_subst_idempotent _ _ _ _ C H) as Heq.
+        injection Heq.
+        intros HeqP _.
+        rewrite HeqP.
+        trivial.
       * eapply wf_env_subst_cb...
-
-
-      * simpl.
-      assert (subst_cset x C x = C) as HeqCset by apply cset_subst_self.
-      rewrite HeqCset...
-      assert (eq (subst_ct x C U) U) as Heq. {
-        eapply wf_env_disallows_self_ref.
-        apply H.
-      }
-      rewrite Heq...
-      apply typing_sub with (S := U)...
-      apply sub_anycapt...
-      apply sub_reflexivity...
-
-    (** In the case where x0<>x, the result follows by an exhaustive
-        case analysis on exactly where x0 is bound in the environment.
-        We perform this case analysis by using the binds_cases tactic,
-        described in the Environment library. *)
-
     + SCase "x0 <> x".
-
       binds_cases H0.
-      * assert ((typ_capt x0 T) = (subst_ct x C (typ_capt x0 T))) as Heq. {
+      * assert ((typ_capt x0 P) = (subst_ct x C (typ_capt x0 P))) as Heq. {
           apply subst_ct_fresh.
           (* somehow by larger env being wf *)
           admit.
@@ -1417,16 +1324,17 @@ Proof with simpl_env;
         apply typing_weakening...
         eapply wf_env_subst_cb...
       * simpl.
-        assert ((x0 : captureset) = subst_cset x C x0) as Heq. {
-          apply subst_cset_fresh.
-          (* somehow by x0 <> x *)
-          admit.
-        }
-        rewrite <- Heq.
-        apply typing_var.
+        rewrite <- (subst_cset_fresh x).
+        2: notin_solve.
+        eapply typing_var.
         eapply wf_env_subst_cb...
-        assert (binds x0 (bind_typ (subst_ct x C T)) (map (subst_cb x C) F)). {
-          unsimpl (subst_cb x C (bind_typ T)).
+        (* heavy environment wrangling ahead... *)
+        assert (binds x0 (bind_typ (subst_ct x C (typ_capt C0 P))) (map (subst_cb x C) F)). {
+          (* unsimpl (subst_cb x C (bind_typ (typ_capt C0 P))). *)
+          assert
+            ((subst_cb x C (bind_typ (typ_capt C0 P))) = (bind_typ (subst_ct x C (typ_capt C0 P))))
+            as H_y_u_no_unsimpl_coq by (simpl; reflexivity).
+          rewrite <- H_y_u_no_unsimpl_coq.
           apply binds_map.
           trivial.
         }
@@ -1451,7 +1359,59 @@ Proof with simpl_env;
     simpl subst_ct.
     destruct (AtomSet.F.mem x (cset_fvars (free_for_cv e1))) eqn:EqMem.
     + SCase "x in fv e1".
-      admit.
+      eenough (typing (map (subst_cb x C) F ++ E)
+                      _
+                      (typ_capt
+                         (free_for_cv (subst_ee x u C e1))
+                         (typ_arrow (subst_ct x C V) (subst_ct x C T1)))).
+      * Set Nested Proofs Allowed.
+        Local Lemma foo : forall x C e,
+            AtomSet.F.In x (cset_fvars (free_for_cv e)) ->
+            subst_cset x C (free_for_cv e) = cset_union C (cset_remove_fvar x (free_for_cv e)).
+        Proof.
+        Admitted.
+        rewrite foo.
+        Local Lemma bar : forall x C e u,
+            AtomSet.F.In x (cset_fvars (free_for_cv e)) ->
+            free_for_cv (subst_ee x u C e) = cset_union (free_for_cv u) (cset_remove_fvar x (free_for_cv e)).
+        Proof.
+        Admitted.
+        rewrite bar in H1.
+        Local Lemma baz : forall E C1 C2 D,
+            wf_cset E D ->
+            subcapt E C1 C2 ->
+            subcapt E (cset_union C1 D) (cset_union C2 D).
+        Proof.
+        Admitted.
+        eapply typing_sub.
+        2: {
+          eapply sub_capt.
+          apply baz with (C1 := (free_for_cv u)).
+          - (* wf_cset *) admit.
+          - rewrite_env (empty ++ (map (subst_cb x C) F ++ E)).
+            eapply value_therefore_fv_subcapt_cv.
+            + admit.
+            + eapply typing_weakening...
+              eapply wf_env_subst_cb...
+              (* how did I lose the environment ??? *)
+              admit.
+            + eapply cv_weakening...
+              eapply wf_env_subst_cb...
+              (* how did I lose the environment ??? *)
+              admit.
+          - apply sub_pre_reflexivity.
+            + admit.
+            + admit.
+        }
+        apply H1.
+        1,2: admit.
+      * pick fresh y and apply typing_abs.
+        rewrite subst_ee_open_ee_var...
+        rewrite subst_ct_open_ct_var...
+        rewrite_env (map (subst_cb x C) ([(y, bind_typ V)] ++ F) ++ E).
+        apply H0...
+      Unshelve.
+      all: auto.
     + SCase "x not in fv e1".
       assert ((subst_cset x C (free_for_cv e1)) = (free_for_cv (subst_ee x u C e1))) as Heq. {
         (* true b/c of subcase assumption, though probably will need to be shown in multiple steps. *)
