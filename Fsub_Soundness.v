@@ -18,11 +18,6 @@ Require Export Fsub_Lemmas.
 (* ********************************************************************** *)
 (** * #<a name="subtyping"></a># Properties of subtyping *)
 
-(* used for termination checking *)
-Lemma cheat : forall A, A.
-Proof.
-Admitted.
-
 
 (* ********************************************************************** *)
 (** ** Weakening (2) *)
@@ -109,15 +104,20 @@ Proof with simpl_env; auto using wf_typ_weakening, wf_pretyp_weakening, cv_weake
     apply sub_top...
   - Case "sub_arrow".
     pick fresh Y and apply sub_arrow.
-    apply cheat.
+    apply sub_weakening...
     rewrite <- concat_assoc.
     apply sub_weakening...
   - Case "sub_all".
     pick fresh Y and apply sub_all.
-    apply cheat.
+    apply sub_weakening...
     rewrite <- concat_assoc.
     apply sub_weakening...
 Qed.
+
+(* used for termination checking *)
+Lemma cheat : forall A, A.
+Proof.
+Admitted.
 
 (* ********************************************************************** *)
 (** ** Reflexivity (1) *)
@@ -229,15 +229,13 @@ Proof with eauto.
     apply cv_weakening...
 Qed.
 
-(* Probably not used? Useful in sub implies subcapt *)
-Lemma cv_unique : forall T E C1 C2,
+Lemma cv_unique : forall E T C1 C2,
   wf_env E ->
+  wf_typ E T ->
   cv E T C1 ->
   cv E T C2 ->
   C1 = C2.
-Proof with eauto.
-  intros T E C1 C2 Hwf Hcv1 Hcv2.
-  induction Hcv1; inversion Hcv2; subst.
+Proof with eauto*.
 Admitted.
 
 Lemma captures_transitivity : forall E xs ys x,
