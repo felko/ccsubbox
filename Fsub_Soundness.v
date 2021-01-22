@@ -1071,6 +1071,8 @@ Proof with simpl_env;
     (* apply wf_typ_weakening... *)
     (* rewrite <- concat_assoc. *)
     (* admit. *)
+  - Case "typing_app".
+    admit.
   - Case "typing_arrow".
     pick fresh X and apply typing_tabs.
     lapply (H X); [intros K | auto].
@@ -1099,11 +1101,13 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
     pick fresh y and apply typing_abs.
     rewrite <- concat_assoc.
     apply H0...
+  - Case "typing_app".
+    admit.
   - Case "typing_tabs".
     pick fresh Y and apply typing_tabs.
     rewrite <- concat_assoc.
     apply H0...
-Qed.
+Admitted.
 
 (************************************************************************ *)
 (** ** Substitution preserves typing (8) *)
@@ -1294,13 +1298,11 @@ Proof with simpl_env;
         eapply wf_env_subst_cb...
         apply binds_head.
         replace (bind_typ X) with (subst_cb x C (bind_typ X))...
-  - Case "typing_var_poly".
-
+  - Case "typing_var".
     destruct (x0 == x); subst.
     + binds_get H0.
-      inversion H2; subst.      
-      inversion HtypU; subst.
-      rewrite_env (empty ++ map (subst_cb x {*}C) F ++ E).
+      inversion H2; inversion HtypU; subst.
+      rewrite_env (empty ++ map (subst_cb x C) F ++ E).
       apply typing_weakening...
       unfold subst_ct. fold subst_cpt.
       (* by simpl. *)
