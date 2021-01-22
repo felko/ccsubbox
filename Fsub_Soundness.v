@@ -132,7 +132,7 @@ Proof with auto.
 Qed.
 
 
-(* capture set substitution does not affect subtyping 
+(* capture set substitution does not affect subtyping
 
   depends on opening in the context
     binds X (bind_sub U) E -> binds X (bind_sub (open_ct U C)) E
@@ -149,7 +149,7 @@ Qed.
 (* TODO move to CaptureSets. *)
 Lemma cset_subset_reflexivity (c : captureset) : cset_subset_prop c c.
 Proof with auto.
-  rewrite cset_subset_iff. 
+  rewrite cset_subset_iff.
   unfold cset_subset_dec.
   destruct c...
   assert (AtomSet.F.subset t t = true). { rewrite <- AtomSetFacts.subset_iff. fsetdec. }
@@ -174,7 +174,7 @@ Proof with auto.
 Qed.
 
 (* unversals can't be subcaptres of concrete capture sets. *)
-Lemma cset_universal_subset : forall tf tb, 
+Lemma cset_universal_subset : forall tf tb,
   cset_subset_prop cset_universal (cset_set tf tb) ->
   False.
 Proof with auto.
@@ -216,7 +216,7 @@ Admitted.
       exists C'.
       apply cv_typ_var with (T := T)...
       rewrite_env (empty ++ [(a0, bind_sub T)] ++ E).
-      apply cv_weakening... 
+      apply cv_weakening...
   - simpl_env in *.
     binds_cases H5...
     assert (wf_typ E a0) by (apply wf_typ_var with (U := U); eauto).
@@ -250,11 +250,11 @@ Lemma captures_transitivity : forall E xs ys x,
   (* E |- {x} <: {ys} *)
   captures E ys x ->
   (* E |- {ys} <: {xs} *)
-  AtomSet.F.For_all (captures E xs) ys -> 
+  AtomSet.F.For_all (captures E xs) ys ->
   (* E |- {x} <: {xs} *)
   captures E xs x.
 Proof with auto.
-  intros E xs ys x Hc Hall.  
+  intros E xs ys x Hc Hall.
   remember ys.
   generalize dependent ys.
   remember xs.
@@ -291,8 +291,8 @@ Proof with auto.
     inversion H3. inversion H3; subst.
     subst.
     inversion H23; subst.
-    eapply subcapt_set...    
-    unfold AtomSet.F.For_all. intros.     
+    eapply subcapt_set...
+    unfold AtomSet.F.For_all. intros.
     apply captures_transitivity with (ys := ys)...
 Qed.
 
@@ -309,7 +309,7 @@ Proof with auto using subcapt_reflexivity.
   intros E T Ok Wf.
   induction Wf.
   (* eauto and econstructor is still broken... hence we need to proof this manually *)
-  - apply sub_refl_tvar... 
+  - apply sub_refl_tvar...
     eapply wf_typ_var with (U := U)...
   - apply sub_capt...
 ------
@@ -352,14 +352,14 @@ Proof with auto.
   intros S G Z Q E P C1 C2 HSub HCv2 HCv1.
   (*remember (G ++ [(Z, bind_sub Q)] ++ E).*)
   generalize dependent C1.
-  generalize dependent C2. 
-  generalize dependent G. 
+  generalize dependent C2.
+  generalize dependent G.
   induction HSub; intros; subst.
-  - 
+  -
     (* Given a valid capture set derivation, we can construct another
         one when we weaken the environment.
-        
-        Probably should be a lemma.*)  
+
+        Probably should be a lemma.*)
     assert (exists C3, cv (G ++ [(Z, bind_sub X)] ++ E) S C3). {
       apply cv_exists...
       (** two wellformedness conditions.  Probably need to strengthen
@@ -370,14 +370,14 @@ Proof with auto.
     inversion H1 as [C3 H2].
     (* Needs subcapt-transitivity -- C1 <: C3 <: C2 *)
     admit.
-  - (*by definition. *)  
+  - (*by definition. *)
     admit.
   - (*by defininition. *)
     admit.
     (*
   - (* inductively use T1 <: T2 *)
     admit.
-  - 
+  -
     (** Now we need show that there is a C3 such that
        cv (G ++ [(Z, bind_sub T2)] ++ E) S C3 *)
     assert (exists C3, cv (G ++ [(Z, bind_sub T2)] ++ E) S C3). {
@@ -388,7 +388,7 @@ Proof with auto.
       admit.
     }
     inversion H0 as [C3 H1].
-    (* inductively, use subtyping judgement. *) 
+    (* inductively, use subtyping judgement. *)
     specialize (IHHSub G C3 H1 C1 HCv1).
     (* now we need to show that C3 <: C2 and apply subcapt_transitivity,
       as cv (type_capt C T2) = C \cup cv T2 *)
@@ -413,11 +413,11 @@ Proof with auto.
     (* X <>x, bindings unchanged. *)
     binds_cases H.
     + apply binds_tail. apply binds_tail... trivial.
-    + apply binds_head... 
+    + apply binds_head...
 Qed.
 
 (** Again, probably not true, due to cv looking into type bindings. *)
-Lemma captures_narrowing : forall F Z P Q E xs x,  
+Lemma captures_narrowing : forall F Z P Q E xs x,
   wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
   sub E P Q ->
   captures (F ++ [(Z, bind_sub Q)] ++ E) xs x ->
@@ -427,7 +427,7 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
   induction H; intros; subst.
   - apply captures_in...
-  - assert (x <> Z). { 
+  - assert (x <> Z). {
       unfold not. intros.
       binds_cases H.
       * subst. unfold dom in Fr0. fsetdec.
@@ -478,13 +478,13 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing
           (* apply H3. *)
           unfold AtomSet.F.For_all in *. intros.
           apply H2...
-        * eapply captures_var with (T := T). 
+        * eapply captures_var with (T := T).
           apply binds_head...
           apply H3.
           unfold AtomSet.F.For_all in *. intros.
           apply H2...
       + (* x <> X *)
-        eapply captures_var with (T := T). 
+        eapply captures_var with (T := T).
         { binds_cases H.
           * apply binds_tail.
             apply binds_tail...
@@ -529,8 +529,8 @@ Proof with eauto using wf_cset_narrowing_typ.
   intros F E x P Q C1 C2 PsubQ Ok C1subC2.
   remember (F ++ [(x, bind_typ Q)] ++ E). generalize dependent F.
   induction C1subC2 ; intros ; subst...
-  - econstructor... 
-    unfold AtomSet.F.For_all. 
+  - econstructor...
+    unfold AtomSet.F.For_all.
     intros.
     unfold AtomSet.F.For_all in H1.
     specialize (H1 x0 H2).
@@ -603,7 +603,7 @@ Lemma empty_cset_implies_no_captures : forall E xs,
 Proof.
   intros E xs Wf H.
   unfold AtomSet.F.For_all in H.
-  
+
   destruct (AtomSet.F.is_empty xs) eqn:Heq.
   - rewrite <- AtomSetFacts.is_empty_iff in Heq.
     fsetdec.
@@ -633,7 +633,7 @@ Proof with eauto.
   inversion H.
   unfold empty_cset.
   split; f_equal.
-  
+
   (* by fsetdec and fnsetdec -- however it crashes at the moment... *)
 Admitted.
 
@@ -643,13 +643,13 @@ Lemma subtyping_preserves_empty_cv : forall E S T,
   cv E S {}C.
 Proof with eauto.
   intros.
-  induction H...  
-  (* - assert (C1 = {}C). { 
+  induction H...
+  (* - assert (C1 = {}C). {
       assert (C2 = {}C). { inversion H0. destruct (empty_cset_union _ _ H6); subst... }
       subst.
       apply (empty_subcapt_implies_empty_cset E C1)...
     }
-    assert (cv E T1 {}C). { 
+    assert (cv E T1 {}C). {
       apply IHsub.
       inversion H0.
       destruct (empty_cset_union _ _ H7); subst...
@@ -657,7 +657,7 @@ Proof with eauto.
     }
     replace {}C with (cset_union {}C {}C). subst. econstructor...
     eauto.
-    unfold cset_union. simpl. 
+    unfold cset_union. simpl.
     rewrite elim_empty_nat_set.
     replace ({} `union` {}) with {}...
     fsetdec.
@@ -674,7 +674,7 @@ with sub_narrowing_pretyp_aux : forall Q F E x P S T,
   sub_pre (F ++ [(x, bind_typ Q)] ++ E) S T ->
   sub E P Q ->
   sub_pre (F ++ [(x, bind_typ P)] ++ E) S T.
-Proof with simpl_env; eauto using wf_typ_narrowing_typ, wf_pretyp_narrowing_typ, 
+Proof with simpl_env; eauto using wf_typ_narrowing_typ, wf_pretyp_narrowing_typ,
     wf_env_narrowing_typ, cv_narrowing_typ, subcapt_narrowing_typ, wf_cset_narrowing_typ.
 ------
   intros Q F E x P S T TransQ SsubT PsubQ.
@@ -711,16 +711,16 @@ with sub_pre_transitivity : forall Q E S T,
 Proof with simpl_env; auto.
 ------
   intros Q E S T W SsubQ QsubT.
-  
+
   generalize dependent T.
-  generalize dependent S. 
+  generalize dependent S.
   generalize dependent E.
-  remember Q as Q' in |-.  
+  remember Q as Q' in |-.
   generalize dependent Q'.
-  
+
   induction W; intros Q'' EQ E' S' SsubQ.
-  
-  Ltac inductionThenInversion Rel1 Rel2 := 
+
+  Ltac inductionThenInversion Rel1 Rel2 :=
       induction Rel1; try discriminate; inversion EQ; subst; intros T' Rel2; inversion Rel2; subst.
 
   (* type_var *)
@@ -732,16 +732,16 @@ Proof with simpl_env; auto.
     apply sub_pre_transitivity with (Q := P)...
 ------
   intros Q E S T W SsubQ QsubT.
-  
+
   generalize dependent T.
-  generalize dependent S. 
+  generalize dependent S.
   generalize dependent E.
-  remember Q as Q' in |-.  
+  remember Q as Q' in |-.
   generalize dependent Q'.
-  
+
   induction W; intros Q'' EQ E' S' SsubQ.
-  
-  Ltac inductionThenInversion2 Rel1 Rel2 := 
+
+  Ltac inductionThenInversion2 Rel1 Rel2 :=
     induction Rel1; try discriminate; inversion EQ; subst; intros T' Rel2; inversion Rel2; subst.
 
   (* type_top *)
@@ -782,7 +782,7 @@ Proof with simpl_env; auto.
       assert (type (open_ct T2 Y))...
       (* apply (sub_transitivity _ _ _ _ H7 H5 H8). *)
       apply sub_transitivity with (Q := (open_ct T2 Y))...
-      
+
       (* rewrite_env (empty ++ [(Y, bind_typ T0)] ++ E).
       eapply sub_narrowing_typ_aux with (Q := T1). *)
       (* unfold transitivity_on.
@@ -924,7 +924,7 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb.
   induction H; intros; subst.
   - constructor...
   (* that's the same as in captures_narrowing -> TODO refactor *)
-  - assert (x <> Z). { 
+  - assert (x <> Z). {
       unfold not. intros.
       binds_cases H.
       * subst. unfold dom in Fr0. fsetdec.
@@ -932,7 +932,7 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb.
     }
     apply captures_var with (T := T) (ys := ys)...
     admit.
-  (* - assert (exists (C3 : captureset), 
+  (* - assert (exists (C3 : captureset),
       cv (subst_tt X P T) (map (subst_tb X P) G ++ E) C3 /\
       subcapt (map (subst_tb X P) G ++ E) C3 C2
            ) as [C3 [C3sub C3eq]]. {
@@ -1014,10 +1014,10 @@ Proof with
   - Case "sub_arrow".
     pick fresh X and apply sub_arrow...
     repeat (rewrite <- subst_tt_open_ct)...
-    assert (X `notin` L) as XL. { fsetdec. } 
+    assert (X `notin` L) as XL. { fsetdec. }
     (* assert ([(X, bind_typ T1)] ++ G ++ [(Z, bind_sub Q)] ++ E = G ++ [(Z, bind_sub Q)] ++ E) as Heq. {
       (* JONATHAN: This is bogus! *)
-      admit. 
+      admit.
     }
     specialize (H0 X XL G Heq).  *)
     rewrite_env (empty ++ [(X, bind_typ (subst_tt Z P T1))] ++ (map (subst_tb Z P) G ++ E)).
@@ -1292,7 +1292,7 @@ Proof with simpl_env;
     + simpl.
       binds_cases H0...
       * rewrite_env (empty ++ map (subst_cb x C) F ++ E).
-        apply typing_weakening... 
+        apply typing_weakening...
         eapply wf_env_subst_cb...
       * apply typing_var_tvar...
         eapply wf_env_subst_cb...
@@ -1322,9 +1322,9 @@ Proof with simpl_env;
         (* wf_env *)
         admit.
         apply binds_tail.
-      replace (bind_typ (typ_capt cset_universal (subst_cpt x C P))) with (subst_cb x C (bind_typ (typ_capt cset_universal P))).      
+      replace (bind_typ (typ_capt cset_universal (subst_cpt x C P))) with (subst_cb x C (bind_typ (typ_capt cset_universal P))).
       apply binds_map.
-      
+
       * assert ((typ_capt x0 T) = (subst_ct x C (typ_capt x0 T))) as Heq. {
           apply subst_ct_fresh.
           (* somehow by larger env being wf *)
@@ -1356,12 +1356,12 @@ Proof with simpl_env;
           assert (wf_env (map (subst_cb x C) F ++ E))... {
             eapply wf_env_subst_cb...
           }
-      
-      
+
+
       simpl.
         binds_cases H0...
         * rewrite_env (empty ++ map (subst_cb x C) F ++ E).
-          apply typing_weakening... 
+          apply typing_weakening...
           eapply wf_env_subst_cb...
         * apply typing_var_tvar...
           eapply wf_env_subst_cb...
@@ -1390,7 +1390,7 @@ Proof with simpl_env;
 
       rewrite_env (empty ++ map (subst_cb x C) F ++ E).
       apply typing_weakening...
-      
+
       * eapply wf_env_subst_cb...
 
 
