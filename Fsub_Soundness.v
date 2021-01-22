@@ -202,10 +202,11 @@ Lemma cv_exists : forall E T,
 Proof with eauto.
   intros E.
   induction E; intros T; induction T; intros; try inversion H0; try inversion H; subst...
-  admit.
-Admitted.
-
-    (* + assert (wf_typ E a0) by (apply wf_typ_var with (U := U); eauto).
+  - inversion H3...
+  - simpl_env in *.
+    binds_cases H3...
+    + assert (wf_typ E a0) by 
+        (apply wf_typ_var with (U := U); eauto).
       specialize (IHE a0 H6 H2) as [C' H'].
       inversion H'; subst...
       exists C'.
@@ -218,7 +219,7 @@ Admitted.
       rewrite_env (empty ++ [(a0, bind_sub T)] ++ E).
       apply cv_weakening...
   - simpl_env in *.
-    binds_cases H5...
+    binds_cases H3...
     assert (wf_typ E a0) by (apply wf_typ_var with (U := U); eauto).
     specialize (IHE a0 H6 H2) as [C' H'].
     inversion H'; subst...
@@ -226,15 +227,7 @@ Admitted.
     apply cv_typ_var with (T := T0)...
     rewrite_env (empty ++ [(x, bind_typ T)] ++ E).
     apply cv_weakening...
-  - simpl_env in *.
-    specialize (IHT H H4) as [C' H'].
-    exists (cset_union c C').
-    constructor...
-  - simpl_env in *.
-    specialize (IHT H H4) as [C' H'].
-    exists (cset_union c C').
-    constructor...
-    *)
+Qed.
 
 (* Probably not used? Useful in sub implies subcapt *)
 Lemma cv_unique : forall T E C1 C2,
