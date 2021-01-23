@@ -1279,10 +1279,20 @@ Lemma cv_wf : forall E T C,
 Proof with simpl_env; eauto*.
   intros E T C WE WT HC.
   induction HC.
-  * assert (wf_typ E T) by (apply wf_typ_from_binds_sub with (x := X); eauto* ).
-    specialize (IHHC WE H0)...
+  * assert (wf_typ E T).
+      admit.
+    assert (wf_env E).
+      admit.
+    specialize (IHHC H0 H)...
+    apply wf_cset_weaken_head...
+  * assert (wf_typ E T).
+      admit.
+    assert (wf_env E).
+      admit.
+    specialize (IHHC H0 H)...
+    apply wf_cset_weaken_head...
   * inversion WT; subst...
-Qed.
+Admitted.
 
 Lemma typing_regular : forall E e T,
   typing E e T ->

@@ -430,10 +430,12 @@ Inductive wf_env : env -> Prop :=
 (** Dealing with cv -- as a fixpoint is problematic. *)
 Inductive cv : env -> typ -> captureset -> Prop :=
   (** Looking up in the environment *)
-  | cv_typ_var : forall (X : atom) T E CT,
-    binds X (bind_sub T) E ->
+  | cv_typ_var_head : forall (X : atom) T E CT,
     cv E T CT ->
-    cv E (typ_fvar X) CT
+    cv ([(X, bind_typ T)] ++ E) (typ_fvar X) CT
+  | cv_typ_var_skip : forall F T E CT,
+    cv E T CT ->
+    cv (F ++ E) T CT
   | cv_typ_capt : forall E C P,
     cv E (typ_capt C P) C.
 
