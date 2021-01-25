@@ -1272,27 +1272,15 @@ Qed.
 (** The things that the cv relation returns are all well-formed,
     assuming the type is well formed... *)
 Lemma cv_wf : forall E T C,
-  wf_env E ->
-  wf_typ E T ->
   cv E T C ->
   wf_cset E C.
 Proof with simpl_env; eauto*.
-  intros E T C WE WT HC.
-  induction HC.
-  * assert (wf_typ E T).
-      admit.
-    assert (wf_env E).
-      admit.
-    specialize (IHHC H0 H)...
-    apply wf_cset_weaken_head...
-  * assert (wf_typ E T).
-      admit.
-    assert (wf_env E).
-      admit.
-    specialize (IHHC H0 H)...
-    apply wf_cset_weaken_head...
-  * inversion WT; subst...
-Admitted.
+  intros E T C HC.
+  dependent induction HC; intros; subst.
+  * apply wf_cset_weaken_head...
+  * apply wf_cset_weaken_head...
+  * assumption.
+Qed.
 
 Lemma typing_regular : forall E e T,
   typing E e T ->
