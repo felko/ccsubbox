@@ -435,11 +435,11 @@ Inductive cv : env -> typ -> captureset -> Prop :=
     wf_env ([(X, bind_sub T)] ++ E) ->
     cv E T CT ->
     cv ([(X, bind_sub T)] ++ E) (typ_fvar X) CT
-  | cv_env_irrel : forall T E F CT,
-    wf_env (F ++ E) ->
-    wf_typ E T ->
-    cv E T CT ->
-    cv (F ++ E) T CT
+  | cv_env_irrel : forall (X : atom) (Y : atom) (B : binding) E CT,
+    wf_env ([(Y, B)] ++ E) ->
+    X <> Y ->
+    cv E X CT ->
+    cv ([(Y, B)] ++ E) (typ_fvar X) CT
   | cv_typ_capt : forall E C P,
     wf_env E ->
     wf_pretyp E P ->
