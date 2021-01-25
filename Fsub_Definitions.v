@@ -431,11 +431,11 @@ Inductive wf_env : env -> Prop :=
 Inductive cv : env -> typ -> captureset -> Prop :=
   (** Looking up in the environment; we ask that T is wf in the environment
       and that the environment is well formed so lookup is well defined. *)
-  | cv_typ_var_head : forall (X : atom) T E CT,
-    wf_env ([(X, bind_typ T)] ++ E) ->
+  | cv_typ_var : forall (X : atom) T E CT,
+    wf_env ([(X, bind_sub T)] ++ E) ->
     cv E T CT ->
-    cv ([(X, bind_typ T)] ++ E) (typ_fvar X) CT
-  | cv_typ_var_skip : forall T E F CT,
+    cv ([(X, bind_sub T)] ++ E) (typ_fvar X) CT
+  | cv_env_irrel : forall T E F CT,
     wf_env (F ++ E) ->
     wf_typ E T ->
     cv E T CT ->
