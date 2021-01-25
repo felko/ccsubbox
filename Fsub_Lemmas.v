@@ -36,10 +36,6 @@ Proof with auto.
   intros.
   inversion H...
 Qed.
-  
-Lemma cheat: forall A, A.
-Proof.
-Admitted.
 
 Lemma type_from_wf_typ : forall E T,  
   wf_typ E T -> type T
@@ -1032,23 +1028,6 @@ Proof with eauto*.
 Qed.
 *)
 
-Require Import Coq.Program.Equality.
-Lemma typing_atom : forall E (x : atom) T,
-  typing E x T ->
-  wf_cset E (free_for_cv x).
-Proof with auto*.
-  (* intros E x T Htyp.
-  (** Use dependent induction when you want to remember the shape of
-      arguments in the typ.  Here we know that x is an atom so the only
-      judgment rules that can show up in the typing judgment is either
-      a lookup rule or a subtyping rule. *)
-  dependent induction Htyp...
-  - constructor. 
-    (** TODO: tactic *)
-    unfold allbound_typ. intros. assert (x0 = x) by fsetdec; subst.
-    exists T... *)
-Admitted.
-
 (*
 Inductive cv_free : exp -> captureset -> Prop :=
   | cv_free_bvar : forall n,
@@ -1276,7 +1255,7 @@ Lemma cv_wf : forall E T C,
   wf_cset E C.
 Proof with simpl_env; eauto*.
   intros E T C HC.
-  dependent induction HC; intros; subst.
+  induction HC; intros; subst.
   * apply wf_cset_weaken_head...
   * apply wf_cset_weaken_head...
   * assumption.
@@ -1327,13 +1306,22 @@ Proof with simpl_env; auto*.
   - destruct IHtyping1 as [Hwf [Hexpr1 HwfF]].
     inversion HwfF; subst...
     destruct (sub_regular _ _ _ H1) as [_ [Wf1 Wf2]].
-    admit.
-    (* inversion Wf2; subst. *)
-    (* repeat split... *)
-    (* constructor... *)
-    (* inversion Wf2; subst. *)
-    (* inversion H7; subst... *)
-    (* apply wf_typ_open_capt with (T1 := (typ_capt C P))... *)
+    inversion Wf2; subst...
+    (** why are these two cases the same... *)
+    {
+      repeat split...
+      + constructor...
+        apply capt_from_wf_cset with (E := E).
+        epose proof (subcapt_regular E C Cv _) as [Hfinish _]...
+      + epose proof (wf_typ_open_capt E C T1 T2 _ _ _)...
+    }
+    {
+      repeat split...
+      + constructor...
+        apply capt_from_wf_cset with (E := E).
+        epose proof (subcapt_regular E C Cv _) as [Hfinish _]...
+      + epose proof (wf_typ_open_capt E C T1 T2 _ _ _)...
+    }  
   (* typing rule: (/\ X e) has type fv(/\ X e) X <: T1 -> T2 *)
   - pick fresh Y. assert (Y `notin` L) by fsetdec...
     specialize (H0 Y H1) as H3; inversion H3...
@@ -1366,7 +1354,7 @@ Proof with simpl_env; auto*.
     inversion Hwf_capt; subst...
   - repeat split...
     pose proof (sub_regular E S T H0)...
-Admitted.
+Qed.
 
 Lemma value_regular : forall e,
   value e ->
