@@ -1493,6 +1493,26 @@ Lemma wf_cset_distributive_over_concrete_cset_union : forall E C D,
 Proof.
 Admitted.
 
+Lemma subst_commutes_with_free_for_cv : forall x u C e,
+    x `notin` (cset_fvars (free_for_cv e)) ->
+    (subst_cset x C (free_for_cv e)) = (free_for_cv (subst_ee x u C e)).
+Proof with eauto.
+  intros *.
+  intro Fr.
+  induction e.
+  - simpl.
+    admit.
+  - simpl in *.
+    admit.
+  - apply IHe...
+  - simpl in *.
+    rewrite <- IHe1...
+    rewrite <- IHe2...
+    all : admit.
+  - apply IHe...
+  - apply IHe...
+Admitted.
+
 Lemma typing_through_subst_ee : forall U E F x T C e u,
   typing (F ++ [(x, bind_typ U)] ++ E) e T ->
   value u ->
@@ -1569,11 +1589,6 @@ Proof with simpl_env;
         eapply wf_env_subst_cb...
         (* heavy environment wrangling ahead... *)
         assert (binds x0 (bind_typ (subst_ct x C (typ_capt C0 P))) (map (subst_cb x C) F)). {
-          (* unsimpl (subst_cb x C (bind_typ (typ_capt C0 P))). *)
-          (* assert *)
-          (*   ((subst_cb x C (bind_typ (typ_capt C0 P))) = (bind_typ (subst_ct x C (typ_capt C0 P)))) *)
-          (*   as H_y_u_no_unsimpl_coq by (simpl; reflexivity). *)
-          (* rewrite <- H_y_u_no_unsimpl_coq. *)
           replace (bind_typ (subst_ct x C (typ_capt C0 P)))
             with (subst_cb x C (bind_typ (typ_capt C0 P))) by auto...
         }
@@ -1582,80 +1597,70 @@ Proof with simpl_env;
         apply binds_weaken.
         ** rewrite -> concat_nil...
         ** rewrite -> concat_nil...
-           assert (wf_env (map (subst_cb x C) F ++ E))... {
-             eapply wf_env_subst_cb...
-           }
+           enough (wf_env (map (subst_cb x C) F ++ E))...
+           eapply wf_env_subst_cb...
 
   (** Informally, the typing_abs case is a straightforward application
       of the induction hypothesis, which is called H0 here. *)
 
   - Case "typing_abs".
+    assert (wf_env (F ++ [(x, bind_typ U)] ++ E)). {
+      pick fresh z for L.
+      pose proof (H z Fr)...
+      enough (wf_env ([(z, bind_typ V)] ++ F ++ [(x, bind_typ U)] ++ E)) as HwfHugeE...
+      inversion HwfHugeE...
+    }
+    assert (wf_typ (F ++ [(x, bind_typ U)] ++ E) V). {
+      pick fresh z for L.
+      pose proof (H z Fr) as HtypE1...
+      enough (wf_env ([(z, bind_typ V)] ++ F ++ [(x, bind_typ U)] ++ E)) as HwfHugeE...
+      inversion HwfHugeE...
+    }
+
     simpl subst_ct.
+    (* destruct (AtomSet.F.mem x (fv_ee e1)) eqn:EqMem. *)
     destruct (AtomSet.F.mem x (cset_fvars (free_for_cv e1))) eqn:EqMem.
     + SCase "x in fv e1".
-      assert (wf_env (F ++ [(x, bind_typ U)] ++ E)). {
-        pick fresh z for L.
-        unshelve epose proof (H z _)...
-        enough (wf_env ([(z, bind_typ V)] ++ F ++ [(x, bind_typ U)] ++ E)) as HwfHugeE...
-        inversion HwfHugeE...
-      }
+      assert (x `in` cset_fvars (free_for_cv e1)) by (rewrite AtomSetFacts.mem_iff; assumption).
+      (* assert (x `in` cset_fvars (free_for_cv e1)). { *)
+      (*   assert (x `in` (fv_ee e1)) by (rewrite AtomSetFacts.mem_iff; assumption). *)
+      (* } *)
+      rewrite foo...
       eenough (typing (map (subst_cb x C) F ++ E)
                       _
                       (typ_capt
                          (free_for_cv (subst_ee x u C e1))
                          (typ_arrow (subst_ct x C V) (subst_ct x C T1)))) as H00.
-      * Set Nested Proofs Allowed.
-        assert (x `in` cset_fvars (free_for_cv e1)) by (rewrite AtomSetFacts.mem_iff; assumption).
-        rewrite foo...
-        rewrite bar in H00...
+      * rewrite bar in H00...
         eapply typing_sub.
         ** apply H00.
         ** eapply sub_capt.
-           apply baz with (C1 := (free_for_cv u)).
-           *** { assert (wf_cset (map (subst_cb x C) F ++ E)
-                                 (cset_union (free_for_cv u)
-                                             (cset_remove_fvar x (free_for_cv e1)))).
-                 { auto... }
-                 admit.
-               }
-           *** { rewrite_env (empty ++ (map (subst_cb x C) F ++ E)).
-                 eauto using value_therefore_fv_subcapt_cv, typing_weakening, cv_weakening.
-               }
-           *** assert (wf_typ (F ++ [(x, bind_typ U)] ++ E) V). {
-                 pick fresh Y for L.
-                 pose proof (H Y Fr) as HtypE1.
-                 pose proof (typing_regular _ _ _ HtypE1) as [HwfEnv [ _ _ ]].
-                 inversion HwfEnv; subst.
-                 match goal with
-                 | H : wf_typ _ V |- _ => pose proof H as HwfV
-                 end.
-                 rewrite_env (F ++ [(x, bind_typ U)] ++ E) in HwfV.
-                 assumption.
-               }
-
-               apply sub_pre_reflexivity...
-               pick fresh Y and apply wf_typ_arrow.
-               **** apply wf_typ_through_subst_ct with (U := U)...
-               **** { rewrite subst_ct_open_ct_var...
-                      rewrite_env (map (subst_cb x C) ([(Y, bind_typ V)] ++ F) ++ E).
-                      unshelve epose proof (H0 Y _ ([(Y, bind_typ V)] ++ F) _)...
-                      (* - constructor... *)
-                      (*   eapply wf_typ_through_subst_ct... *)
-                      - rewrite_env (map (subst_cb x C) ([(Y, bind_typ V)] ++ F) ++ E).
-                        eapply wf_typ_through_subst_ct...
-                        unshelve epose proof (H Y _)...
+           *** apply baz with (C1 := (free_for_cv u)).
+               **** { assert (wf_cset (map (subst_cb x C) F ++ E)
+                                      (cset_union (free_for_cv u)
+                                                  (cset_remove_fvar x (free_for_cv e1))))...
+                      unshelve epose proof
+                               (wf_cset_distributive_over_concrete_cset_union _ _ _ _ _ H4)
+                        as [P1 P2];
+                        eauto using free_for_cv_is_concrete, concrete_cset_except_var_is_concrete.
                     }
+               **** { rewrite_env (empty ++ (map (subst_cb x C) F ++ E)).
+                      eauto using value_therefore_fv_subcapt_cv, typing_weakening, cv_weakening.
+                    }
+           *** apply sub_pre_reflexivity...
+               pick fresh Y and apply wf_typ_arrow; eauto using wf_typ_through_subst_ct.
+               { rewrite subst_ct_open_ct_var...
+                 rewrite_env (map (subst_cb x C) ([(Y, bind_typ V)] ++ F) ++ E).
+                 unshelve epose proof (H0 Y _ ([(Y, bind_typ V)] ++ F) _); eauto.
+               }
       * pick fresh y and apply typing_abs.
         rewrite subst_ee_open_ee_var...
         rewrite subst_ct_open_ct_var...
         rewrite_env (map (subst_cb x C) ([(y, bind_typ V)] ++ F) ++ E).
         apply H0...
     + SCase "x not in fv e1".
-      assert ((subst_cset x C (free_for_cv e1)) = (free_for_cv (subst_ee x u C e1))) as Heq. {
-        (* true b/c of subcase assumption, though probably will need to be shown in multiple steps. *)
-        admit.
-      }
-      rewrite Heq.
+      assert (x `notin` cset_fvars (free_for_cv e1)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
+      rewrite subst_commutes_with_free_for_cv with (u := u)...
       pick fresh y and apply typing_abs.
       rewrite subst_ee_open_ee_var...
       rewrite subst_ct_open_ct_var...
@@ -1663,15 +1668,8 @@ Proof with simpl_env;
       apply H0...
   - Case "typing_app".
     rewrite subst_ct_open_ct...
-    eapply typing_app.
-    + simpl subst_ct in IHHtypT1.
-      apply IHHtypT1...
-    + apply IHHtypT2...
-    + eapply sub_through_subst_ct...
-    + eapply cv_through_subst_c...
-    + eapply cv_through_subst_c...
-    + eapply subcapt_through_subst_cset...
-    + eapply subcapt_through_subst_cset...
+    simpl subst_ct in IHHtypT1...
+    eapply typing_app; eauto using sub_through_subst_ct, cv_through_subst_c, subcapt_through_subst_cset.
   - Case "typing_tabs".
     simpl subst_ct.
     destruct (AtomSet.F.mem x (cset_fvars (free_for_cv e1))) eqn:EqMem.
@@ -1717,6 +1715,9 @@ Proof with simpl_env;
   generalize dependent F.
   induction Typ; intros F EQ; subst;
     simpl subst_te in *; simpl subst_tt in *...
+  - Case "typing_var_tvar".
+    rewrite (map_subst_tb_id E Z P).
+    binds_cases H0.
   - Case "typing_var".
   (*
     apply typing_var.
