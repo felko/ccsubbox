@@ -456,16 +456,22 @@ Proof with eauto using subcapt_reflexivity.
   intros E S T C D Hsub WfC WfD HcvC HcvD.
 
   induction Hsub; destruct C; destruct D; try solve [inversion HcvC; inversion HcvD; eauto].  
-  - pose proof (cv_unique _ _ _ _ H HcvC HcvD) as Eq; inversion Eq...
-  - pose proof (cv_unique _ _ _ _ H HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
   (* TODO factor into lemma binds_unique *)
-  - inversion HcvC; subst. inversion H1. inversion H. rewrite H4 in H2. inversion H2; subst.
-    apply IHHsub...
-  - inversion HcvC; subst. inversion H1. inversion H. rewrite H4 in H2. inversion H2; subst.
-    apply IHHsub...
+  - admit.
+    (* inversion HcvC; subst. inversion H4. inversion H. rewrite H4 in H2. inversion H2; subst. *)
+    (* apply IHHsub... *)
+  - admit.
+    (* inversion HcvC; subst. inversion H1. inversion H. rewrite H4 in H2. inversion H2; subst. *)
+    (* apply IHHsub... *)
   - inversion HcvC; subst. inversion HcvD; subst...
+    apply subcapt_universal...
   - inversion HcvC; subst. inversion HcvD; subst...
-Qed.
+    all: admit.
+  - admit.
+  - admit.
+Admitted.
 
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
@@ -541,14 +547,15 @@ Proof with auto.
   remember (G ++ [(x, bind_typ Q)] ++ E). generalize dependent G.
   induction HCv ; intros ; subst...
   destruct (X == x) ; subst.
-  - (* this can't happen, x is a variable not a type. *)
-    binds_get H.
-  - apply cv_typ_var with (T := T)...
-    (* X <>x, bindings unchanged. *)
-    binds_cases H.
-    + apply binds_tail. apply binds_tail... trivial.
-    + apply binds_head...
-Qed.
+  all: admit.
+  (* - (* this can't happen, x is a variable not a type. *) *)
+  (*   binds_get H. *)
+  (* - apply cv_typ_var with (T := T)... *)
+  (*   (* X <>x, bindings unchanged. *) *)
+  (*   binds_cases H. *)
+  (*   + apply binds_tail. apply binds_tail... trivial. *)
+  (*   + apply binds_head... *)
+Admitted.
 
 (** Again, probably not true, due to cv looking into type bindings. *)
 Lemma captures_narrowing : forall F Z P Q E xs x,
@@ -1375,9 +1382,12 @@ Proof with subst; simpl; auto.
   - epose proof (cv_exists E S P1 _ ) as [D HcvS].
     (** Edward: Hints are not working for me here.  Which version of
         Coq are people using?  I'm using 8.10.2 *)
-    epose proof (cv_wf E S D _ _ _).
-    epose proof (cv_wf E T C0 _ _ _).
-    pose proof (sub_implies_subcapt _ _ _ _ _ H H0 H1).
+    (** Alex: This doesn't seem to be a matter of hints. See below.
+        The commented out script works, as does the actual one. *)
+    (* epose proof (cv_wf _ _ _ Hcv) as HwfC0. *)
+    (* epose proof (cv_wf _ _ _ HcvS) as HwfD. *)
+    (* pose proof (sub_implies_subcapt _ _ _ _ _ H HwfC0 HwfD). *)
+    epose proof (sub_implies_subcapt _ _ _ _ _ H _ _).
     epose proof (IHHtyp Hv _ _ _ D HcvS)...
     apply subcapt_transitivity with (C2 := D)...
     Unshelve.
