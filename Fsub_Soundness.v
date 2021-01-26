@@ -60,9 +60,12 @@ Proof with eauto using cv_regular.
   * apply cv_env_irrel...
     destruct H0 as [_ [Ha _]].
     (** from wellformedness -- later *)
-    assert (a0 `in` dom E) by admit.
+    assert (a0 `in` dom E). {
+      inversion Ha; subst.
+      eapply binds_In...
+    }
     inversion H; rewrite dom_concat in *; fsetdec.
-Admitted.
+Qed.
 
 Lemma cv_weakening : forall E F G T C,
   cv (G ++ E) T C ->
