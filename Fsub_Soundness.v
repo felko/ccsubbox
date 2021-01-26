@@ -580,6 +580,7 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
       * subst. unfold dom in Fr0. fsetdec.
       * subst. 
         assert (ok (F ++ [(Z, bind_sub P)] ++ E)) by auto.
+        exfalso.
         pose proof (fresh_mid_head _ _ _ _ _ H).
         pose proof (binds_In _ _ _ _ H5)...
     }
@@ -613,14 +614,13 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing
           (* here we could choose our own captureset ys, as long as
              ys <= x
            *)
-          eapply captures_var.
-          apply binds_tail.
-          apply binds_head...
-          trivial.
+          eapply captures_var with (ys := ys)...
           (* then use sub_implies_subcapt *)
           destruct (cv_exists E P) as [C CV]...
-          { destruct C.
-            ** (* universal *)
+          { destruct C...
+            ** 
+            
+            (* universal *)
                 exfalso. admit.
             ** admit.
           }
@@ -646,27 +646,22 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing
     }
 Admitted.
 
+
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
+  (* many of those premises could be replaced by adding wf_env to subcapt_regular *)
+  wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
   subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(Z, bind_sub P)] ++ E) C1 C2.
-Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
-  intros F E Z P Q C1 C2 SubPQ SubCap.
+Proof with eauto using wf_cset_narrowing, wf_env_narrowing, captures_narrowing.
+  intros F E Z P Q C1 C2 SubPQ Ok SubCap.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
   induction SubCap ; intros ; subst...
   (** Alex: eauto seems to not solve some goals it solved previously? *)
-  - admit.
-  - apply subcapt_set...
-    + admit.
-    + admit.
-    + unfold AtomSet.F.For_all.
-      intros.
-      unfold AtomSet.F.For_all in H1.
-      specialize (H1 x H2).
-      (* requires captures regularity *)
-      assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)). { admit. }
-      admit.
-Admitted.
+  - econstructor... unfold AtomSet.F.For_all. intros.
+    specialize (H1 x H2).
+    eapply captures_narrowing...
+Qed.
 
 
 Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
