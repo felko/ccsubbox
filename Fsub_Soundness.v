@@ -570,22 +570,23 @@ Lemma captures_narrowing : forall F Z P Q E xs x,
   sub E P Q ->
   captures (F ++ [(Z, bind_sub Q)] ++ E) xs x ->
   captures (F ++ [(Z, bind_sub P)] ++ E) xs x.
-Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
+Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
   intros F Z P Q E xs x Ok Sub H.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
-  induction H; intros; subst.
-  - apply captures_in...
+  induction H; intros; subst...  
   - assert (x <> Z). {
       unfold not. intros.
       binds_cases H.
       * subst. unfold dom in Fr0. fsetdec.
-      * subst. admit.
+      * subst. 
+        assert (ok (F ++ [(Z, bind_sub P)] ++ E)) by auto.
+        pose proof (fresh_mid_head _ _ _ _ _ H).
+        pose proof (binds_In _ _ _ _ H5)...
     }
     apply captures_var with (T := T) (ys := ys)...
     unfold AtomSet.F.For_all in *. intros.
-    admit.
-    (*apply H2...*)
-Admitted.
+    apply H2...
+Qed.
 
 Lemma captures_narrowing_typ : forall F X P Q E xs x,
   ok (F ++ [(X, bind_typ Q)] ++ E) ->
