@@ -453,25 +453,31 @@ Lemma sub_implies_subcapt : forall E S T C D,
   cv E S C ->
   cv E T D ->
   subcapt E C D.
-Proof with eauto using subcapt_reflexivity.
+Proof with eauto using subcapt_reflexivity, cv_weakening_head.
   intros E S T C D Hsub WfC WfD HcvC HcvD.
 
   induction Hsub; destruct C; destruct D; try solve [inversion HcvC; inversion HcvD; eauto].  
   - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...  
   - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
-  (* TODO factor into lemma binds_unique *)
-  - admit.
-    (* inversion HcvC; subst. inversion H4. inversion H. rewrite H4 in H2. inversion H2; subst. *)
-    (* apply IHHsub... *)
-  - admit.
+  - exfalso. admit.
     (* inversion HcvC; subst. inversion H1. inversion H. rewrite H4 in H2. inversion H2; subst. *)
     (* apply IHHsub... *)
   - inversion HcvC; subst. inversion HcvD; subst...
     apply subcapt_universal...
   - inversion HcvC; subst. inversion HcvD; subst...
-    all: admit.
-  - admit.
-  - admit.
+    + epose proof (cv_unique _ _ _ _ _ _ H3 H8) as Eq; inversion Eq...
+    + assert (T0 = U) by admit. subst.
+      inversion Hsub; subst.
+      * assert (cv ([(X, bind_sub X0)] ++ E0) X0 (cset_set t t0))...        
+      * apply IHHsub...
+    + assert (T0 = U) by admit. subst.       
+      apply IHHsub...
+    + inversion H4; subst.
+      * assert (T0 = U) by admit; subst...
+      * admit.
+  - exfalso. inversion HcvC; inversion HcvD; subst... inversion H.
+  - inversion HcvC. inversion HcvD; subst...
 Admitted.
 
 (* ********************************************************************** *)
