@@ -1580,15 +1580,19 @@ Proof with simpl_env;
       * eapply wf_env_subst_cb...
     + SCase "x0 <> x".
       binds_cases H0.
-      * assert ((typ_capt x0 P) = (subst_ct x C (typ_capt x0 P))) as Heq. {
-          apply subst_ct_fresh.
-          (* somehow by larger env being wf *)
-          admit.
-        }
-        rewrite <- Heq.
+      * replace (subst_ct x C (typ_capt x0 P)) with (typ_capt x0 P).
         rewrite_env (empty ++ map (subst_cb x C) F ++ E).
         apply typing_weakening...
         eapply wf_env_subst_cb...
+        apply subst_ct_fresh.
+        assert (x `notin` fv_ept P). {
+          assert (x `notin` dom E). { eapply fresh_mid_tail... }
+          epose proof (wf_typ_from_binds_typ _ _ _ _ H0).
+          assert (wf_pretyp E P). { inversion H2... }
+          epose proof (notin_fv_wf_pretyp _ _ _ H3 H1).
+          notin_solve.
+        }
+        notin_solve.
       * simpl.
         rewrite <- (subst_cset_fresh x).
         2: notin_solve.
