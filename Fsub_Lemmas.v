@@ -719,10 +719,14 @@ Proof with eauto.
 Qed.
 
 Local Lemma notin_fv_open_cset : forall (X : atom) c C k,
+  c <> cset_universal ->
   X `notin` (fv_cset (open_cset k c C)) ->
   X `notin` (fv_cset C).
 Proof with auto.
-Admitted.
+  intros. revert H0.
+  unfold fv_cset. unfold open_cset.
+  cset_split; destruct C eqn:HC; destruct c eqn:Hc...
+Qed.
 
 (* revert H. 
     unfold fv_cset. unfold open_cset. 
@@ -778,6 +782,7 @@ Proof with eauto*.
   intros Y X T. 
   induction T ; simpl ; intros k H Fr ; try apply notin_union; eauto.
   - apply notin_fv_open_cset with (k := k) (c := Y)...
+    discriminate.
   - apply notin_fv_ct_open_cpt_rec with (k := k) (Y := Y)...
 ------
   intros Y X T.
