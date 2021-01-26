@@ -1722,9 +1722,9 @@ Proof with simpl_env;
   generalize dependent F.
   induction Typ; intros F EQ; subst;
     simpl subst_te in *; simpl subst_tt in *...
-  - Case "typing_var_tvar".
+  (* - Case "typing_var_tvar".
     rewrite (map_subst_tb_id E Z P).
-    binds_cases H0.
+    binds_cases H0. *)
   - Case "typing_var".
   (*
     apply typing_var.
@@ -1821,24 +1821,25 @@ Lemma preservation : forall E e e' T,
 Proof with simpl_env; eauto.
   intros E e e' T Typ. generalize dependent e'.
   induction Typ; intros e' Red; try solve [ inversion Red; subst; eauto ].
-  Case "typing_app".
+  - Case "typing_app".
     inversion Red; subst...
-    SCase "red_abs".
+    + SCase "red_abs".
       destruct (typing_inv_abs _ _ _ _ Typ1 T1 T2 Cf) as [P1 [S2 [L P2]]].
         apply sub_reflexivity...
       pick fresh x.
       destruct (P2 x) as [? ?]...
       rewrite (subst_ee_intro x)...
+      rewrite (subst_ct_intro x)...
       rewrite_env (empty ++ E).
-      (* admit. *)
       rewrite_env (map (subst_cb x C) empty ++ E).
-      rewrite (subst_ct_intro x).
-      apply (typing_through_subst_ee T).
+      apply (typing_through_subst_ee T)...
         apply (typing_sub S2)...
           rewrite_env (empty ++ [(x, bind_typ T)] ++ E).
           apply sub_weakening...
+        epose proof (sub_implies_subcapt _ _ _ _ _ P1).
+        (* Here we need to show that ct T = C *)
         admit.
-  Case "typing_tapp".
+  - Case "typing_tapp".
     inversion Red; subst...
     SCase "red_tabs".
       destruct (typing_inv_tabs _ _ _ _ Typ T1 T2 C) as [P1 [S2 [L P2]]].
