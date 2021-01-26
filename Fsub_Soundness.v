@@ -566,7 +566,7 @@ Admitted.
 
 (** Again, probably not true, due to cv looking into type bindings. *)
 Lemma captures_narrowing : forall F Z P Q E xs x,
-  wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
+  ok (F ++ [(Z, bind_sub P)] ++ E) ->
   sub E P Q ->
   captures (F ++ [(Z, bind_sub Q)] ++ E) xs x ->
   captures (F ++ [(Z, bind_sub P)] ++ E) xs x.
@@ -646,11 +646,18 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing
     }
 Admitted.
 
+Lemma ok_ignores_binding : forall (F E: env) x b1 b2,
+  ok (F ++ [(x, b1)] ++ E) ->
+  ok (F ++ [(x, b2)] ++ E).
+Proof.
+Admitted.
+
+Hint Resolve ok_ignores_binding : core.
 
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
   (* many of those premises could be replaced by adding wf_env to subcapt_regular *)
-  wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
+  ok (F ++ [(Z, bind_sub P)] ++ E) ->
   subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(Z, bind_sub P)] ++ E) C1 C2.
 Proof with eauto using wf_cset_narrowing, wf_env_narrowing, captures_narrowing.
@@ -669,18 +676,15 @@ Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
   ok (F ++ [(x, bind_typ P)] ++ E) ->
   subcapt (F ++ [(x, bind_typ Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(x, bind_typ P)] ++ E) C1 C2.
-Proof with eauto using wf_cset_narrowing_typ.
+Proof with eauto using wf_cset_narrowing_typ, captures_narrowing_typ.
   intros F E x P Q C1 C2 PsubQ Ok C1subC2.
   remember (F ++ [(x, bind_typ Q)] ++ E). generalize dependent F.
   induction C1subC2 ; intros ; subst...
   - econstructor...
     unfold AtomSet.F.For_all.
     intros.
-    unfold AtomSet.F.For_all in H1.
-    specialize (H1 x0 H2).
-    eapply captures_narrowing_typ with (Q := Q)...
-    admit.
-Admitted.
+    specialize (H1 x0 H2)...
+Qed.
 
 Definition transitivity_on Q := forall E S T,
   sub E S Q -> sub E Q T -> sub E S T.
@@ -723,7 +727,7 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing,
         inversion H1; subst...
     + SCase "X <> Z".
       apply (sub_trans_tvar U)...
-  - apply sub_capt...
+  - apply sub_capt...    
 ------
   intros Q F E Z P S T TransQ SsubT PsubQ.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
@@ -830,8 +834,6 @@ Proof with simpl_env; eauto using wf_typ_narrowing_typ, wf_pretyp_narrowing_typ,
     + apply binds_tail. apply binds_tail... auto.
     + apply binds_head...
   - apply sub_capt...
-    eapply subcapt_narrowing_typ...
-    apply cheat.
 ------
   intros Q F E x P S T TransQ SsubT PsubQ.
   remember (F ++ [(x, bind_typ Q)] ++ E). generalize dependent F.

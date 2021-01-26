@@ -1419,6 +1419,7 @@ Hint Extern 1 (wf_cset ?E ?C) =>
 Hint Extern 1 (wf_env ?E) =>
   match goal with
   | H: sub _ _ _ |- _ => apply (proj1 (sub_regular _ _ _ H))
+  | H: sub_pre _ _ _ |- _ => apply (proj1 (sub_pre_regular _ _ _ H))
   | H: typing _ _ _ |- _ => apply (proj1 (typing_regular _ _ _ H))
   end
 : core.
