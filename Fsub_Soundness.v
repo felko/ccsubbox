@@ -1707,6 +1707,34 @@ Admitted.
 (************************************************************************ *)
 (** ** Type substitution preserves typing (11) *)
 
+Lemma subst_te_idempotent_wrt_free_for_cv : forall e x C,
+    free_for_cv (subst_te x C e) = free_for_cv e.
+Proof.
+Admitted.
+
+Lemma subst_tt_open_ct : forall x C S T,
+    type S ->
+    open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
+Proof.
+Admitted.
+
+Lemma subst_tt_open_ct_var : forall x y S T,
+    type S ->
+    open_ct (subst_tt x S T) (cset_fvar y) = subst_tt x S (open_ct T (cset_fvar y)).
+Proof.
+  intros.
+  apply subst_tt_open_ct; auto.
+Qed.
+
+Hint Extern 1 (wf_typ ?E ?T) =>
+match goal with
+| H : wf_typ ?E (typ_capt _ ?P) |- _ =>
+  inversion H; subst; (match goal with
+                       | H : wf_pretyp ?E (typ_arrow ?T _) |- _ =>
+                         inversion H; subst; assumption
+                       end)
+end.
+
 Lemma typing_through_subst_te : forall Q E F Z e T P,
   typing (F ++ [(Z, bind_sub Q)] ++ E) e T ->
   sub E P Q ->
@@ -1745,19 +1773,34 @@ Proof with simpl_env;
     admit.
   - Case "typing_abs".
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
-    2: { (* Alex: needs a lemma? *) admit. }
+    2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
     pick fresh y and apply typing_abs.
     rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E).
     rewrite subst_te_open_ee_var...
-    (* Alex: missing open_ct-subst_tt lemma... *)
-    admit.
-    (* rewrite (subst_tt_open_ct Z y)... *)
-    (* eapply (H0 y _ ([(y, bind_typ V)] ++ F) _)... *)
+    rewrite subst_tt_open_ct_var...
+    unshelve eapply (H0 y _ ([(y, bind_typ V)] ++ F) _)...
   - Case "typing_app".
-    admit.
+    unshelve epose proof (IHTyp2 F _)...
+    unshelve epose proof (IHTyp1 F _)...
+    unshelve epose proof (cv_exists (map (subst_tb Z P) F ++ E) (subst_tt Z P T1') _ _) as [? ?]...
+    assert (wf_typ (map (subst_tb Z P) F ++ E)
+                  (typ_capt Cf (typ_arrow (subst_tt Z P T1) (subst_tt Z P T2))))...
+    unshelve epose proof (cv_exists (map (subst_tb Z P) F ++ E) (subst_tt Z P T1) _ _) as [? ?]...
+    rewrite <- subst_tt_open_ct...
+    eapply typing_app.
+    + apply H5.
+    + apply H4.
+    + trivial...
+    + trivial...
+    + trivial...
+    + eapply subcapt_transitivity with (C2 := Cv')...
+      eapply cv_through_subst_tt with (T := T1')...
+      eapply subcapt_through_subst_tt...
+    + (* Alex: unsound, again ?!? *)
+      admit.
   - Case "typing_tabs".
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
-    2: { (* Alex: needs a lemma? *) admit. }
+    2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
     pick fresh Y and apply typing_tabs.
     rewrite subst_te_open_te_var...
     rewrite subst_tt_open_tt_var...
