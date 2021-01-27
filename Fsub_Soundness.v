@@ -692,6 +692,11 @@ Definition transitivity_on Q := forall E S T,
 Definition transitivity_pre_on Q := forall E S T,
   sub_pre E S Q -> sub_pre E Q T -> sub_pre E S T.
 
+Hint Extern 1 (wf_env ?E) =>
+match goal with
+| H : sub_pre ?E _ _ |- _ => apply (proj1 (sub_pre_regular _ _ _ H))
+end.
+
 Lemma sub_narrowing_aux : forall Q F E Z P S T,
   transitivity_on Q ->
   sub (F ++ [(Z, bind_sub Q)] ++ E) S T ->
@@ -727,7 +732,7 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing,
         inversion H1; subst...
     + SCase "X <> Z".
       apply (sub_trans_tvar U)...
-  - apply sub_capt...    
+  - eapply sub_capt...
 ------
   intros Q F E Z P S T TransQ SsubT PsubQ.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
@@ -1533,16 +1538,9 @@ Proof with simpl_env;
   assert (wf_env E) as HwfE. {
     apply wf_env_strengthening with (F := (F ++ [(x, bind_typ U)]))...
   }
-  (* assert (wf_env (F ++ [(x, bind_typ U)] ++ E)) as HwfFxE by auto. *)
-  (* assert (wf_env (map (subst_cb x C) F ++ E)) as HwfsubstFE. { *)
-  (*   (* rewrite_env (map (subst_cb x C) F ++ E). *) *)
-  (*   eapply wf_env_subst_cb... *)
-  (* } *)
   remember (F ++ [(x, bind_typ U)] ++ E).
   generalize dependent F.
   induction HtypT; intros F EQ; subst; simpl subst_ee...
-  (* induction HtypT; intros F EQ HwfsubstFE; subst; simpl subst_ee... *)
-
   (** The typing_var case involves a case analysis on whether the
       variable is the same as the one being substituted for. *)
 
@@ -1633,9 +1631,6 @@ Proof with simpl_env;
     destruct (AtomSet.F.mem x (cset_fvars (free_for_cv e1))) eqn:EqMem.
     + SCase "x in fv e1".
       assert (x `in` cset_fvars (free_for_cv e1)) by (rewrite AtomSetFacts.mem_iff; assumption).
-      (* assert (x `in` cset_fvars (free_for_cv e1)). { *)
-      (*   assert (x `in` (fv_ee e1)) by (rewrite AtomSetFacts.mem_iff; assumption). *)
-      (* } *)
       rewrite foo...
       eenough (typing (map (subst_cb x C) F ++ E)
                       _
@@ -1726,32 +1721,50 @@ Proof with simpl_env;
   generalize dependent F.
   induction Typ; intros F EQ; subst;
     simpl subst_te in *; simpl subst_tt in *...
-  (* - Case "typing_var_tvar".
-    rewrite (map_subst_tb_id E Z P).
-    binds_cases H0. *)
-  - Case "typing_var".
-  (*
-    apply typing_var.
+  - Case "typing_var_tvar".
+    destruct (X == Z).
+    (* Alex: for some reason, ifs in bindings don't want to reduce below... *)
+    + subst.
       rewrite (map_subst_tb_id E Z P);
         [ | auto | eapply fresh_mid_tail; eauto ].
-      binds_cases H0... *)
+      binds_cases H0...
+      * enough (binds x (subst_tb Z P (bind_typ Z)) (map (subst_tb Z P) E))...
+        simpl in *.
+        admit.
+      * admit.
+    + subst.
+      apply typing_var_tvar...
+      rewrite (map_subst_tb_id E Z P);
+        [ | auto | eapply fresh_mid_tail; eauto ].
+      binds_cases H0...
+      * enough (binds x (subst_tb Z P (bind_typ X)) (map (subst_tb Z P) E))...
+        simpl in H1...
+        admit.
+      * admit.
+  - Case "typing_var".
     admit.
   - Case "typing_abs".
+    replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
+    2: { (* Alex: needs a lemma? *) admit. }
+    pick fresh y and apply typing_abs.
+    rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E).
+    rewrite subst_te_open_ee_var...
+    (* Alex: missing open_ct-subst_tt lemma... *)
     admit.
-    (* pick fresh y and apply typing_abs. *)
-    (* rewrite subst_te_open_ee_var... *)
-    (* rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E). *)
-    (* apply H0... *)
+    (* rewrite (subst_tt_open_ct Z y)... *)
+    (* eapply (H0 y _ ([(y, bind_typ V)] ++ F) _)... *)
+  - Case "typing_app".
+    admit.
   - Case "typing_tabs".
-  (*
+    replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
+    2: { (* Alex: needs a lemma? *) admit. }
     pick fresh Y and apply typing_tabs.
     rewrite subst_te_open_te_var...
     rewrite subst_tt_open_tt_var...
     rewrite_env (map (subst_tb Z P) ([(Y, bind_sub V)] ++ F) ++ E).
     apply H0...
-  Case "typing_tapp".
-    rewrite subst_tt_open_tt... *)
-  admit.
+  - Case "typing_tapp".
+    rewrite subst_tt_open_tt...
 Admitted.
 
 
