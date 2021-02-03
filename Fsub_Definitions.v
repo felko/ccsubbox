@@ -57,7 +57,7 @@ Inductive exp : Type :=
   | exp_bvar : nat -> exp
   | exp_fvar : atom -> exp
   | exp_abs : typ -> exp -> exp
-  | exp_app : exp -> captureset -> exp -> exp
+  | exp_app : exp -> exp -> exp
   | exp_tabs : typ -> exp -> exp
   | exp_tapp : exp -> typ -> exp
 .
@@ -127,9 +127,7 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   | exp_bvar i => exp_bvar i
   | exp_fvar x => exp_fvar x
   | exp_abs V e1 => exp_abs  (open_tt_rec K U V)  (open_te_rec K U e1)
-  (** NEW: applications have an explicitly annotated capture set.
-        As capture sets don't mention type variables, C is just carried through *)
-  | exp_app e1 C e2 => exp_app  (open_te_rec K U e1) C (open_te_rec K U e2)
+  | exp_app e1 e2 => exp_app  (open_te_rec K U e1) (open_te_rec K U e2)
   | exp_tabs V e1 => exp_tabs (open_tt_rec K U V)  (open_te_rec (S K) U e1)
   | exp_tapp e1 V => exp_tapp (open_te_rec K U e1) (open_tt_rec K U V)
   end.
@@ -152,7 +150,7 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (c : captureset) (e : exp)  {struct e} 
   | exp_bvar i => if k === i then f else (exp_bvar i)
   | exp_fvar x => exp_fvar x
   | exp_abs t e1 => exp_abs (open_ct_rec k c t) (open_ee_rec (S k) f c e1)
-  | exp_app e1 C e2 => exp_app (open_ee_rec k f c e1) (open_cset k c C) (open_ee_rec k f c e2)
+  | exp_app e1 e2 => exp_app (open_ee_rec k f c e1) (open_ee_rec k f c e2)
   | exp_tabs t e1 => exp_tabs (open_ct_rec k c t) (open_ee_rec k f c e1)
   | exp_tapp e1 t => exp_tapp (open_ee_rec k f c e1) (open_ct_rec k c t)
   end.
@@ -256,11 +254,10 @@ Inductive expr : exp -> Prop :=
       type T ->
       (forall x : atom, x `notin` L -> expr (open_ee e1 x x)) ->
       expr (exp_abs T e1)
-  | expr_app : forall e1 e2 C,
+  | expr_app : forall e1 e2,
       expr e1 ->
       expr e2 ->
-      capt C ->
-      expr (exp_app e1 C e2)
+      expr (exp_app e1 e2)
   | expr_tabs : forall L T e1,
       type T ->
       (forall X : atom, X `notin` L -> expr (open_te e1 X)) ->
@@ -368,38 +365,42 @@ Notation "[ x ]" := (x :: nil).
   sets -- only term variables are allowed. *)
 Definition allbound_typ (E : env) (X : atoms) : Prop :=
   forall x, AtomSet.F.In x X -> exists T, binds x (bind_typ T) E.
+Definition present_in (A : atoms) (X : atoms) : Prop :=
+  forall x, AtomSet.F.In x X -> AtomSet.F.In x A.
+  
 
-Inductive wf_cset : env -> captureset -> Prop :=
-  | wf_universal_cset : forall E,
-    wf_cset E cset_universal
-  | wf_concrete_cset : forall E fvars,
+Inductive wf_cset : env -> atoms -> captureset -> Prop :=
+  | wf_universal_cset : forall E A,
+    wf_cset E A cset_universal
+  | wf_concrete_cset : forall E A fvars,
     (allbound_typ E fvars) ->
-    wf_cset E (cset_set fvars {}N)
+    (present_in A fvars) ->
+    wf_cset E A (cset_set fvars {}N)
 .
 
 (* Wellformedness of types where locally bound variables are only
    allowed in positive positions. *)
-Inductive wf_typ : env -> typ -> Prop :=
-  | wf_typ_var : forall U E (X : atom),
+Inductive wf_typ : env -> atoms -> atoms -> typ -> Prop :=
+  | wf_typ_var : forall U E Ap Am (X : atom),
       binds X (bind_sub U) E ->
-      wf_typ E (typ_fvar X)
-  | wf_typ_capt : forall E C P,
-      wf_cset E C ->
-      wf_pretyp E P ->
-      wf_typ E (typ_capt C P)
-with wf_pretyp : env -> pretyp -> Prop :=
-  | wf_typ_top : forall E,
-      wf_pretyp E typ_top
-  | wf_typ_arrow : forall L E T1 T2,
-      wf_typ E T1 ->
+      wf_typ E Ap Am (typ_fvar X)
+  | wf_typ_capt : forall E Ap Am C P,
+      wf_cset E Ap C ->
+      wf_pretyp E Ap Am P ->
+      wf_typ E Ap Am (typ_capt C P)
+with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
+  | wf_typ_top : forall E Ap Am,
+      wf_pretyp E Ap Am typ_top
+  | wf_typ_arrow : forall L E Ap Am T1 T2,
+      wf_typ E Am Ap T1 ->
       (forall X : atom, X `notin` L ->
-        wf_typ ([(X, bind_typ T1)] ++ E) (open_ct T2 X)) ->
-        wf_pretyp E (typ_arrow T1 T2)
-  | wf_typ_all : forall L E T1 T2,
-      wf_typ E T1 ->
+        wf_typ ([(X, bind_typ T1)] ++ E) (Ap `union` singleton X) Am (open_ct T2 X)) ->
+      wf_pretyp E Ap Am (typ_arrow T1 T2)
+  | wf_typ_all : forall L E Ap Am T1 T2,
+      wf_typ E Am Ap T1 ->
       (forall X : atom, X `notin` L ->
-      wf_typ ([(X, bind_sub T1)] ++ E) (open_tt T2 X)) ->
-      wf_pretyp E (typ_all T1 T2)
+      wf_typ ([(X, bind_sub T1)] ++ E) Ap Am (open_tt T2 X)) ->
+      wf_pretyp E Ap Am (typ_all T1 T2)
 .
 
 (** An environment E is well-formed, denoted [(wf_env E)], if each
@@ -417,13 +418,13 @@ Inductive wf_env : env -> Prop :=
   | wf_env_sub : forall (E : env) (X : atom) (T : typ),
       wf_env E ->
       (* TODO verify this when we check regularity *)
-      wf_typ E T ->
+      wf_typ E (dom E) (dom E) T ->
       X `notin` dom E ->
       wf_env ([(X, bind_sub T)] ++ E)
   | wf_env_typ : forall (E : env) (x : atom) (T : typ),
       wf_env E ->
       (* TODO verify this when we check regularity *)
-      wf_typ E T ->
+      wf_typ E (dom E) (dom E) T ->
       x `notin` dom E ->
       wf_env ([(x, bind_typ T)] ++ E).
 
@@ -440,10 +441,10 @@ Inductive cv : env -> typ -> captureset -> Prop :=
     X <> Y ->
     cv E X CT ->
     cv ([(Y, B)] ++ E) (typ_fvar X) CT
-  | cv_typ_capt : forall E C P,
+  | cv_typ_capt : forall E Ap Am C P,
     wf_env E ->
-    wf_pretyp E P ->
-    wf_cset E C ->
+    wf_pretyp E Ap Am P ->
+    wf_cset E Ap C ->
     cv E (typ_capt C P) C.
 
 
@@ -467,11 +468,11 @@ Inductive captures : env -> atoms -> atom -> Prop :=
 
 Inductive subcapt : env -> captureset -> captureset -> Prop :=
   | subcapt_universal : forall E C,
-      wf_cset E C ->
+      wf_cset E (dom E) C ->
       subcapt E C cset_universal
   | subcapt_set : forall E xs ys,
-      wf_cset E (cset_set xs {}N) ->
-      wf_cset E (cset_set ys {}N) ->
+      wf_cset E (dom E) (cset_set xs {}N) ->
+      wf_cset E (dom E) (cset_set ys {}N) ->
       AtomSet.F.For_all (captures E ys) xs ->
       subcapt E (cset_set xs {}N) (cset_set ys {}N)
 .
@@ -489,7 +490,7 @@ Inductive sub : env -> typ -> typ -> Prop :=
      and sub_transitivity. *)
   | sub_refl_tvar : forall E X,
       wf_env E ->
-      wf_typ E (typ_fvar X) ->
+      wf_typ E (dom E) (dom E) (typ_fvar X) ->
       sub E (typ_fvar X) (typ_fvar X)
 
   | sub_trans_tvar : forall U E T X,
@@ -510,7 +511,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
   *)
   | sub_top : forall E S,
       wf_env E ->
-      wf_pretyp E S ->
+      wf_pretyp E (dom E) (dom E) S ->
       sub_pre E S typ_top
 
   (*
@@ -552,7 +553,7 @@ match e with
   | exp_bvar i => {}C
   | exp_fvar x => (cset_fvar x)
   | exp_abs t e1 => (free_for_cv e1)
-  | exp_app e1 C e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
+  | exp_app e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
   | exp_tabs t e1 => (free_for_cv e1)
   | exp_tapp e1 t => (free_for_cv e1)
   end.
@@ -570,15 +571,12 @@ Inductive typing : env -> exp -> typ -> Prop :=
       (forall x : atom, x `notin` L ->
         typing ([(x, bind_typ V)] ++ E) (open_ee e1 x x) (open_ct T1 x)) ->
       typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
-  | typing_app : forall T1 E e1 C e2 T2 Cf Cv Cv' T1',
+  | typing_app : forall T1 E e1 e2 T2 Cf Cv' T1',
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
       typing E e2 T1' ->
       sub E T1' T1 ->
       cv E T1' Cv' ->
-      cv E T1 Cv ->
-      subcapt E Cv' C ->
-      subcapt E C Cv ->
-      typing E (exp_app e1 C e2) (open_ct T2 C)
+      typing E (exp_app e1 e2) (open_ct T2 Cv')
   | typing_tabs : forall L E V e1 T1,
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
@@ -611,25 +609,24 @@ Inductive value : exp -> Prop :=
 (** * #<a name="reduction"></a># Reduction *)
 
 Inductive red : exp -> exp -> Prop :=
-  | red_app_1 : forall e1 e1' e2 C,
+  | red_app_1 : forall e1 e1' e2,
       expr e2 ->
-      capt C ->
       red e1 e1' ->
-      red (exp_app e1 C e2) (exp_app e1' C e2)
-  | red_app_2 : forall e1 e2 e2' C,
+      red (exp_app e1 e2) (exp_app e1' e2)
+  | red_app_2 : forall e1 e2 e2',
       value e1 ->
-      capt C ->
       red e2 e2' ->
-      red (exp_app e1 C e2) (exp_app e1 C e2')
+      red (exp_app e1 e2) (exp_app e1 e2')
   | red_tapp : forall e1 e1' V,
       type V ->
       red e1 e1' ->
       red (exp_tapp e1 V) (exp_tapp e1' V)
-  | red_abs : forall T e1 v2 C,
+  | red_abs : forall T e1 v2,
       expr (exp_abs T e1) ->
-      capt C ->
       value v2 ->
-      red (exp_app (exp_abs T e1) C v2) (open_ee e1 v2 C)
+      red (exp_app (exp_abs T e1) v2) 
+        (** is this the right reduction semantics? *)
+        (open_ee e1 v2 (free_for_cv v2))
   | red_tabs : forall T1 e1 T2,
       expr (exp_tabs T1 e1) ->
       type T2 ->
