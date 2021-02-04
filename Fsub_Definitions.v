@@ -20,6 +20,8 @@ Require Export Metatheory.
 Require Export CaptureSets.
 Require Import Coq.Program.Wf.
 
+Require Import Atom.
+
 (* ********************************************************************** *)
 (** * #<a name="syntax"></a># Syntax (pre-terms) *)
 
@@ -365,18 +367,18 @@ Notation "[ x ]" := (x :: nil).
   sets -- only term variables are allowed. *)
 Definition allbound_typ (E : env) (X : atoms) : Prop :=
   forall x, AtomSet.F.In x X -> exists T, binds x (bind_typ T) E.
-Definition present_in (A : atoms) (X : atoms) : Prop :=
-  forall x, AtomSet.F.In x X -> AtomSet.F.In x A.
-  
 
 Inductive wf_cset : env -> atoms -> captureset -> Prop :=
   | wf_universal_cset : forall E A,
     wf_cset E A cset_universal
   | wf_concrete_cset : forall E A fvars,
-    (allbound_typ E fvars) ->
-    (present_in A fvars) ->
+    allbound_typ E fvars ->
+    AtomSet.F.Subset fvars A ->
     wf_cset E A (cset_set fvars {}N)
 .
+
+Definition wf_cset_in (E : env) (C : captureset) : Prop :=
+  wf_cset E (dom E) C.
 
 (* Wellformedness of types where locally bound variables are only
    allowed in positive positions. *)
@@ -403,6 +405,12 @@ with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
       wf_pretyp E Ap Am (typ_all T1 T2)
 .
 
+Definition wf_typ_in (E : env) (T : typ) : Prop :=
+  wf_typ E (dom E) (dom E) T.
+
+Definition wf_pretyp_in (E : env) (U : pretyp) : Prop :=
+  wf_pretyp E (dom E) (dom E) U.
+
 (** An environment E is well-formed, denoted [(wf_env E)], if each
     atom is bound at most at once and if each binding is to a
     well-formed type.  This is a stronger relation than the [ok]
@@ -418,13 +426,13 @@ Inductive wf_env : env -> Prop :=
   | wf_env_sub : forall (E : env) (X : atom) (T : typ),
       wf_env E ->
       (* TODO verify this when we check regularity *)
-      wf_typ E (dom E) (dom E) T ->
+      wf_typ_in E T ->
       X `notin` dom E ->
       wf_env ([(X, bind_sub T)] ++ E)
   | wf_env_typ : forall (E : env) (x : atom) (T : typ),
       wf_env E ->
       (* TODO verify this when we check regularity *)
-      wf_typ E (dom E) (dom E) T ->
+      wf_typ_in E T ->
       x `notin` dom E ->
       wf_env ([(x, bind_typ T)] ++ E).
 
@@ -441,12 +449,11 @@ Inductive cv : env -> typ -> captureset -> Prop :=
     X <> Y ->
     cv E X CT ->
     cv ([(Y, B)] ++ E) (typ_fvar X) CT
-  | cv_typ_capt : forall E Ap Am C P,
+  | cv_typ_capt : forall E C P,
     wf_env E ->
-    wf_pretyp E Ap Am P ->
-    wf_cset E Ap C ->
+    wf_pretyp_in E P ->
+    wf_cset_in E C ->
     cv E (typ_capt C P) C.
-
 
 
 (* ********************************************************************** *)
@@ -468,11 +475,11 @@ Inductive captures : env -> atoms -> atom -> Prop :=
 
 Inductive subcapt : env -> captureset -> captureset -> Prop :=
   | subcapt_universal : forall E C,
-      wf_cset E (dom E) C ->
+      wf_cset_in E C ->
       subcapt E C cset_universal
   | subcapt_set : forall E xs ys,
-      wf_cset E (dom E) (cset_set xs {}N) ->
-      wf_cset E (dom E) (cset_set ys {}N) ->
+      wf_cset_in E (cset_set xs {}N) ->
+      wf_cset_in E (cset_set ys {}N) ->
       AtomSet.F.For_all (captures E ys) xs ->
       subcapt E (cset_set xs {}N) (cset_set ys {}N)
 .
@@ -490,7 +497,7 @@ Inductive sub : env -> typ -> typ -> Prop :=
      and sub_transitivity. *)
   | sub_refl_tvar : forall E X,
       wf_env E ->
-      wf_typ E (dom E) (dom E) (typ_fvar X) ->
+      wf_typ_in E (typ_fvar X) ->
       sub E (typ_fvar X) (typ_fvar X)
 
   | sub_trans_tvar : forall U E T X,
@@ -511,7 +518,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
   *)
   | sub_top : forall E S,
       wf_env E ->
-      wf_pretyp E (dom E) (dom E) S ->
+      wf_pretyp_in E S ->
       sub_pre E S typ_top
 
   (*
@@ -523,8 +530,8 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
   *)
   | sub_arrow : forall L E S1 S2 T1 T2,
       sub E T1 S1 ->
-      (* wf_typ E (typ_arrow T1 T2) ->
-      wf_typ E (typ_arrow S1 S2) -> *)
+      wf_pretyp_in E (typ_arrow T1 T2) ->
+      wf_pretyp_in E (typ_arrow S1 S2) ->
       (forall x : atom, x `notin` L ->
           sub ([(x, bind_typ T1)] ++ E) (open_ct S2 x) (open_ct T2 x)) ->
       sub_pre E (typ_arrow S1 S2) (typ_arrow T1 T2)
@@ -536,8 +543,8 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
   *)
   | sub_all : forall L E S1 S2 T1 T2,
       sub E T1 S1 ->
-      (* wf_typ E (typ_arrow T1 T2) ->
-      wf_typ E (typ_arrow S1 S2) -> *)
+      wf_pretyp_in E (typ_all T1 T2) ->
+      wf_pretyp_in E (typ_all S1 S2) ->
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
       sub_pre E (typ_all S1 S2) (typ_all T1 T2)
@@ -624,7 +631,7 @@ Inductive red : exp -> exp -> Prop :=
   | red_abs : forall T e1 v2,
       expr (exp_abs T e1) ->
       value v2 ->
-      red (exp_app (exp_abs T e1) v2) 
+      red (exp_app (exp_abs T e1) v2)
         (** is this the right reduction semantics? *)
         (open_ee e1 v2 (free_for_cv v2))
   | red_tabs : forall T1 e1 T2,
