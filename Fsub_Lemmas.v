@@ -1292,6 +1292,15 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     fsetdec.
 Qed.
 
+Lemma wf_cset_expand_variance_sets : forall E A A' C,
+  wf_cset E A C ->
+  AtomSet.F.Subset A A' ->
+  wf_cset E A' C.
+Proof with eauto*.
+  intros.
+  inversion H; constructor...
+Qed.
+
 (** The things that the cv relation returns are all well-formed,
     assuming the type is well formed... *)
 Lemma cv_wf : forall E T C,
@@ -1300,12 +1309,14 @@ Lemma cv_wf : forall E T C,
 Proof with simpl_env; eauto*.
   intros E T C HC.
   induction HC; intros; subst.
-  all : admit.
-Admitted.
-(*   * apply wf_cset_weaken_head... *)
-(*   * apply wf_cset_weaken_head... *)
-(*   * assumption. *)
-(* Qed. *)
+  * apply wf_cset_weaken_head; simpl dom.
+    apply wf_cset_expand_variance_sets with (A := dom E)...
+    inversion IHHC...
+  * apply wf_cset_weaken_head; simpl dom.
+    apply wf_cset_expand_variance_sets with (A := dom E)...
+    inversion IHHC...
+  * assumption.
+Qed.
 
 Lemma typing_regular : forall E e T,
   typing E e T ->
