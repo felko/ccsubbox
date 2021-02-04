@@ -112,6 +112,14 @@ Proof.
   fsetdec.
 Qed.
 
+Local Lemma atomset_union_right : forall A B C,
+  AtomSet.F.Subset A B ->
+  AtomSet.F.Subset (A `union` C) (B `union` C).
+Proof.
+  intros.
+  fsetdec.
+Qed.
+
 Lemma wf_typ_weakening : forall T E Ap Am Ap' Am' F G,
   wf_typ (G ++ E) Ap Am T ->
   ok (G ++ F ++ E) ->
@@ -143,15 +151,7 @@ Proof with simpl_env; eauto using wf_cset_weakening.
     eapply wf_typ_weakening...
     rewrite <- concat_assoc.
     eapply wf_typ_weakening...
-    Set Nested Proofs Allowed.
-    Local Lemma just_do_it : forall A B C,
-        AtomSet.F.Subset A B ->
-        AtomSet.F.Subset (A `union` C) (B `union` C).
-    Proof.
-      intros.
-      fsetdec.
-    Qed.
-    apply just_do_it.
+    apply atomset_union_right.
     fsetdec.
   (* typ_all case *)
   - pick fresh Y and apply wf_typ_all.
@@ -192,14 +192,6 @@ with wf_pretyp_narrowing : forall V U T E Ap Am F X,
   wf_pretyp (F ++ [(X, bind_sub V)] ++ E) Ap Am T ->
   ok (F ++ [(X, bind_sub U)] ++ E) ->
   wf_pretyp (F ++ [(X, bind_sub U)] ++ E) Ap Am T.
-(* Lemma wf_typ_narrowing : forall V U T E F X, *)
-(*   wf_typ_in (F ++ [(X, bind_sub V)] ++ E) T -> *)
-(*   ok (F ++ [(X, bind_sub U)] ++ E) -> *)
-(*   wf_typ_in (F ++ [(X, bind_sub U)] ++ E) T *)
-(* with wf_pretyp_narrowing : forall V U T E F X, *)
-(*   wf_pretyp_in (F ++ [(X, bind_sub V)] ++ E) T -> *)
-(*   ok (F ++ [(X, bind_sub U)] ++ E) -> *)
-(*   wf_pretyp_in (F ++ [(X, bind_sub U)] ++ E) T. *)
 Proof with simpl_env; eauto using wf_cset_narrowing.
 ------
   intros.
@@ -283,7 +275,7 @@ Proof with simpl_env; eauto*.
   * exists (subst_tt Z P T)...
 Qed.
 
-Lemma come_on : forall E Ap Am Ap' Am' T,
+Lemma wf_typ_expand_variance_sets : forall E Ap Am Ap' Am' T,
   wf_typ E Ap Am T ->
   ok E ->
   AtomSet.F.Subset Ap Ap' ->
@@ -344,13 +336,13 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
       rewrite <- subst_tt_open_ct_rec...
       rewrite_env (map (subst_tb Z P) ([(Y, bind_typ T1)] ++ F) ++ E).
       eapply wf_typ_subst_tb...
-      * apply come_on with (Ap := Ap) (Am := Am)...
+      * apply wf_typ_expand_variance_sets with (Ap := Ap) (Am := Am)...
         ** rewrite_env (empty ++ E).
            rewrite_env (empty ++ map (subst_tb Z P) F ++ E) in Hok.
            eapply ok_remove_mid...
         ** fsetdec.
         ** fsetdec.
-      * apply come_on with (Ap := Am) (Am := Ap)...
+      * apply wf_typ_expand_variance_sets with (Ap := Am) (Am := Ap)...
         ** rewrite_env (empty ++ E).
            rewrite_env (empty ++ map (subst_tb Z P) F ++ E) in Hok.
            eapply ok_remove_mid...
@@ -363,18 +355,6 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
       rewrite subst_tt_open_tt_var...
       rewrite_env (map (subst_tb Z P) ([(Y, bind_sub T1)] ++ F) ++ E).
       eapply wf_typ_subst_tb...
-      (* * apply come_on with (Ap := Ap) (Am := Am)... *)
-      (*   ** rewrite_env (empty ++ E). *)
-      (*      rewrite_env (empty ++ map (subst_tb Z P) F ++ E) in Hok. *)
-      (*      eapply ok_remove_mid... *)
-      (*   ** fsetdec. *)
-      (*   ** fsetdec. *)
-      (* * apply come_on with (Ap := Am) (Am := Ap)... *)
-      (*   ** rewrite_env (empty ++ E). *)
-      (*      rewrite_env (empty ++ map (subst_tb Z P) F ++ E) in Hok. *)
-      (*      eapply ok_remove_mid... *)
-      (*   ** fsetdec. *)
-      (*   ** fsetdec. *)
 Qed.
 
 (* Lemma wf_typ_open : forall E U T1 T2, *)
@@ -1052,36 +1032,10 @@ Proof with simpl_env; auto*.
   - Case  "sub_trans_arrow".
     pose proof (sub_regular E _ _ H).
     repeat split...
-    (* + (* S1 -> S2 wf *) *)
-    (*   pick fresh Y and apply wf_typ_arrow... *)
-    (*   assert (Y `notin` L) by fsetdec. *)
-    (*   rewrite_env (empty ++ [(Y, bind_typ S1)] ++ E). *)
-    (*   apply wf_typ_narrowing_typ with (C1 := T1)... *)
-    (*   specialize (H0 Y H2). *)
-    (*   pose proof (sub_regular _ _ _ H0)... *)
-    (*   replace (dom E `union` singleton Y) with (dom ([(Y, bind_typ T1)] ++ E))... *)
-    (*   simpl dom in *. *)
-    (* + (* T1 -> T2 wf *) *)
-    (*   pick fresh Y and apply wf_typ_arrow... *)
-    (*   assert (Y `notin` L) by fsetdec. *)
-    (*   specialize (H0 Y H2). *)
-    (*   pose proof (sub_regular _ _ _ H0)... *)
   - Case "sub_all".
     pose proof (sub_regular E _ _ H).
     repeat split...
     all : trivial.
-    (* SCase "Second of original three conjuncts". *)
-    (*   pick fresh Y and apply wf_typ_all... *)
-    (*   assert (Y `notin` L) by fsetdec. *)
-    (*   specialize (H0 Y H2). *)
-    (*   destruct (sub_regular _ _ _ H0) as [_ [Wf _]]... *)
-    (*   rewrite_env (empty ++ [(Y, bind_sub S1)] ++ E). *)
-    (*   apply (wf_typ_narrowing T1)... *)
-    (* SCase "Third of original three conjuncts". *)
-    (*   pick fresh Y and apply wf_typ_all... *)
-    (*   assert (Y `notin` L) by fsetdec. *)
-    (*   specialize (H0 Y H2). *)
-    (*   destruct (sub_regular _ _ _ H0) as [_ [_ Wf]]... *)
 Qed.
 
 Lemma cv_free_never_universal : forall e,
@@ -1125,39 +1079,6 @@ Proof.
     fsetdec.
   * fsetdec.
 Qed.
-(*
-Lemma cv_open : forall (x y : atom) e,
-  expr e ->
-  cv_free e x ->
-  cv_free (open_ee e y y) x.
-Proof with eauto*.
-  intros.
-  unfold open_ee.
-  rewrite <- open_ee_rec_expr with (e := e) (k := 0) (u := y) (c := y)...
-Qed.
-*)
-
-(*
-Inductive cv_free : exp -> captureset -> Prop :=
-  | cv_free_bvar : forall n,
-                    cv_free (exp_bvar n) {}C
-  | cv_free_fvar : forall x,
-                    cv_free (exp_fvar x) (cset_fvar x)
-  | cv_free_abs : forall T e1 C,
-                    cv_free e1 C ->
-                    cv_free (exp_abs T e1) C
-  | cv_free_app : forall e1 e2 C1 C2 C,
-                    cv_free e1 C1 ->
-                    cv_free e2 C2 ->
-                    cv_free (exp_app e1 C e2) (cset_union C1 C2)
-  | cv_free_tabs : forall T e1 C,
-                    cv_free e1 C ->
-                    cv_free (exp_tabs T e1) C
-  | cv_free_tapp : forall e1 T C,
-                    cv_free e1 C ->
-                    cv_free (exp_tapp e1 T) C
-*)
-
 
 Lemma free_for_cv_open : forall e k (y : atom),
   cset_subset_prop (free_for_cv e) (free_for_cv (open_ee_rec k y y e)).

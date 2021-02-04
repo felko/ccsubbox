@@ -656,3 +656,4 @@ Inductive red : exp -> exp -> Prop :=
 Hint Constructors type pretype expr capt wf_typ wf_pretyp wf_env value red cv sub captures subcapt typing wf_cset : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
+Hint Unfold wf_typ_in wf_pretyp_in : core.
