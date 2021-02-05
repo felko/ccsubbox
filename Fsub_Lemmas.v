@@ -1042,11 +1042,18 @@ Proof with simpl_env; auto*.
   - repeat split...
   - Case  "sub_trans_arrow".
     pose proof (sub_regular E _ _ H).
-    repeat split...
+    repeat split; [
+      auto* |
+      apply wf_typ_arrow with (L := L); auto* |
+      apply wf_typ_arrow with (L := L); auto*
+    ].
   - Case "sub_all".
     pose proof (sub_regular E _ _ H).
-    repeat split...
-    all : trivial.
+    repeat split; [
+      auto* |
+      apply wf_typ_all with (L := L); auto* |
+      apply wf_typ_all with (L := L); auto*
+    ].
 Qed.
 
 Lemma cv_free_never_universal : forall e,

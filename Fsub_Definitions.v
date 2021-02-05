@@ -533,8 +533,12 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
   *)
   | sub_arrow : forall L E S1 S2 T1 T2,
       sub E T1 S1 ->
-      wf_pretyp_in E (typ_arrow T1 T2) ->
-      wf_pretyp_in E (typ_arrow S1 S2) ->
+      wf_typ_in E T1 ->
+      wf_typ_in E S1 ->
+      (forall x : atom, x `notin` L ->
+          wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x)) ->
+      (forall x : atom, x `notin` L ->
+          wf_typ ([(x, bind_typ S1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct S2 x)) ->
       (forall x : atom, x `notin` L ->
           sub ([(x, bind_typ T1)] ++ E) (open_ct S2 x) (open_ct T2 x)) ->
       sub_pre E (typ_arrow S1 S2) (typ_arrow T1 T2)
@@ -546,8 +550,12 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
   *)
   | sub_all : forall L E S1 S2 T1 T2,
       sub E T1 S1 ->
-      wf_pretyp_in E (typ_all T1 T2) ->
-      wf_pretyp_in E (typ_all S1 S2) ->
+      wf_typ_in E T1 ->
+      wf_typ_in E S1 ->
+      (forall X : atom, X `notin` L ->
+          wf_typ ([(X, bind_sub T1)] ++ E) (dom E) (dom E) (open_tt T2 X)) ->
+      (forall X : atom, X `notin` L ->
+          wf_typ ([(X, bind_sub S1)] ++ E) (dom E) (dom E) (open_tt S2 X)) ->
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
       sub_pre E (typ_all S1 S2) (typ_all T1 T2)
