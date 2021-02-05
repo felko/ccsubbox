@@ -586,9 +586,11 @@ Inductive typing : env -> exp -> typ -> Prop :=
       binds x (bind_typ (typ_capt C P)) E ->
       typing E (exp_fvar x) (typ_capt x P)
   | typing_abs : forall L E V e1 T1,
+      wf_typ_in E V ->
+      (forall x : atom, x `notin` L ->
+          wf_typ ([(x, bind_typ V)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T1 x)) ->
       (forall x : atom, x `notin` L ->
         typing ([(x, bind_typ V)] ++ E) (open_ee e1 x x) (open_ct T1 x)) ->
-      wf_pretyp_in E (typ_arrow V T1) ->
       typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
   | typing_app : forall T1 E e1 e2 T2 Cf Cv' T1',
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
@@ -597,9 +599,11 @@ Inductive typing : env -> exp -> typ -> Prop :=
       cv E T1' Cv' ->
       typing E (exp_app e1 e2) (open_ct T2 Cv')
   | typing_tabs : forall L E V e1 T1,
+      wf_typ_in E V ->
+      (forall x : atom, x `notin` L ->
+        wf_typ ([(x, bind_sub V)] ++ E) (dom E) (dom E) (open_tt T1 x)) ->
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
-      wf_pretyp_in E (typ_all V T1) ->
       typing E (exp_tabs V e1) (typ_capt (free_for_cv e1) (typ_all V T1))
   | typing_tapp : forall T1 E e1 T T2 C,
       typing E e1 (typ_capt C (typ_all T1 T2)) ->
