@@ -590,22 +590,21 @@ Qed.
 (*       eapply wf_typ_subst_cb... *)
 (* Qed. *)
 
-(* Lemma wf_typ_open_capt : forall E C T1 T2, *)
-(*   ok E -> *)
-(*   wf_pretyp E (typ_arrow T1 T2) -> *)
-(*   wf_cset E C -> *)
-(*   wf_typ E (open_ct T2 C). *)
-(* Proof with simpl_env; eauto. *)
-(*   intros E U T1 T2 O WA WC. *)
-(*   inversion WA; subst. *)
-(*   pick fresh X. *)
-(*   rewrite (subst_ct_intro X)... *)
-(*   (** Needs new lemmas for opening a type with a capture set; *)
-(*       probably wf_typ_subst_eb and subst_ct_intro X *) *)
-(*   rewrite_env (map (subst_cb X U) empty ++ E). *)
-(*   apply wf_typ_subst_cb with (Q := T1)... *)
-(* Qed. *)
-
+Lemma wf_typ_open_capt : forall E C T1 T2,
+  ok E ->
+  wf_pretyp_in E (typ_arrow T1 T2) ->
+  wf_cset_in E C ->
+  wf_typ_in E (open_ct T2 C).
+Proof with simpl_env; eauto.
+  intros E C T1 T2 Hok HwfA HwfC.
+  inversion HwfA; subst...
+  pick fresh X.
+  rewrite (subst_ct_intro X)...
+  rewrite_env (map (subst_cb X C) empty ++ E).
+  (** another lemma needed *)
+  admit.
+  (*   apply wf_typ_subst_cb with (Q := T1)... *)
+Admitted.
 
 (* ********************************************************************** *)
 (** * #<a name="oktwft"></a># Properties of [wf_env] and [wf_typ] *)
@@ -1379,9 +1378,11 @@ Proof with simpl_env; auto*.
     destruct IHtyping1 as [_ [_ Hwf]].
     inversion Hwf; subst...
     inversion H9; subst...
-    eapply wf_typ_expand_variance_sets.
+    apply wf_typ_expand_variance_sets with (Ap := dom E) (Am := dom E)...
     (** needs substitution lemma here. *)
-    all : admit.
+    apply wf_typ_open_capt with (T1 := T1)...
+    (** needs CV regular *)
+    admit.
   (* typing rule: type abstractions. *)
   - pick fresh y; assert (y `notin` L) by fsetdec...  
     unshelve epose proof (H2 y _) as H4...
