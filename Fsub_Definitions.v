@@ -411,6 +411,9 @@ Definition wf_typ_in (E : env) (T : typ) : Prop :=
 Definition wf_pretyp_in (E : env) (U : pretyp) : Prop :=
   wf_pretyp E (dom E) (dom E) U.
 
+Hint Unfold wf_typ_in : core.
+Hint Unfold wf_pretyp_in : core.
+
 (** An environment E is well-formed, denoted [(wf_env E)], if each
     atom is bound at most at once and if each binding is to a
     well-formed type.  This is a stronger relation than the [ok]
@@ -577,7 +580,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_abs : forall L E V e1 T1,
       (forall x : atom, x `notin` L ->
         typing ([(x, bind_typ V)] ++ E) (open_ee e1 x x) (open_ct T1 x)) ->
-      wf_typ_in E (typ_arrow V T1) ->
+      wf_pretyp_in E (typ_arrow V T1) ->
       typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
   | typing_app : forall T1 E e1 e2 T2 Cf Cv' T1',
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
@@ -588,7 +591,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_tabs : forall L E V e1 T1,
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
-      wf_typ_in E (typ_all V T1) ->
+      wf_pretyp_in E (typ_all V T1) ->
       typing E (exp_tabs V e1) (typ_capt (free_for_cv e1) (typ_all V T1))
   | typing_tapp : forall T1 E e1 T T2 C,
       typing E e1 (typ_capt C (typ_all T1 T2)) ->
