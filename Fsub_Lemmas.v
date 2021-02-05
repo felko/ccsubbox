@@ -32,6 +32,18 @@ Require Import Atom.
 (** If a type is well-formed in an environment, then it is locally
     closed. *)
 
+Ltac clear_frees :=
+  repeat match goal with
+         | H : _ `notin` _ |- _ =>
+           clear H
+         end.
+
+Hint Extern 10 (AtomSet.F.Subset _ _) =>
+idtac "go fsetdec go" ;
+(* NOTE: "free" hypothesis are unlikely to help with subsets and they can cause fsetdec to hang *)
+try solve [clear_frees; simpl_env in *; fsetdec]
+: core.
+
 Lemma capt_from_wf_cset : forall E A C,
   wf_cset E A C -> capt C.
 Proof with auto.
@@ -101,6 +113,18 @@ Proof with auto*.
   wf_cset_simpl True...
 Qed.
 
+Lemma wf_cset_set_weakening : forall E A A' C,
+  wf_cset E A C ->
+  ok E ->
+  AtomSet.F.Subset A A' ->
+  wf_cset E A' C.
+Proof.
+  intros.
+  rewrite_env (empty ++ empty ++ E).
+  rewrite_env (empty ++ E) in H.
+  eapply wf_cset_weakening; eauto.
+Qed.
+
 Lemma wf_cset_weaken_head : forall C E A F,
   wf_cset E A C ->
   ok (F ++ E) ->
@@ -109,7 +133,6 @@ Proof.
   intros.
   rewrite_env (empty ++ F++ E).
   apply wf_cset_weakening with (A := A); auto.
-  fsetdec.
 Qed.
 
 Local Lemma atomset_union_right : forall A B C,
@@ -151,8 +174,6 @@ Proof with simpl_env; eauto using wf_cset_weakening.
     eapply wf_typ_weakening...
     rewrite <- concat_assoc.
     eapply wf_typ_weakening...
-    apply atomset_union_right.
-    fsetdec.
   (* typ_all case *)
   - pick fresh Y and apply wf_typ_all.
     eapply wf_typ_weakening...
@@ -170,6 +191,19 @@ Proof.
   intros.
   rewrite_env (empty ++ F ++ E).
   apply wf_typ_weakening with (Ap := Ap) (Am := Am); eauto || fsetdec.
+Qed.
+
+Lemma wf_typ_set_weakening : forall E Ap Am Ap' Am' T,
+  wf_typ E Ap Am T ->
+  ok E ->
+  AtomSet.F.Subset Ap Ap' ->
+  AtomSet.F.Subset Am Am' ->
+  wf_typ E Ap' Am' T.
+Proof.
+  intros.
+  rewrite_env (empty ++ empty ++ E).
+  rewrite_env (empty ++ E) in H.
+  eapply wf_typ_weakening; eauto.
 Qed.
 
 (* Type bindings don't matter at all! *)
@@ -310,13 +344,6 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
   induction HwfT; intros F EQF Hok; subst; simpl subst_tt.
   - Case "wf_typ_var".
     destruct (X == Z); subst...
-    + rewrite_env (empty ++ map (subst_tb Z P) F ++ E).
-      eapply wf_typ_weakening.
-      1: {
-        simpl_env.
-        apply HwfPp.
-      }
-      all : auto || fsetdec.
     + SCase "X <> Z".
       unfold wf_typ_in in *.
       binds_cases H...
@@ -340,14 +367,10 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
         ** rewrite_env (empty ++ E).
            rewrite_env (empty ++ map (subst_tb Z P) F ++ E) in Hok.
            eapply ok_remove_mid...
-        ** fsetdec.
-        ** fsetdec.
       * apply wf_typ_expand_variance_sets with (Ap := Am) (Am := Ap)...
         ** rewrite_env (empty ++ E).
            rewrite_env (empty ++ map (subst_tb Z P) F ++ E) in Hok.
            eapply ok_remove_mid...
-        ** fsetdec.
-        ** fsetdec.
   - Case "wf_typ_all".
     pick fresh Y and apply wf_typ_all...
     + SCase "T2".
@@ -612,13 +635,7 @@ Proof with eauto using wf_typ_weaken_head.
   (* remember m; generalize dependent m. *)
   unfold wf_typ_in.
   induction Hwf; binds_cases Hbinds...
-  + eapply wf_typ_weaken_head...
-    all : simpl; fsetdec.
-  + eapply wf_typ_weaken_head...
-    all : simpl; fsetdec.
-  + inversion H3; subst...
-    eapply wf_typ_weaken_head...
-    all : simpl; fsetdec.
+  inversion H3; subst...
 Qed.
 
 Lemma wf_typ_from_binds_sub : forall x U E,
@@ -630,13 +647,7 @@ Proof with eauto using wf_typ_weaken_head.
   (* remember m; generalize dependent m. *)
   unfold wf_typ_in.
   induction Hwf; binds_cases Hbinds...
-  + eapply wf_typ_weaken_head...
-    all : simpl; fsetdec.
-  + inversion H3; subst...
-    eapply wf_typ_weaken_head...
-    all : simpl; fsetdec.
-  + eapply wf_typ_weaken_head...
-    all : simpl; fsetdec.
+  inversion H3; subst...
 Qed.
 
 Lemma wf_typ_from_wf_env_typ : forall x T E,
@@ -1090,7 +1101,6 @@ Proof with eauto*.
   - specialize (IHe1 k y).
     specialize (IHe2 k y).
     inversion IHe1; inversion IHe2; subst; constructor...
-    fsetdec.
     fnsetdec.
 Qed.
 
@@ -1103,7 +1113,6 @@ Proof with eauto*.
   - specialize (IHe1 k y).
     specialize (IHe2 k y).
     inversion IHe1; inversion IHe2; subst; constructor...
-    fsetdec.
     fnsetdec.
 Qed.
 
@@ -1198,10 +1207,6 @@ Proof with eauto using cv_free_never_universal; eauto*.
     inversion IHe1; inversion IHe2; subst...
     constructor; try fsetdec; try fnsetdec...
 Qed.
-
-Hint Extern 10 (AtomSet.F.Subset _ _) =>
-  idtac "go fsetdec go" ; try solve [simpl dom in *; fsetdec]
-: core.
 
 (** This should be easily true: free variables
     are all bound if a term has a type.... *)
