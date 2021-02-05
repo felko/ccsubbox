@@ -14,65 +14,10 @@
 
 Require Export Fsub_Lemmas.
 
+Set Nested Proofs Allowed.
+
 (* ********************************************************************** *)
 (** * #<a name="subtyping"></a># Properties of subtyping *)
-
-Set Nested Proofs Allowed.
-
-Lemma subcapt_reflexivity : forall E A C,
-  wf_env E ->
-  (* We need as a precondition that C is locally closed! *)
-  wf_cset E A C ->
-  AtomSet.F.Subset A (dom E) ->
-  subcapt E C C.
-Proof with auto.
-  intros *.
-  intros Ok Closed Hsubset.
-  destruct C...
-  - assert (t0 = {}N). { inversion Closed... }
-    subst.
-    apply subcapt_set...
-    + apply wf_cset_set_weakening with (A := A)...
-    + apply wf_cset_set_weakening with (A := A)...
-    + unfold AtomSet.F.For_all. intros.
-      apply captures_in...
-Qed.
-
-Set Nested Proofs Allowed.
-
-Lemma sub_reflexivity : forall E Ap Am T,
-  wf_env E ->
-  wf_typ E Ap Am T ->
-  AtomSet.F.Subset Ap (dom E) ->
-  AtomSet.F.Subset Am (dom E) ->
-  sub E T T
-with sub_pre_reflexivity : forall E Ap Am T,
-  wf_env E ->
-  wf_pretyp E Ap Am T ->
-  AtomSet.F.Subset Ap (dom E) ->
-  AtomSet.F.Subset Am (dom E) ->
-  sub_pre E T T.
-Proof with eauto using subcapt_reflexivity, wf_typ_set_weakening.
-------
-  intros *.
-  intros Ok Wf HsubsetAp HsubsetAm.
-  induction Wf.
-  (* eauto and econstructor is still broken... hence we need to proof this manually *)
-  - apply sub_refl_tvar.
-    auto.
-    eapply wf_typ_var with (U := U)...
-  - apply sub_capt...
-------
-  intros *.
-  intros Ok Wf HsubsetAp HsubsetAm.
-  induction Wf.
-  - apply sub_top...
-  - apply sub_arrow with (L := L `union` dom E)...
-    intros; eapply sub_reflexivity...
-  - apply sub_all with (L := L `union` dom E)...
-    intros; eapply sub_reflexivity...
-Qed.
-
 
 (* ********************************************************************** *)
 (** ** Weakening (2) *)
@@ -265,11 +210,12 @@ Admitted.
 
 (*
   opening capture sets in types preserves well-formedness. *)
-Lemma open_ct_wf_typ : forall E T C,
-  wf_typ E T -> wf_typ E (open_ct T C).
-Proof with auto.
-  intros E T C H.
-  closed_type.
+Lemma open_ct_wf_typ : forall E Ap Am T C,
+  wf_typ E Ap Am T -> wf_typ E Ap Am (open_ct T C).
+Proof with eauto using type_from_wf_typ.
+  intros *.
+  intros H.
+  closed_type...
 Qed.
 
 
@@ -280,12 +226,12 @@ Qed.
  *)
 Lemma open_ct_sub : forall E S T C,
   wf_env E ->
-  sub E S T -> sub E (open_ct S C) (open_ct T C).
+  sub E S T ->
+  sub E (open_ct S C) (open_ct T C).
 Proof with auto using open_ct_wf_typ.
   intros E S T C Eok H.
   inversion H ; simpl ; closed_type ; subst...
 Qed.
-
 
 (* TODO move to CaptureSets. *)
 Lemma cset_subset_reflexivity (c : captureset) : cset_subset_prop c c.
@@ -298,22 +244,24 @@ Proof with auto.
   intuition.
 Qed.
 
-
-Lemma subcapt_reflexivity : forall E C,
+Lemma subcapt_reflexivity : forall E A C,
   wf_env E ->
   (* We need as a precondition that C is locally closed! *)
-  wf_cset E C ->
+  wf_cset E A C ->
+  AtomSet.F.Subset A (dom E) ->
   subcapt E C C.
 Proof with auto.
-  intros E C Ok Closed.
+  intros *.
+  intros Ok Closed Hsubset.
   destruct C...
-  assert (t0 = {}N). { inversion Closed... }
-  subst.
-  apply subcapt_set...
-  unfold AtomSet.F.For_all. intros.
-  apply captures_in...
+  - assert (t0 = {}N). { inversion Closed... }
+    subst.
+    apply subcapt_set...
+    + apply wf_cset_set_weakening with (A := A)...
+    + apply wf_cset_set_weakening with (A := A)...
+    + unfold AtomSet.F.For_all. intros.
+      apply captures_in...
 Qed.
-
 (* unversals can't be subcaptres of concrete capture sets. *)
 Lemma cset_universal_subset : forall tf tb,
   cset_subset_prop cset_universal (cset_set tf tb) ->
@@ -336,49 +284,50 @@ Proof with auto.
   - exists xs. exists {}N...
 Qed.
 
-Lemma cv_exists : forall E T,
+Lemma cv_exists : forall E T Ap Am,
   wf_env E ->
-  wf_typ E T ->
+  wf_typ E Ap Am T ->
   exists C, cv E T C.
 Proof with eauto.
-  intros E.
-  induction E; intros T; induction T; intros; try inversion H0; try inversion H; subst...
-  - inversion H3...
-  - simpl_env in *.
-    binds_cases H3...
-    + assert (wf_typ E a0) by
-        (apply wf_typ_var with (U := U); eauto).
-      specialize (IHE a0 H6 H2) as [C' H'].
-      inversion H'; subst...
-      * exists C'.
-        apply cv_env_irrel...
-        rewrite dom_concat in *.
-        rewrite dom_single in *.
-        fsetdec.
-      * exists C'.
-        apply cv_env_irrel...
-        rewrite dom_concat in *.
-        rewrite dom_single in *.
-        fsetdec.
-    + specialize (IHE T H6 H7) as [C' H'].
-      exists C'.
-      apply cv_typ_var with (T := T)...
-  - simpl_env in *.
-    binds_cases H3...
-    assert (wf_typ E a0) by (apply wf_typ_var with (U := U); eauto).
-    specialize (IHE a0 H6 H2) as [C' H'].
-    inversion H'; subst...
-    * exists C'.
-      apply cv_env_irrel...
-      rewrite dom_concat in *.
-      rewrite dom_single in *.
-      fsetdec.
-    * exists C'.
-      apply cv_env_irrel...
-      rewrite dom_concat in *.
-      rewrite dom_single in *.
-      fsetdec.
-Qed.
+  admit.
+Admitted.
+(*   induction E; induction T; intros; try inversion H0; try inversion H; subst... *)
+(*   - inversion H3... *)
+(*   - simpl_env in *. *)
+(*     binds_cases H3... *)
+(*     + assert (wf_typ E a0) by *)
+(*         (apply wf_typ_var with (U := U); eauto). *)
+(*       specialize (IHE a0 H6 H2) as [C' H']. *)
+(*       inversion H'; subst... *)
+(*       * exists C'. *)
+(*         apply cv_env_irrel... *)
+(*         rewrite dom_concat in *. *)
+(*         rewrite dom_single in *. *)
+(*         fsetdec. *)
+(*       * exists C'. *)
+(*         apply cv_env_irrel... *)
+(*         rewrite dom_concat in *. *)
+(*         rewrite dom_single in *. *)
+(*         fsetdec. *)
+(*     + specialize (IHE T H6 H7) as [C' H']. *)
+(*       exists C'. *)
+(*       apply cv_typ_var with (T := T)... *)
+(*   - simpl_env in *. *)
+(*     binds_cases H3... *)
+(*     assert (wf_typ E a0) by (apply wf_typ_var with (U := U); eauto). *)
+(*     specialize (IHE a0 H6 H2) as [C' H']. *)
+(*     inversion H'; subst... *)
+(*     * exists C'. *)
+(*       apply cv_env_irrel... *)
+(*       rewrite dom_concat in *. *)
+(*       rewrite dom_single in *. *)
+(*       fsetdec. *)
+(*     * exists C'. *)
+(*       apply cv_env_irrel... *)
+(*       rewrite dom_concat in *. *)
+(*       rewrite dom_single in *. *)
+(*       fsetdec. *)
+(* Qed. *)
 
 Lemma wf_env_weaken_head : forall E F,
   wf_env (F ++ E) ->
@@ -389,52 +338,54 @@ Proof with eauto*.
   inversion Hwf...
 Qed.
 
-Lemma cv_unique : forall E T C1 C2,
+Lemma cv_unique : forall E Ap Am T C1 C2,
   wf_env E ->
-  wf_typ E T ->
+  wf_typ E Ap Am T ->
   cv E T C1 ->
   cv E T C2 ->
   C1 = C2.
 Proof with eauto*.
-  intros E; induction E; intros T; induction T; intros...
-  {
-    inversion H1; inversion H2; subst...
-  }
-  {
-    (*contradiction *)
-    inversion H0.
-  }
-  {
-    (*contradiction*)
-    inversion H0...
-    inversion H5...
-  }
-  {
-    inversion H1...
-    inversion H2...
-  }
-  {
-    inversion H0.
-  }
-  {
-    destruct a as [a' B].
-    simpl_env in *.
-    destruct (a' == a0); subst...
-    {
-      inversion H2; subst...
-      inversion H1; subst...
-      apply IHE with (T := T)...
-      pose proof (cv_regular E T C2 H8)...
-      pose proof (cv_regular E T C2 H8)...
-    }
-    {
-      inversion H1; subst...
-      inversion H2; subst...
-      apply IHE with (T := a0);
-      pose proof (cv_regular E a0 C2 H13)...
-    }
-  }
-Qed.
+  admit.
+Admitted.
+(*   intros E; induction E; intros T; induction T; intros... *)
+(*   { *)
+(*     inversion H1; inversion H2; subst... *)
+(*   } *)
+(*   { *)
+(*     (*contradiction *) *)
+(*     inversion H0. *)
+(*   } *)
+(*   { *)
+(*     (*contradiction*) *)
+(*     inversion H0... *)
+(*     inversion H5... *)
+(*   } *)
+(*   { *)
+(*     inversion H1... *)
+(*     inversion H2... *)
+(*   } *)
+(*   { *)
+(*     inversion H0. *)
+(*   } *)
+(*   { *)
+(*     destruct a as [a' B]. *)
+(*     simpl_env in *. *)
+(*     destruct (a' == a0); subst... *)
+(*     { *)
+(*       inversion H2; subst... *)
+(*       inversion H1; subst... *)
+(*       apply IHE with (T := T)... *)
+(*       pose proof (cv_regular E T C2 H8)... *)
+(*       pose proof (cv_regular E T C2 H8)... *)
+(*     } *)
+(*     { *)
+(*       inversion H1; subst... *)
+(*       inversion H2; subst... *)
+(*       apply IHE with (T := a0); *)
+(*       pose proof (cv_regular E a0 C2 H13)... *)
+(*     } *)
+(*   } *)
+(* Qed. *)
 
 Lemma captures_transitivity : forall E xs ys x,
   (* E |- {x} <: {ys} *)
@@ -486,52 +437,67 @@ Proof with auto.
     apply captures_transitivity with (ys := ys)...
 Qed.
 
-Lemma sub_reflexivity : forall E T,
+Lemma sub_reflexivity : forall E Ap Am T,
   wf_env E ->
-  wf_typ E T ->
+  wf_typ E Ap Am T ->
+  AtomSet.F.Subset Ap (dom E) ->
+  AtomSet.F.Subset Am (dom E) ->
   sub E T T
-with sub_pre_reflexivity : forall E T,
+with sub_pre_reflexivity : forall E Ap Am T,
   wf_env E ->
-  wf_pretyp E T ->
+  wf_pretyp E Ap Am T ->
+  AtomSet.F.Subset Ap (dom E) ->
+  AtomSet.F.Subset Am (dom E) ->
   sub_pre E T T.
-Proof with auto using subcapt_reflexivity.
+Proof with eauto using subcapt_reflexivity, wf_typ_set_weakening.
 ------
-  intros E T Ok Wf.
+  intros *.
+  intros Ok Wf HsubsetAp HsubsetAm.
   induction Wf.
   (* eauto and econstructor is still broken... hence we need to proof this manually *)
-  - apply sub_refl_tvar...
+  - apply sub_refl_tvar.
+    auto.
     eapply wf_typ_var with (U := U)...
   - apply sub_capt...
 ------
-  intros E T Ok Wf.
+  intros *.
+  intros Ok Wf HsubsetAp HsubsetAm.
   induction Wf.
   - apply sub_top...
   - apply sub_arrow with (L := L `union` dom E)...
+    intros; eapply sub_reflexivity...
   - apply sub_all with (L := L `union` dom E)...
+    intros; eapply sub_reflexivity...
 Qed.
 
 (* Subtyping implies subcapturing *)
-Lemma sub_implies_subcapt : forall E S T C D,
+Lemma sub_implies_subcapt : forall E A1 A2 S T C D,
   sub E S T ->
-  wf_cset E C ->
-  wf_cset E D ->
+  AtomSet.F.Subset A1 (dom E) ->
+  AtomSet.F.Subset A2 (dom E) ->
+  wf_cset E A1 C ->
+  wf_cset E A2 D ->
   cv E S C ->
   cv E T D ->
   subcapt E C D.
 Proof with eauto using subcapt_reflexivity, cv_weakening_head.
-  intros E S T C D Hsub WfC WfD HcvC HcvD.
+  intros *.
+  intros Hsub HssetA1 HssetA2 WfC WfD HcvC HcvD.
 
   induction Hsub; destruct C; destruct D; try solve [inversion HcvC; inversion HcvD; eauto].
-  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
-  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
-  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
   - exfalso. admit.
     (* inversion HcvC; subst. inversion H1. inversion H. rewrite H4 in H2. inversion H2; subst. *)
     (* apply IHHsub... *)
+  - admit.
+    (* inversion HcvC; subst. inversion HcvD; subst... *)
+    (* apply subcapt_universal... *)
   - inversion HcvC; subst. inversion HcvD; subst...
-    apply subcapt_universal...
-  - inversion HcvC; subst. inversion HcvD; subst...
-    + epose proof (cv_unique _ _ _ _ _ _ H3 H8) as Eq; inversion Eq...
+    + admit.
+      (* unshelve epose proof (cv_unique _ _ _ _ _ _ _ _ H3 H8) as Eq... *)
+      (* inversion Eq... *)
     + assert (T0 = U) by admit. subst.
       inversion Hsub; subst.
       * assert (cv ([(X, bind_sub X0)] ++ E0) X0 (cset_set t t0))...

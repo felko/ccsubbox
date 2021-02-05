@@ -1500,7 +1500,7 @@ Admitted.
     The other three hints try outright to solve their respective
     goals. *)
 
-Hint Extern 1 (wf_cset ?E ?C) =>
+Hint Extern 1 (wf_cset ?E _ ?C) =>
   match goal with
   | H: subcapt _ C _ |- _ => apply (proj1 (subcapt_regular _ _ _ H))
   | H: subcapt _ _ C |- _ => apply (proj2 (subcapt_regular _ _ _ H))
@@ -1515,7 +1515,7 @@ Hint Extern 1 (wf_env ?E) =>
   end
 : core.
 
-Hint Extern 1 (wf_typ ?E ?T) =>
+Hint Extern 1 (wf_typ ?E _ _ ?T) =>
   match goal with
   | H: typing E _ T |- _ => apply (proj2 (proj2 (typing_regular _ _ _ H)))
   | H: sub E T _ |- _ => apply (proj1 (proj2 (sub_regular _ _ _ H)))
@@ -1531,26 +1531,26 @@ Hint Extern 1 (wf_pretyp ?E ?T) =>
 : core.
 
 Hint Extern 1 (type ?T) =>
-  let go E := apply (type_from_wf_typ E); auto in
+  let go E := eapply (type_from_wf_typ E); eauto in
   match goal with
   | H: typing ?E _ T |- _ => go E
   | H: sub ?E T _ |- _ => go E
   | H: sub ?E _ T |- _ => go E
-  | H: wf_typ ?E T |- _ => go E
+  | H: wf_typ ?E _ _ T |- _ => go E
   end
 : core.
 
 Hint Extern 1 (pretype ?T) =>
-  let go E := apply (pretype_from_wf_pretyp E); auto in
+  let go E := eapply (pretype_from_wf_pretyp E); eauto in
   match goal with
   | H: sub_pre ?E T _ |- _ => go E
   | H: sub_pre ?E _ T |- _ => go E
-  | H: wf_pretyp ?E T |- _ => go E
+  | H: wf_pretyp ?E _ _ T |- _ => go E
   end
 : core.
 
 Hint Extern 1 (capt ?C) =>
-  let go E := apply (capt_from_wf_cset E); auto in
+  let go E := eapply (capt_from_wf_cset E); eauto in
   match goal with
   | H: subcapt ?E C _ |- _ => go E
   | H: subcapt ?E _ C |- _ => go E
