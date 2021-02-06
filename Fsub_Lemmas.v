@@ -38,10 +38,13 @@ Ltac clear_frees :=
            clear H
          end.
 
+Ltac prepare_for_fsetdec :=
+  clear_frees; simpl_env in *.
+
 Hint Extern 10 (AtomSet.F.Subset _ _) =>
 idtac "go fsetdec go" ;
 (* NOTE: "free" hypothesis are unlikely to help with subsets and they can cause fsetdec to hang *)
-try solve [clear_frees; simpl_env in *; fsetdec]
+try solve [prepare_for_fsetdec; fsetdec]
 : core.
 
 Lemma capt_from_wf_cset : forall E A C,

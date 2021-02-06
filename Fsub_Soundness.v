@@ -262,6 +262,7 @@ Proof with auto.
     + unfold AtomSet.F.For_all. intros.
       apply captures_in...
 Qed.
+
 (* unversals can't be subcaptres of concrete capture sets. *)
 Lemma cset_universal_subset : forall tf tb,
   cset_subset_prop cset_universal (cset_set tf tb) ->
@@ -514,13 +515,6 @@ Admitted.
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
 
-Lemma cv_narrowing : forall S G Z Q E P C1 C2,
-  sub E P Q ->
-  cv (G ++ [(Z, bind_sub Q)] ++ E) S C2 ->
-  cv (G ++ [(Z, bind_sub P)] ++ E) S C1.
-Proof with auto.
-Admitted.
-
 Lemma cv_narrowing_fix : forall S G Z Q E P C1 C2,
   sub E P Q ->
   cv (G ++ [(Z, bind_sub Q)] ++ E) S C2 ->
@@ -539,7 +533,7 @@ Proof with auto.
 
         Probably should be a lemma.*)
     assert (exists C3, cv (G ++ [(Z, bind_sub X)] ++ E) S C3). {
-      apply cv_exists...
+      eapply cv_exists...
       (** two wellformedness conditions.  Probably need to strengthen
           conditions. *)
       admit.
@@ -581,7 +575,8 @@ Lemma cv_narrowing_typ : forall S G x Q E P C,
   cv (G ++ [(x, bind_typ Q)] ++ E) S C ->
   cv (G ++ [(x, bind_typ P)] ++ E) S C.
 Proof with auto.
-  intros S G x Q E P C HSub Ok HCv.
+  intros *.
+  intros HSub Ok HCv.
   remember (G ++ [(x, bind_typ Q)] ++ E). generalize dependent G.
   induction HCv ; intros ; subst...
   destruct (X == x) ; subst.
@@ -687,7 +682,6 @@ Hint Resolve ok_ignores_binding : core.
 
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
-  (* many of those premises could be replaced by adding wf_env to subcapt_regular *)
   ok (F ++ [(Z, bind_sub P)] ++ E) ->
   subcapt (F ++ [(Z, bind_sub Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(Z, bind_sub P)] ++ E) C1 C2.
