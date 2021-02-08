@@ -522,7 +522,57 @@ Lemma wf_cset_over_subst : forall F Q E A Z C C',
   wf_cset (F ++ [(Z, bind_typ Q)] ++ E) A C' ->
   ok (F ++ [(Z, bind_typ Q)] ++ E) ->
   wf_cset (map (subst_cb Z C) F ++ E) (A `remove` Z) (subst_cset Z C C').
-Proof.
+Proof with eauto.
+    intros F Q E A Z C C'.
+    intros HokFE HwfC HwfC' Hok.
+    inversion HwfC; inversion HwfC'; subst...
+    (** Case analysis : this should maybe go through better, hopefully? *)
+    + unfold subst_cset; cset_split; try constructor...
+      {
+        unfold allbound_typ in *.
+        intros x Hfvx.
+        specialize (H2 _ Hfvx).
+        rewrite cset_not_references_fvar_eq in H_destruct...
+        csethyp.
+        assert (x <> Z) by fsetdec.
+        inversion H2 as [T H0]...
+        binds_cases H0...
+        exists (subst_ct Z cset_universal T)...
+      }
+      {
+        rewrite cset_not_references_fvar_eq in H_destruct...
+        csethyp.
+        fsetdec.
+      }
+    + unfold subst_cset...
+      cset_split; inversion HwfC; inversion HwfC';
+      try rewrite cset_not_references_fvar_eq in H_destruct;
+      try rewrite cset_references_fvar_eq in H_destruct;
+      assert (NatSet.F.union {}N {}N = {}N) as Hunion by (fnsetdec; eauto*); subst;
+      try rewrite Hunion in *; constructor; unfold allbound_typ in *; intros...
+      {
+        assert (x `in` (fvars `union` fvars0)) as Hfv by fsetdec.
+        rewrite AtomSetFacts.union_iff in Hfv... inversion Hfv...
+        specialize (H _ H3).
+        inversion H as [T H10].
+        exists T...
+      } 
+      {
+        assert ((fvars `union` fvars0) `subset` A) by fsetdec.
+        (** ugh *)
+        admit.
+      }
+      {
+        specialize (H9 _ H1)...
+        inversion H9 as [T H10].
+        binds_cases H10; subst...
+        admit.
+        admit.
+      }
+      {
+        csethyp.
+        fsetdec.
+      }
 Admitted.
 (*   intros *. *)
 (*   intros HOK HwfC HwfC' HokZ . *)
