@@ -566,8 +566,13 @@ Proof with eauto.
         specialize (H9 _ H1)...
         inversion H9 as [T H10].
         binds_cases H10; subst...
-        admit.
-        admit.
+        {
+          csethyp.
+          fsetdec. 
+        }
+        {
+          exists (subst_ct Z (cset_set fvars {}N) T)...
+        }
       }
       {
         csethyp.
