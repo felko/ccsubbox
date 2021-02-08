@@ -1298,6 +1298,25 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     binds_cases Hbinds...
 Qed.
 
+
+Lemma wf_typ_open : forall E U T1 T2,
+  ok E ->
+  wf_pretyp_in E (typ_all T1 T2) ->
+  wf_typ_in E U ->
+  wf_typ_in E (open_tt T2 U).
+Proof with simpl_env; eauto.
+  intros E U T1 T2 Hok HwfA HwfU.
+  inversion HwfA; subst...
+  pick fresh X.
+  rewrite (subst_tt_intro X)...
+  rewrite_env (map (subst_tb X U) empty ++ E).
+  assert (({} `union` dom E) = dom E) by fsetdec.
+  rewrite_env (map (subst_tb X U) empty ++ E).
+  apply wf_typ_subst_tb with (Q := T1)...
+  all : rewrite H...
+Qed.
+
+
 Lemma wf_cset_expand_variance_sets : forall E A A' C,
   wf_cset E A C ->
   AtomSet.F.Subset A A' ->
@@ -1322,23 +1341,6 @@ Proof with simpl_env; eauto*.
     apply wf_cset_expand_variance_sets with (A := dom E)...
     inversion IHHC...
   * assumption.
-Qed.
-
-Lemma wf_typ_open : forall E U T1 T2,
-  ok E ->
-  wf_pretyp_in E (typ_all T1 T2) ->
-  wf_typ_in E U ->
-  wf_typ_in E (open_tt T2 U).
-Proof with simpl_env; eauto.
-  intros E U T1 T2 Hok HwfA HwfU.
-  inversion HwfA; subst...
-  pick fresh X.
-  rewrite (subst_tt_intro X)...
-  rewrite_env (map (subst_tb X U) empty ++ E).
-  assert (({} `union` dom E) = dom E) by fsetdec.
-  rewrite_env (map (subst_tb X U) empty ++ E).
-  apply wf_typ_subst_tb with (Q := T1)...
-  all : rewrite H...
 Qed.
 
 Lemma typing_regular : forall E e T,
@@ -1384,8 +1386,7 @@ Proof with simpl_env; auto*.
     apply wf_typ_expand_variance_sets with (Ap := dom E) (Am := dom E)...
     (** needs substitution lemma here. *)
     apply wf_typ_open_capt with (T1 := T1)...
-    (** needs CV regular *)
-    admit.
+    apply cv_wf with (T := T1')...
   (* typing rule: type abstractions. *)
   - pick fresh y; assert (y `notin` L) by fsetdec...  
     unshelve epose proof (H2 y _) as H4...
@@ -1411,98 +1412,10 @@ Proof with simpl_env; auto*.
     inversion Hwf; subst...
     apply wf_typ_open with (T1 := T1)...
     destruct (sub_regular _ _ _ H0) as [R1 [R2 R3]]...
-Admitted.
+  - repeat split...
+    pose proof (sub_regular E S T H0)...
+Qed.
 
-
-  (* (* typing_var_tvar  *) *)
-  (* - repeat split... *)
-  (*   apply wf_typ_from_binds_typ with (x := x)... *)
-  (* (* typing_var_poly  *) *)
-  (* - repeat split... *)
-  (*   assert (wf_typ E (typ_capt C P)). { *)
-  (*     apply wf_typ_from_binds_typ with (x := x)... *)
-  (*   } *)
-  (*   subst. *)
-  (*   inversion H1; subst. *)
-  (*   constructor... *)
-  (*   constructor. *)
-  (*   unfold allbound_typ. intros. *)
-  (*   assert (x0 = x) by fsetdec. *)
-  (*   subst; eauto. *)
-  (* (* typing rule: (\x e) has type fv((\x e)) T1 -> T2 *) *)
-  (* - pick fresh y; assert (y `notin` L) by fsetdec... *)
-  (*   specialize (H0 y H1) as H3; inversion H3 as [Henv [Hexpr Hwf]]... *)
-  (*   repeat split... *)
-  (*   (* wf_env *) *)
-  (*   + inversion Henv... *)
-  (*   (* expr *) *)
-  (*   + pick fresh x and apply expr_abs. *)
-  (*     * eauto using type_from_wf_typ, wf_typ_from_wf_env_typ. *)
-  (*     * destruct (H0 x)... *)
-  (*   (* wf_typ *) *)
-  (*   + constructor... *)
-  (*   assert (typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))). { *)
-  (*     apply typing_abs with (L := L). apply H. *)
-  (*   } *)
-  (*   apply typing_cv with (e := (exp_abs V e1)) (T := (typ_capt (free_for_cv e1) (typ_arrow V T1)))... *)
-  (*   pick fresh x and apply wf_typ_arrow... *)
-  (*   * eauto using type_from_wf_typ, wf_typ_from_wf_env_typ. *)
-  (*   * destruct (H0 x)... *)
-  (* (* typing rule: app poly *) *)
-  (* - destruct IHtyping1 as [Hwf [Hexpr1 HwfF]]. *)
-  (*   inversion HwfF; subst... *)
-  (*   destruct (sub_regular _ _ _ H1) as [_ [Wf1 Wf2]]. *)
-  (*   inversion Wf2; subst... *)
-  (*   (** why are these two cases the same... *) *)
-  (*   { *)
-  (*     repeat split... *)
-  (*     + constructor... *)
-  (*       apply capt_from_wf_cset with (E := E). *)
-  (*       unshelve epose proof (subcapt_regular E C Cv _) as [Hfinish _]... *)
-  (*     + unshelve epose proof (wf_typ_open_capt E C X T2 _ _ _)... *)
-  (*       unshelve epose proof (subcapt_regular E C Cv _) as [Hfinish _]... *)
-  (*   } *)
-  (*   { *)
-  (*     repeat split... *)
-  (*     + constructor... *)
-  (*       apply capt_from_wf_cset with (E := E). *)
-  (*       unshelve epose proof (subcapt_regular E C Cv _) as [Hfinish _]... *)
-  (*     + unshelve epose proof (wf_typ_open_capt E C (typ_capt C0 P) T2 _ _ _)... *)
-  (*       unshelve epose proof (subcapt_regular E C Cv _) as [Hfinish _]... *)
-  (*   } *)
-  (* (* typing rule: (/\ X e) has type fv(/\ X e) X <: T1 -> T2 *) *)
-  (* - pick fresh Y. assert (Y `notin` L) by fsetdec... *)
-  (*   specialize (H0 Y H1) as H3; inversion H3... *)
-  (*   repeat split... *)
-  (*   (* wf_env *) *)
-  (*   + inversion H2... *)
-  (*   (* expr *) *)
-  (*   + econstructor... *)
-  (*     * apply type_from_wf_typ with (E := E). *)
-  (*       apply wf_typ_from_wf_env_sub with (x := Y)... *)
-  (*     * instantiate (1 := L). intros... *)
-  (*       specialize (H0 X H5) as H8... *)
-  (*   (* wf_typ *) *)
-  (*   + constructor... *)
-  (*     assert (typing E (exp_tabs V e1) (typ_capt (free_for_cv e1) (typ_all V T1))). { *)
-  (*       apply typing_tabs with (L := L). apply H. *)
-  (*     } *)
-  (*     apply typing_cv with (e := (exp_tabs V e1)) (T := (typ_capt (free_for_cv e1) (typ_all V T1)))... *)
-  (*     pick fresh X and apply wf_typ_all... *)
-  (*     * eauto using type_from_wf_typ, wf_typ_from_wf_env_sub. *)
-  (*     * destruct (H0 X)... *)
-  (* (* typing rule: t-app *) *)
-  (* - repeat split... *)
-  (*   constructor... *)
-  (*   pose proof (sub_regular E T T1 H0). *)
-  (*   apply type_from_wf_typ with (E := E)... *)
-  (*   destruct (sub_regular _ _ _ H0) as [R1 [R2 R3]]. *)
-  (*   apply wf_typ_open with (T1 := T1)... *)
-  (*   inversion IHtyping as [Henv [Hexpr Hwf_capt]]. *)
-  (*   inversion Hwf_capt; subst... *)
-  (* - repeat split... *)
-  (*   pose proof (sub_regular E S T H0)... *)
-(* Qed. *)
 
 Lemma value_regular : forall e,
   value e ->
