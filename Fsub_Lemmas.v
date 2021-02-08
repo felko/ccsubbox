@@ -542,6 +542,12 @@ Qed.
 (*         eauto*. *)
 (* Qed. *)
 
+Lemma wf_typ_in_subst_cb : forall F E Z Q T C,
+  wf_typ_in (F ++ [(Z, bind_typ Q)] ++ E) T ->
+  wf_cset_in E C ->
+  wf_typ_in (map (subst_cb Z C) F ++ E) (subst_ct Z C T).
+Proof.
+Admitted.
 (* Lemma wf_typ_subst_cb : forall F Q E Z C T, *)
 (*   wf_typ (F ++ [(Z, bind_typ Q)] ++ E) T -> *)
 (*   (** NOTE here that P needs to be well formed in both the + and - environments, *)
@@ -605,9 +611,12 @@ Proof with simpl_env; eauto.
   rewrite (subst_ct_intro X)...
   rewrite_env (map (subst_cb X C) empty ++ E).
   (** another lemma needed *)
-  admit.
-  (*   apply wf_typ_subst_cb with (Q := T1)... *)
-Admitted.
+  eapply wf_typ_in_subst_cb with (Q := T1)...
+  assert (X `notin` L) by fsetdec.
+  specialize (H5 X H).
+  unfold wf_typ_in...
+  eapply wf_typ_set_weakening...
+Qed.
 
 (* ********************************************************************** *)
 (** * #<a name="oktwft"></a># Properties of [wf_env] and [wf_typ] *)
