@@ -78,7 +78,7 @@ Ltac prepare_for_fsetdec ::=
   clear_frees; simpl_env in *; simpl dom_typ in *.
 
 Lemma dom_typ_subsets_dom : forall E,
-    AtomSet.F.Subset (dom_typ E) (dom E).
+  AtomSet.F.Subset (dom_typ E) (dom E).
 Proof.
   induction E.
   - simpl_hammer; fsetdec.
@@ -148,8 +148,8 @@ Proof with eauto.
       by cset_eq_dec.
     apply typing_var with (C := cset_universal).
     + econstructor...
-    + simpl_hammer;
-        replace_if_cond_with_left...
+    + simpl_hammer.
+      replace_if_cond_with_left...
 Qed.
 
 Lemma ez_pz_lemon_sqz :

@@ -33,6 +33,16 @@ Notation "x `in` E" :=
 Notation "x `notin` E" :=
   (~ AtomSet.F.In x E) (at level 69) : set_scope.
 
+Notation "E `subset` F" :=
+  (AtomSet.F.Subset E F)
+  (at level 68)
+  : set_scope.
+
+Notation "E `remove` x" :=
+  (AtomSet.F.remove x E)
+  (at level 68)
+  : set_scope.
+
 (** The empty set may be written similarly to informal practice. *)
 
 Notation "{}" :=
