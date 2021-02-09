@@ -1492,7 +1492,7 @@ Proof with eauto.
         + apply cheat.
         + notin_solve.
         + rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
-          apply subcapt_weakening; simpl_env.
+          apply subcapt_weakening; simpl_env...
           * trivial.
           * econstructor.
             -- trivial.
