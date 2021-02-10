@@ -1553,8 +1553,9 @@ Proof with eauto; fold subst_cpt.
         (Ap `union` singleton y)
         Am x C D (open_ct T2 y) _ H0 _ _ _).
       * econstructor...
-      * apply cheat.
-      * apply cheat.
+      (* we need to help fsetdec here a little *)
+      * clear Fr. simpl. fsetdec.
+      * clear Fr. simpl. fsetdec.
       * rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
         eapply wf_typ_ignores_bindings...
       * destruct H4.
