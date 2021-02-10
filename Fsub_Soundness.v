@@ -1416,7 +1416,7 @@ Proof with eauto.
   generalize dependent F.  
   induction H; intros F Eq; subst.
   - apply wf_typ_var with (U := U)...
-    binds_cases H.
+    binds_cases H...
   (* requires wf_cset_ignores_bindings *)
   - econstructor... eapply wf_cset_ignores_bindings...
 ------
@@ -1437,6 +1437,59 @@ Proof with eauto.
       eapply wf_typ_ignores_bindings with (T1 := T1)...
       eapply H0...
 Qed.
+
+(* Substituting the same capture set preserves subcapturing *)
+Lemma subcapt_through_subst_cset : forall F x U E C1 C2 D,
+    subcapt (F ++ [(x, bind_typ U)] ++ E) C1 C2 ->
+    cv E U D ->
+    subcapt (map (subst_cb x D) F ++ E) (subst_cset x D C1) (subst_cset x D C2).
+Proof.
+  admit.
+Admitted.
+
+Lemma subst_cset_across_subcapt : forall E x C D C0 A,
+  wf_env E ->
+  wf_cset E A C0 ->
+  subcapt E C D ->
+  subcapt E (subst_cset x C C0) (subst_cset x D C0).
+Proof with eauto.
+  intros *.
+  intros WfEnv Wf Sub.
+  remember C0.
+  destruct C0...
+  - destruct (AtomSet.F.mem x (cset_fvars c)) eqn:InAp.
+    * inversion Sub; subst.
+      + unfold subst_cset. unfold cset_references_fvar_dec...
+      + unfold subst_cset. unfold cset_references_fvar_dec...
+    * rewrite <- AtomSetFacts.not_mem_iff in InAp.
+      replace (subst_cset x C c) with c.
+      replace (subst_cset x D c) with c.
+      apply subcapt_reflexivity with (A := A)...
+      (* is this problematic ??? *)
+      apply cheat.
+      apply subst_cset_fresh. inversion Wf; subst...
+      apply subst_cset_fresh. inversion Wf; subst...
+  - destruct (AtomSet.F.mem x (cset_fvars c)) eqn:InAp.
+    * inversion Sub; subst.      
+      + simpl in InAp. unfold subst_cset. unfold cset_references_fvar_dec. rewrite InAp. constructor.
+        admit.
+      + simpl in InAp. unfold subst_cset. unfold cset_references_fvar_dec. rewrite InAp. 
+        inversion Wf; subst.
+        simpl. rewrite elim_empty_nat_set. constructor...
+        admit.
+        admit.
+        unfold AtomSet.F.For_all in *; intros.
+        (* More set fiddling *)
+        admit.
+    * rewrite <- AtomSetFacts.not_mem_iff in InAp.
+      replace (subst_cset x C c) with c.
+      replace (subst_cset x D c) with c.
+      apply subcapt_reflexivity with (A := A)...
+      (* is this problematic ??? *)
+      apply cheat.
+      apply subst_cset_fresh. unfold fv_cset; subst...
+      apply subst_cset_fresh. unfold fv_cset; subst...
+Admitted.
 
 Lemma meaning_of : forall E Ap Am x C D T,
   wf_env E ->
@@ -1461,8 +1514,14 @@ Proof with eauto; fold subst_cpt.
   - simpl. constructor...
   - destruct (pre_meaning_of E Ap Am x C D P HwfE H0 H7 Hsc).
     split; intros; constructor...
-    apply cheat.
-    apply cheat.
+    + eapply subst_cset_across_subcapt...
+    + replace (subst_cset x D C0) with C0.
+      replace (subst_cset x C C0) with C0.
+      apply subcapt_reflexivity with (A := Ap)...
+      (* is this problematic ??? *)
+      apply cheat.
+      apply subst_cset_fresh. inversion H6...
+      apply subst_cset_fresh. inversion H6...
 ------
   intros *.
   intros HwfE Typ HwfT Hsc.
@@ -1637,13 +1696,7 @@ Proof.
 Admitted.
 
 
-Lemma subcapt_through_subst_cset : forall F x U E C1 C2 D,
-    subcapt (F ++ [(x, bind_typ U)] ++ E) C1 C2 ->
-    cv E U D ->
-    subcapt (map (subst_cb x D) F ++ E) (subst_cset x D C1) (subst_cset x D C2).
-Proof.
-  admit.
-Admitted.
+
 
 Lemma subst_ct_open_tt : forall x c t1 t2,
   capt c ->
