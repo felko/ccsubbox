@@ -807,7 +807,7 @@ Definition transitivity_pre_on Q := forall E S T,
 Hint Extern 1 (wf_env ?E) =>
 match goal with
 | H : sub_pre ?E _ _ |- _ => apply (proj1 (sub_pre_regular _ _ _ H))
-end.
+end : core.
 
 Ltac rewrite_parenthesise_binding :=
   match goal with
@@ -2036,6 +2036,17 @@ Proof with eauto.
   - apply IHe...
 Admitted.
 
+Lemma free_for_cv_subst_ee_cset_irrelevancy: forall x u C D t,
+  free_for_cv (subst_ee x u C t) =
+  free_for_cv (subst_ee x u D t).
+Proof.
+  induction t.
+  all : simpl; eauto.
+  rewrite IHt1.
+  rewrite IHt2.
+  trivial.
+Qed.
+
 Lemma notin_fv_wf_typ : forall E (X : atom) T,
   wf_typ_in E T ->
   X `notin` dom E ->
@@ -2048,12 +2059,23 @@ Proof with eauto.
   all: admit.
 Admitted.
 
+Lemma capt_from_cv : forall E T C,
+    cv E T C -> capt C.
+Proof with eauto.
+  intros.
+  assert (wf_cset_in E C) as HA by auto.
+  eapply capt_from_wf_cset...
+Qed.
+Hint Resolve capt_from_cv : core.
+
 Lemma typing_through_subst_ee : forall U E F x T C e u,
   typing (F ++ [(x, bind_typ U)] ++ E) e T ->
   value u ->
   typing E u U ->
   cv E U C ->
-  typing (map (subst_cb x C) F ++ E) (subst_ee x u C e) (subst_ct x C T).
+  typing (map (subst_cb x C) F ++ E)
+         (subst_ee x u (free_for_cv u) e)
+         (subst_ct x C T).
 Proof with eauto 4.
   intros *.
   intros HtypT HvalU HtypU HcvU.
@@ -2177,31 +2199,30 @@ Proof with eauto 4.
               ** rewrite subst_ct_open_ct_var...
                  rewrite_env (map (subst_cb x C) ([(Y, bind_typ V)] ++ F) ++ E).
                  unshelve epose proof (H2 Y _ ([(Y, bind_typ V)] ++ F) _) as SpH2...
-                 inversion SpH2; subst.
-                 pose proof (proj2 (proj2 (typing_regular _ _ _ SpH2))) as HwfY.
-                 apply (wf_typ_set_weakening _ _ _ _ _ _ HwfY); simpl_env...
-                 lazymatch goal with
-                   |- (wf_typ ?E _ _ ?T) =>
-                   idtac E T;
-                   lazymatch goal with
-                   | H: typing E _ T |- _ =>
-                     idtac H
-                     (* apply (proj2 (proj2 (typing_regular _ _ _ H))) *)
-                   end
-                 end.
-      * pick fresh y and apply typing_abs.
-        rewrite subst_ee_open_ee_var...
-        rewrite subst_ct_open_ct_var...
-        rewrite_env (map (subst_cb x C) ([(y, bind_typ V)] ++ F) ++ E).
-        apply H0...
+                 (* This part seems to require the "weird" wf_typ_through_subst_ct lemma again... *)
+                 (* See H1 *)
+                 admit.
+                 (* inversion SpH2; subst. *)
+                 (* pose proof (proj2 (proj2 (typing_regular _ _ _ SpH2))) as HwfY. *)
+      * admit.
+        (* pick fresh y and apply typing_abs. *)
+        (* -- admit. *)
+        (* -- admit. *)
+        (* -- rewrite subst_ee_open_ee_var... *)
+        (*    rewrite subst_ct_open_ct_var... *)
+        (*    rewrite_env (map (subst_cb x C) ([(y, bind_typ V)] ++ F) ++ E). *)
+        (*    apply H2... *)
     + SCase "x not in fv e1".
       assert (x `notin` cset_fvars (free_for_cv e1)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
       rewrite subst_commutes_with_free_for_cv with (u := u)...
-      pick fresh y and apply typing_abs.
-      rewrite subst_ee_open_ee_var...
-      rewrite subst_ct_open_ct_var...
-      rewrite_env (map (subst_cb x C) ([(y, (bind_typ V))] ++ F) ++ E).
-      apply H0...
+      admit.
+      (* pick fresh y and apply typing_abs. *)
+      (* * admit. *)
+      (* * admit. *)
+      (* * rewrite subst_ee_open_ee_var... *)
+      (*   rewrite subst_ct_open_ct_var... *)
+      (*   rewrite_env (map (subst_cb x C) ([(y, (bind_typ V))] ++ F) ++ E). *)
+      (*   apply H2... *)
   - Case "typing_app".
     rewrite subst_ct_open_ct...
     simpl subst_ct in IHHtypT1...
@@ -2217,11 +2238,26 @@ Proof with eauto 4.
         admit.
       }
       rewrite Heq.
-      pick fresh y and apply typing_tabs.
-      rewrite subst_ee_open_te_var...
-      rewrite subst_ct_open_tt_var...
-      rewrite_env (map (subst_cb x C) ([(y, (bind_sub V))] ++ F) ++ E).
-      apply H0...
+      eapply typing_sub with (S :=
+                                (typ_capt (free_for_cv (subst_ee x u C e1))
+                                          (typ_all (subst_ct x (free_for_cv u) V)
+                                                   (subst_ct x C T1)))).
+      2: {
+        econstructor...
+        - eapply subcapt_reflexivity with (A := dom (map (subst_cb x C) F ++ E))...
+          + admit.              (* from H2 *)
+          + admit.              (* more new lemmas??? *)
+        - econstructor...
+          apply value_therefore_fv_subcapt_cv
+      }
+      * apply typing_abs.
+        pick fresh y and apply typing_tabs.
+        * admit.
+        * admit.
+        * rewrite subst_ee_open_te_var...
+          rewrite subst_ct_open_tt_var...
+          rewrite_env (map (subst_cb x C) ([(y, (bind_sub V))] ++ F) ++ E).
+          apply H2...
   - Case "typing_tapp".
     rewrite subst_ct_open_tt...
     eapply typing_tapp.
@@ -2256,14 +2292,14 @@ Proof.
   apply subst_tt_open_ct; auto.
 Qed.
 
-Hint Extern 1 (wf_typ ?E ?T) =>
+Hint Extern 1 (wf_typ_in ?E ?T) =>
 match goal with
-| H : wf_typ ?E (typ_capt _ ?P) |- _ =>
+| H : wf_typ_in ?E (typ_capt _ ?P) |- _ =>
   inversion H; subst; (match goal with
-                       | H : wf_pretyp ?E (typ_arrow ?T _) |- _ =>
+                       | H : wf_pretyp_in ?E (typ_arrow ?T _) |- _ =>
                          inversion H; subst; assumption
                        end)
-end.
+end : core.
 
 Lemma typing_through_subst_te : forall Q E F Z e T P,
   typing (F ++ [(Z, bind_sub Q)] ++ E) e T ->
@@ -2283,59 +2319,58 @@ Proof with simpl_env;
     destruct (X == Z).
     (* Alex: for some reason, ifs in bindings don't want to reduce below... *)
     + subst.
-      rewrite (map_subst_tb_id E Z P);
-        [ | auto | eapply fresh_mid_tail; eauto ].
-      binds_cases H0...
-      * enough (binds x (subst_tb Z P (bind_typ Z)) (map (subst_tb Z P) E))...
-        simpl in *.
-        admit.
-      * admit.
+      admit.
+      (* rewrite (map_subst_tb_id E Z P); *)
+      (*   [ | auto | eapply fresh_mid_tail; eauto ]. *)
+      (* binds_cases H0... *)
+      (* * enough (binds x (subst_tb Z P (bind_typ Z)) (map (subst_tb Z P) E))... *)
+      (*   simpl in *. *)
+      (*   admit. *)
+      (* * admit. *)
     + subst.
       apply typing_var_tvar...
-      rewrite (map_subst_tb_id E Z P);
-        [ | auto | eapply fresh_mid_tail; eauto ].
-      binds_cases H0...
-      * enough (binds x (subst_tb Z P (bind_typ X)) (map (subst_tb Z P) E))...
-        simpl in H1...
-        admit.
-      * admit.
+      admit.
+      (* rewrite (map_subst_tb_id E Z P); *)
+      (*   [ | auto | eapply fresh_mid_tail; eauto ]. *)
+      (* binds_cases H0... *)
+      (* * enough (binds x (subst_tb Z P (bind_typ X)) (map (subst_tb Z P) E))... *)
+      (*   simpl in H1... *)
+      (*   admit. *)
+      (* * admit. *)
   - Case "typing_var".
     admit.
   - Case "typing_abs".
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
     2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
     pick fresh y and apply typing_abs.
-    rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E).
-    rewrite subst_te_open_ee_var...
-    rewrite subst_tt_open_ct_var...
-    unshelve eapply (H0 y _ ([(y, bind_typ V)] ++ F) _)...
+    + admit.
+    + admit.
+    + rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E).
+      rewrite subst_te_open_ee_var...
+      rewrite subst_tt_open_ct_var...
+      unshelve eapply (H2 y _ ([(y, bind_typ V)] ++ F) _)...
   - Case "typing_app".
     unshelve epose proof (IHTyp2 F _)...
     unshelve epose proof (IHTyp1 F _)...
-    unshelve epose proof (cv_exists (map (subst_tb Z P) F ++ E) (subst_tt Z P T1') _ _) as [? ?]...
-    assert (wf_typ (map (subst_tb Z P) F ++ E)
-                  (typ_capt Cf (typ_arrow (subst_tt Z P T1) (subst_tt Z P T2))))...
-    unshelve epose proof (cv_exists (map (subst_tb Z P) F ++ E) (subst_tt Z P T1) _ _) as [? ?]...
+    unshelve epose proof (cv_exists_in (map (subst_tb Z P) F ++ E) (subst_tt Z P T1') _ _) as [? ?]...
+    assert (wf_typ_in (map (subst_tb Z P) F ++ E)
+                      (typ_capt Cf (typ_arrow (subst_tt Z P T1) (subst_tt Z P T2))))...
+    unshelve epose proof (cv_exists_in (map (subst_tb Z P) F ++ E) (subst_tt Z P T1) _ _) as [? ?]...
+    admit.                      (* well-formedness *)
     rewrite <- subst_tt_open_ct...
-    eapply typing_app.
-    + apply H5.
-    + apply H4.
-    + trivial...
-    + trivial...
-    + trivial...
-    + eapply subcapt_transitivity with (C2 := Cv')...
-      eapply cv_through_subst_tt with (T := T1')...
-      eapply subcapt_through_subst_tt...
-    + (* Alex: unsound, again ?!? *)
-      admit.
+    (* IMPORTANT! *)
+    admit.
+    (* eapply typing_app with (Cf := x)... *)
   - Case "typing_tabs".
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
     2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
     pick fresh Y and apply typing_tabs.
-    rewrite subst_te_open_te_var...
-    rewrite subst_tt_open_tt_var...
-    rewrite_env (map (subst_tb Z P) ([(Y, bind_sub V)] ++ F) ++ E).
-    apply H0...
+    + admit.
+    + admit.
+    + rewrite subst_te_open_te_var...
+      rewrite subst_tt_open_tt_var...
+      rewrite_env (map (subst_tb Z P) ([(Y, bind_sub V)] ++ F) ++ E).
+      apply H2...
   - Case "typing_tapp".
     rewrite subst_tt_open_tt...
 Admitted.
@@ -2352,10 +2387,24 @@ Lemma typing_inv_abs : forall E S1 e1 T,
   typing E (exp_abs S1 e1) T ->
   forall U1 U2 C, sub E T (typ_capt C (typ_arrow U1 U2)) ->
      sub E U1 S1
-  /\ exists S2, exists L, forall x, x `notin` L ->
+  /\ exists L, forall x, x `notin` L -> exists S2,
      typing ([(x, bind_typ S1)] ++ E) (open_ee e1 x x) S2 /\ sub E S2 (open_ct U2 x).
 Proof with auto.
-  admit.
+  intros *.
+  intro Htyp.
+  dependent induction Htyp; intros U1 U2 C Hsub.
+  - Case "typing_abs".
+    inversion Hsub; subst.
+    match goal with H : sub_pre _ _ _ |- _ =>
+      inversion H; subst
+    end.
+    split...
+    exists L.
+    intros y ?.
+    exists (open_ct T1 y).
+    admit.
+  - Case "typing_sub".
+    eauto using (sub_transitivity T).
 Admitted.
 (*
   intros E S1 e1 T Typ.
@@ -2414,32 +2463,36 @@ Proof with simpl_env; eauto.
   - Case "typing_app".
     inversion Red; subst...
     + SCase "red_abs".
-      destruct (typing_inv_abs _ _ _ _ Typ1 T1 T2 Cf) as [P1 [S2 [L P2]]].
-        apply sub_reflexivity...
+      destruct (typing_inv_abs _ _ _ _ Typ1 T1 T2 Cf) as [P1 [L P2]].
+        eapply sub_reflexivity...
       pick fresh x.
-      destruct (P2 x) as [? ?]...
+      destruct (P2 x ltac:(notin_solve)) as [S2 ?]...
       rewrite (subst_ee_intro x)...
       rewrite (subst_ct_intro x)...
       rewrite_env (empty ++ E).
-      rewrite_env (map (subst_cb x C) empty ++ E).
-      apply (typing_through_subst_ee T)...
-        apply (typing_sub S2)...
-          rewrite_env (empty ++ [(x, bind_typ T)] ++ E).
-          apply sub_weakening...
-        epose proof (sub_implies_subcapt _ _ _ _ _ P1).
-        (* Here we need to show that ct T = C *)
-        admit.
+      rewrite_env (map (subst_cb x Cv') empty ++ E).
+      (* Alex: and here the cookie crumbles. *)
+      admit.
+      (* apply (typing_through_subst_ee T)... *)
+      (*   apply (typing_sub S2)... *)
+      (*     rewrite_env (empty ++ [(x, bind_typ T)] ++ E). *)
+      (*     apply sub_weakening... *)
+      (*   epose proof (sub_implies_subcapt _ _ _ _ _ P1). *)
+      (*   (* Here we need to show that ct T = C *) *)
+      (*   admit. *)
   - Case "typing_tapp".
     inversion Red; subst...
     SCase "red_tabs".
-      destruct (typing_inv_tabs _ _ _ _ Typ T1 T2 C) as [P1 [S2 [L P2]]].
-        apply sub_reflexivity...
-      pick fresh X.
-      destruct (P2 X) as [? ?]...
-      rewrite (subst_te_intro X)...
-      rewrite (subst_tt_intro X)...
-      rewrite_env (map (subst_tb X T) empty ++ E).
-      apply (typing_through_subst_te T1)...
+    admit.
+    (* destruct (typing_inv_tabs _ _ _ _ Typ T1 T2 C) as [P1 [L P2]]. { *)
+    (*   eapply sub_reflexivity... *)
+    (* } *)
+    (* pick fresh X. *)
+    (* destruct (P2 X ltac:(notin_solve)) as [S2 ?]... *)
+    (* rewrite (subst_te_intro X)... *)
+    (* rewrite (subst_tt_intro X)... *)
+    (* rewrite_env (map (subst_tb X T) empty ++ E). *)
+    (* apply (typing_through_subst_te T1)... *)
 Admitted.
 
 (* ********************************************************************** *)
@@ -2508,7 +2561,7 @@ Proof with eauto.
         destruct (canonical_form_abs _ _ _ _ Val1 Typ1) as [S [e3 EQ]].
         subst.
         right.
-        exists (open_ee e3 e2 C)...
+        exists (open_ee e3 e2 (free_for_cv e2))...
   Case "typing_tapp".
     right.
     destruct IHTyp as [Val1 | [e1' Rede1']]...
