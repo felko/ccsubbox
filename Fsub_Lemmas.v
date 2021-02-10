@@ -537,8 +537,9 @@ Proof with eauto.
       {
         assert ((fvars `union` fvars0) `subset` A) by fsetdec.
         assert (((fvars `union` fvars0) `remove` Z) `subset` (A `remove` Z)) by fsetdec.
-        (** ugh ... Z could be in fvars **and** in A. Then fvars is not a subset of A / Z *)
-        admit.
+        (** Z is not in fvars as Z is not in dom(E) *)
+        assert (Z `notin` fvars) by admit.
+        fsetdec.
       }
       {
         specialize (H9 _ H1)...
@@ -686,7 +687,10 @@ Proof with eauto.
   replace (dom F `union` dom E)
     with ((dom F `union` singleton Z `union` dom E) `remove` Z).
   2: {
-    admit.
+    (* Z is not in dom F nor in dom E. *)
+    assert (Z `notin` dom F) by admit.
+    assert (Z `notin` dom E) by admit.
+    fsetdec.
   }
   apply wf_typ_subst_cb with (Q := Q)...
   eapply wf_cset_set_weakening...
@@ -810,9 +814,8 @@ Lemma wf_typ_subst_tb' : forall F Q E Z P T,
 Proof with eauto.
   intros.
   apply wf_typ_subst_tb with (Q := Q)...
-  eapply wf_typ_set_weakening...
-  - admit.
-  - admit.
+  eapply wf_typ_set_weakening with (Ap := dom (map (subst_tb Z P) F ++ E)) (Am := dom (map (subst_tb Z P) F ++ E))...
+  (** Edward: hint broken -- sets expanded. *)
 Admitted.
 
 Lemma wf_env_subst_tb : forall Q Z P E F,
