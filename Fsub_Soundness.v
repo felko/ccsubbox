@@ -14,6 +14,7 @@
 
 Require Export Fsub_Lemmas.
 
+
 Set Nested Proofs Allowed.
 
 Lemma wf_cset_narrowing : forall F E x Q P C,
@@ -1434,7 +1435,7 @@ with pre_meaning_of_neg_wellformedness : forall E Ap Am x C D T,
 Proof with eauto.
 { intros *.
   intros HwfE HwfT HinOr Hsc.
-  dependent induction HwfT.
+  induction HwfT.
   - simpl.
     constructor...
   - constructor...
@@ -1442,7 +1443,7 @@ Proof with eauto.
 }
 { intros *.
   intros HwfE HwfT HinOr Hsc.
-  dependent induction HwfT.
+  induction HwfT.
   - simpl.
     constructor...
   - constructor...
@@ -1452,84 +1453,86 @@ Proof with eauto.
   intros HwfE HwfT HinOr Hsc.
   induction HwfT.
   - simpl; constructor...
-  -
-    assert (sub E (subst_ct x D T1) (subst_ct x C T1)). {
+  - assert (sub E (subst_ct x D T1) (subst_ct x C T1)). {
       eapply meaning_of_neg_wellformedness...
     }
     pick fresh y and apply sub_arrow; fold subst_ct...
-    3: {
-      assert (y `notin` Am) by notin_solve.
-      rewrite subst_ct_open_ct_var...
-      rewrite subst_ct_open_ct_var.
-      { apply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am).
-        + econstructor.
-          * trivial...
-          * trivial...
-          * notin_solve.
-        + apply cheat.
-        + notin_solve.
-        + rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
-          apply subcapt_weakening; simpl_env.
-          * trivial.
-          * econstructor.
-            -- trivial.
-            -- trivial...
-            -- notin_solve.
-      }
-      notin_solve.
-      trivial...
-    }
-    (* wf_typ ([(y, bind_typ (subst_ct x D T1))] ++ E) (dom E `union` singleton y)
-        (dom E) (open_ct (subst_ct x D T2) y)
-     *)
-    {
-      rewrite subst_ct_open_ct_var...
+    + (*rewrite subst_ct_open_ct_var...
       assert (sub ([(y, bind_typ (subst_ct x D T1))] ++ E)
                   (subst_ct x C (open_ct T2 y))
                   (subst_ct x D (open_ct T2 y))). {
-        eapply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am).
-        + econstructor...
+        apply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am)...
         + apply cheat.
-        + notin_solve.
         + rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
           apply subcapt_weakening; simpl_env...
-          * trivial.
-          * econstructor.
-            -- trivial.
-            -- trivial...
-            -- notin_solve.
       }
-    }
+      (* Alex: no way to progress? *)*)
+      apply cheat.
+    + apply cheat.
+    + assert (y `notin` Am) by notin_solve.
+      rewrite subst_ct_open_ct_var...
+      rewrite subst_ct_open_ct_var...
+      apply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am)...
+      * apply cheat.
+      * rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
+        apply subcapt_weakening; simpl_env...
 
-  - assert (sub E (subst_ct x D T2) (subst_ct x C T2)). {
+  - assert (sub E (subst_ct x D T1) (subst_ct x C T1)). {
       eapply meaning_of_neg_wellformedness...
     }
-    pick fresh y and apply sub_arrow; fold subst_ct...
-    3: {
-      assert (y `notin` Am) by notin_solve.
-      rewrite subst_ct_open_ct_var...
-      rewrite subst_ct_open_ct_var.
-      { apply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am).
-        + econstructor.
-          * trivial...
-          * trivial...
-          * notin_solve.
-        + apply cheat.
-        + notin_solve.
-        + rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
-          apply subcapt_weakening; simpl_env.
-          * trivial.
-          * econstructor.
-            -- trivial.
-            -- trivial...
-            -- notin_solve.
-      }
-      notin_solve.
-      trivial...
-    }
+    pick fresh y and apply sub_all; fold subst_ct...
+    + apply cheat.
+    + apply cheat.
+    + rewrite subst_ct_open_tt_var...
+      rewrite subst_ct_open_tt_var...
+      apply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am)...
+      * apply cheat.
+      * rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
+        apply subcapt_weakening; simpl_env...
 }
 
-Qed.
+{ intros *.
+  intros HwfE HwfT Hnotin Hsc.
+  induction HwfT.
+  - simpl; constructor...
+  - assert (sub E (subst_ct x C T1) (subst_ct x D T1)). {
+      eapply meaning_of_pos_wellformedness...
+    }
+    pick fresh y and apply sub_arrow; fold subst_ct...
+    + (*rewrite subst_ct_open_ct_var...
+      assert (sub ([(y, bind_typ (subst_ct x C T1))] ++ E)
+                  (subst_ct x D (open_ct T2 y))
+                  (subst_ct x C (open_ct T2 y))). {
+        apply meaning_of_neg_wellformedness with (Ap := Ap) (Am := Am `union` singleton y)...
+        + apply cheat.
+        + rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
+          apply subcapt_weakening; simpl_env...
+      }
+      (* Alex: no way to progress? *)*)
+      apply cheat.
+    + apply cheat.
+    + rewrite subst_ct_open_ct_var...
+      rewrite subst_ct_open_ct_var...
+      apply meaning_of_neg_wellformedness with (Ap := Ap) (Am := Am `union` singleton y)...
+      * apply cheat.
+      * rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
+        apply subcapt_weakening; simpl_env...
+
+  - assert (sub E (subst_ct x C T1) (subst_ct x D T1)). {
+      eapply meaning_of_pos_wellformedness...
+    }
+    pick fresh y and apply sub_all; fold subst_ct...
+    + apply cheat.
+    + apply cheat.
+    + rewrite subst_ct_open_tt_var...
+      rewrite subst_ct_open_tt_var...
+      apply meaning_of_neg_wellformedness with (Ap := Ap) (Am := Am `union` singleton y)...
+      * apply cheat.
+      * rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
+        apply subcapt_weakening; simpl_env...
+}
+(* Alex: cannot guess decreasing argument of `fix` :( *)
+Admitted.
 
 Lemma typing_narrowing : forall Q E F X P e T,
   sub E P Q ->
