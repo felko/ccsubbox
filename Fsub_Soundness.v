@@ -1044,65 +1044,39 @@ Proof with simpl_env; auto.
   + eapply sub_top...
     (* wf_typ typ_arrow *)
     pick fresh X and apply wf_typ_arrow...
-    (* assert (X `notin` L0)... *)
-    (* specialize (H2 X H5). *)
-    (* (* by regularity *) *)
-    (* assert (wf_typ ([(X, bind_typ T1)] ++ E) (open_ct S2 X))... *)
-    (* rewrite_env (empty ++ [(X, bind_typ S1)] ++ E). *)
-    (* eapply wf_typ_narrowing_typ with (C1 := T1). *)
-    (* trivial. *)
-    (* assert (wf_env (empty ++ [(X, bind_typ T1)] ++ E)). { auto. } *)
-    (* pose proof (ok_from_wf_env _ H7). *)
-    (* inversion H8. *)
-    (* simpl_env. *)
-    (* econstructor... *)
-  + pick fresh Y and apply sub_arrow.
-    (* Oh dear god this looks horrifying, I'm sorry Jonathan... *)
-    all: trivial.
-    all: admit.
+  + pick fresh Y and apply sub_arrow.    
+    all: trivial.    
     (* SCase "bounds". *)
-    (*   apply cheat. *)
-    (* SCase "bodies". *)
-    (*   lapply (H0 Y); [ intros K | auto ]. *)
-    (*   assert (Y `notin` L0) by notin_solve. *)
-    (*   assert (Y `notin` L1) by notin_solve. *)
-    (*   specialize (H2 Y H3). *)
-    (*   specialize (H8 Y H4). *)
-    (*   assert (sub ([(Y, bind_typ T0)] ++ E) (open_ct S2 Y) (open_ct T2 Y)). { *)
-    (*     rewrite_env (empty ++ [(Y, bind_typ T0)] ++ E). *)
-    (*     eapply sub_narrowing_typ_aux with (Q := T1)... *)
-    (*     apply cheat. *)
-    (*   } *)
-    (*   assert (type (open_ct T2 Y))... *)
-    (*   (* apply (sub_transitivity _ _ _ _ H7 H5 H8). *) *)
-    (*   apply sub_transitivity with (Q := (open_ct T2 Y))... *)
-
-      (* rewrite_env (empty ++ [(Y, bind_typ T0)] ++ E).
-      eapply sub_narrowing_typ_aux with (Q := T1). *)
-      (* unfold transitivity_on.
-      auto using (sub_transitivity T1). *)
+       auto using (sub_transitivity T1).
+       assert (Y `notin` L1) by notin_solve...
+       assert (Y `notin` L1) by notin_solve...
+    SCase "bodies".
+      lapply (H0 Y); [ intros K | auto ].
+      assert (Y `notin` L0) by notin_solve.
+      assert (Y `notin` L1) by notin_solve.
+      apply sub_transitivity with (Q := (open_ct T2 Y))...
+      rewrite_env (empty ++ [(Y, bind_typ T0)] ++ E).
+      eapply sub_narrowing_typ_aux with (Q := T1)...
+      unfold transitivity_on.
+      auto using (sub_transitivity T1).
   (* type_all. *)
-  - apply cheat.
-  (* - inductionThenInversion2 SsubQ QsubT.
+  - inductionThenInversion2 SsubQ QsubT.
   + apply sub_top...
     pick fresh X and apply wf_typ_all...
-    assert (X `notin` L0) by notin_solve.
-    specialize (H2 X H5)...
-    assert (wf_typ ([(X, bind_sub T1)] ++ E) (open_tt S2 X))...
-    (* wf_typ S2 *)
-    apply cheat.
   + pick fresh Y and apply sub_all.
+    all: trivial.
     SCase "bounds".
       apply sub_transitivity with (Q := T1)...
+      assert (Y `notin` L1) by notin_solve...
+      assert (Y `notin` L1) by notin_solve...
     SCase "bodies".
       lapply (H0 Y); [ intros K | auto ].
       apply sub_transitivity with (Q := (open_tt T2 Y))...
       rewrite_env (empty ++ [(Y, bind_sub T0)] ++ E).
-      apply (sub_narrowing_aux T1)...
-      apply cheat.
-      (* unfold transitivity_on.
-      auto using (sub_transitivity T1). *) *)
-Admitted.
+      apply (sub_narrowing_aux T1)...      
+      unfold transitivity_on.
+      auto using (sub_transitivity T1).
+Qed.
 
 Lemma sub_narrowing : forall Q E F Z P S T,
   sub E P Q ->
