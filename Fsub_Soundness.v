@@ -764,8 +764,6 @@ Admitted.
 
 Hint Resolve ok_ignores_binding : core.
 
-(** Alex: this should still be true, but captures_narrowing is just false,
-          we will need to prove it directly I guess? *)
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
   ok (F ++ [(Z, bind_sub P)] ++ E) ->
@@ -780,9 +778,6 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
   (*   specialize (H1 x H2). *)
   (*   eapply captures_narrowing... *)
 Admitted.
-
-
-(* Hint Resolve wf_cset_in_narrowing_typ : core. *)
 
 Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
   sub E P Q ->
@@ -1365,7 +1360,8 @@ Proof with simpl_env;
   - Case "typing_abs".
     pick fresh X and apply typing_abs...
     + rewrite_parenthesise_binding.
-      (* Alex: uh, I think this'll be easier to prove if we just add a single binding... *)
+      (* Alex: uh, I think this'll be easier to prove if we just add a single
+      binding as opposed to a complete F... *)
       admit.
     + lapply (H0 X); [intros K | auto].
       admit.
@@ -1436,19 +1432,18 @@ Proof with eauto.
 { intros *.
   intros HwfE HwfT HinOr Hsc.
   induction HwfT.
-  - simpl.
-    constructor...
+  - simpl. constructor...
   - constructor...
     apply cheat.
 }
 { intros *.
   intros HwfE HwfT HinOr Hsc.
   induction HwfT.
-  - simpl.
-    constructor...
+  - simpl. constructor...
   - constructor...
     apply cheat.
 }
+
 { intros *.
   intros HwfE HwfT HinOr Hsc.
   induction HwfT.
