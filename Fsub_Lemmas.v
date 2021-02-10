@@ -536,7 +536,8 @@ Proof with eauto.
       }
       {
         assert ((fvars `union` fvars0) `subset` A) by fsetdec.
-        (** ugh *)
+        assert (((fvars `union` fvars0) `remove` Z) `subset` (A `remove` Z)) by fsetdec.
+        (** ugh ... Z could be in fvars **and** in A. Then fvars is not a subset of A / Z *)
         admit.
       }
       {

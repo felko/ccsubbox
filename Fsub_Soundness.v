@@ -346,15 +346,6 @@ Proof with auto.
   - exists xs. exists {}N...
 Qed.
 
-(* Alex: this seems easier to work with than cv_exists *)
-Lemma cv_exists_in : forall E T,
-    wf_env E ->
-    wf_typ_in E T ->
-    exists C, cv E T C.
-Proof with eauto.
-  admit.
-Admitted.
-
 (* Lemma cv_exists : forall E T Ap Am, *)
 (*   wf_env E -> *)
 (*   wf_typ E Ap Am T -> *)
@@ -365,6 +356,19 @@ Admitted.
 (*   induction E; induction T; intros; try inversion H0; try inversion H; subst... *)
 (*   - inversion H3... *)
 (*   - simpl_env in *. *)
+
+Lemma cv_exists_in : forall E T,
+  wf_env E ->
+  wf_typ_in E T ->
+  exists C, cv E T C.
+Proof with eauto.  
+  induction E; induction T; intros; try inversion H0; subst.
+  - inversion H6...
+  - binds_cases H5...
+  - inversion H6...
+  - admit.
+Admitted.
+
 (*     binds_cases H3... *)
 (*     + assert (wf_typ E a0) by *)
 (*         (apply wf_typ_var with (U := U); eauto). *)
@@ -1404,130 +1408,118 @@ Proof with auto*.
   admit.
 Admitted.
 
-Lemma meaning_of_pos_wellformedness : forall E Ap Am x C D T,
-  wf_env E ->
-  wf_typ E Ap Am T ->
-  (x `notin` Am) ->
-  subcapt E C D ->
-  sub E (subst_ct x C T) (subst_ct x D T)
-with meaning_of_neg_wellformedness : forall E Ap Am x C D T,
-  wf_env E ->
-  wf_typ E Ap Am T ->
-  (x `notin` Ap) ->
-  subcapt E C D ->
-  sub E (subst_ct x D T) (subst_ct x C T)
-with pre_meaning_of_pos_wellformedness : forall E Ap Am x C D T,
-  wf_env E ->
-  wf_pretyp E Ap Am T ->
-  (x `notin` Am) ->
-  subcapt E C D ->
-  sub_pre E (subst_cpt x C T) (subst_cpt x D T)
-with pre_meaning_of_neg_wellformedness : forall E Ap Am x C D T,
-  wf_env E ->
-  wf_pretyp E Ap Am T ->
-  (x `notin` Ap) ->
-  subcapt E C D ->
-  sub_pre E (subst_cpt x D T) (subst_cpt x C T).
-Proof with eauto.
-{ intros *.
-  intros HwfE HwfT HinOr Hsc.
-  induction HwfT.
-  - simpl. constructor...
-  - constructor...
-    apply cheat.
-}
-{ intros *.
-  intros HwfE HwfT HinOr Hsc.
-  induction HwfT.
-  - simpl. constructor...
-  - constructor...
-    apply cheat.
-}
-
-{ intros *.
-  intros HwfE HwfT HinOr Hsc.
-  induction HwfT.
-  - simpl; constructor...
-  - assert (sub E (subst_ct x D T1) (subst_ct x C T1)). {
-      eapply meaning_of_neg_wellformedness...
-    }
-    pick fresh y and apply sub_arrow; fold subst_ct...
-    + (*rewrite subst_ct_open_ct_var...
-      assert (sub ([(y, bind_typ (subst_ct x D T1))] ++ E)
-                  (subst_ct x C (open_ct T2 y))
-                  (subst_ct x D (open_ct T2 y))). {
-        apply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am)...
-        + apply cheat.
-        + rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
-          apply subcapt_weakening; simpl_env...
-      }
-      (* Alex: no way to progress? *)*)
-      apply cheat.
-    + apply cheat.
-    + assert (y `notin` Am) by notin_solve.
-      rewrite subst_ct_open_ct_var...
-      rewrite subst_ct_open_ct_var...
-      apply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am)...
-      * apply cheat.
-      * rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
-        apply subcapt_weakening; simpl_env...
-
-  - assert (sub E (subst_ct x D T1) (subst_ct x C T1)). {
-      eapply meaning_of_neg_wellformedness...
-    }
-    pick fresh y and apply sub_all; fold subst_ct...
-    + apply cheat.
-    + apply cheat.
-    + rewrite subst_ct_open_tt_var...
-      rewrite subst_ct_open_tt_var...
-      apply meaning_of_pos_wellformedness with (Ap := Ap `union` singleton y) (Am := Am)...
-      * apply cheat.
-      * rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
-        apply subcapt_weakening; simpl_env...
-}
-
-{ intros *.
-  intros HwfE HwfT Hnotin Hsc.
-  induction HwfT.
-  - simpl; constructor...
-  - assert (sub E (subst_ct x C T1) (subst_ct x D T1)). {
-      eapply meaning_of_pos_wellformedness...
-    }
-    pick fresh y and apply sub_arrow; fold subst_ct...
-    + (*rewrite subst_ct_open_ct_var...
-      assert (sub ([(y, bind_typ (subst_ct x C T1))] ++ E)
-                  (subst_ct x D (open_ct T2 y))
-                  (subst_ct x C (open_ct T2 y))). {
-        apply meaning_of_neg_wellformedness with (Ap := Ap) (Am := Am `union` singleton y)...
-        + apply cheat.
-        + rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
-          apply subcapt_weakening; simpl_env...
-      }
-      (* Alex: no way to progress? *)*)
-      apply cheat.
-    + apply cheat.
-    + rewrite subst_ct_open_ct_var...
-      rewrite subst_ct_open_ct_var...
-      apply meaning_of_neg_wellformedness with (Ap := Ap) (Am := Am `union` singleton y)...
-      * apply cheat.
-      * rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
-        apply subcapt_weakening; simpl_env...
-
-  - assert (sub E (subst_ct x C T1) (subst_ct x D T1)). {
-      eapply meaning_of_pos_wellformedness...
-    }
-    pick fresh y and apply sub_all; fold subst_ct...
-    + apply cheat.
-    + apply cheat.
-    + rewrite subst_ct_open_tt_var...
-      rewrite subst_ct_open_tt_var...
-      apply meaning_of_neg_wellformedness with (Ap := Ap) (Am := Am `union` singleton y)...
-      * apply cheat.
-      * rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
-        apply subcapt_weakening; simpl_env...
-}
-(* Alex: cannot guess decreasing argument of `fix` :( *)
+Lemma cheat_with : forall A B,
+  A -> B.
+Proof.
 Admitted.
+
+Lemma wf_typ_ignores_bindings : forall E F x T1 T2 Ap Am T,
+  wf_typ (F ++ [(x, bind_typ T1)] ++ E) Ap Am T ->
+  wf_typ (F ++ [(x, bind_typ T2)] ++ E) Ap Am T
+with wf_pretyp_ignores_bindings : forall E F x T1 T2 Ap Am T,
+  wf_pretyp (F ++ [(x, bind_typ T1)] ++ E) Ap Am T ->
+  wf_pretyp (F ++ [(x, bind_typ T2)] ++ E) Ap Am T.
+Proof with eauto.
+------
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_typ T1)] ++ E).
+  generalize dependent F.  
+  induction H; intros F Eq; subst.
+  - apply cheat.
+  (* requires wf_cset_ignores_bindings *)
+  - econstructor... apply cheat.
+------
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_typ T1)] ++ E).
+  generalize dependent F.  
+  induction H; intros F Eq; subst.
+  - econstructor.
+  - pick fresh X and apply wf_typ_arrow.  
+    + eapply wf_typ_ignores_bindings...
+    + rewrite_parenthesise_binding.
+      eapply wf_typ_ignores_bindings with (T1 := T1)...
+      eapply H0...
+  - pick fresh X and apply wf_typ_all.  
+    + eapply wf_typ_ignores_bindings...
+    + rewrite_parenthesise_binding.
+      eapply wf_typ_ignores_bindings with (T1 := T1)...
+      eapply H0...
+Qed.
+
+Lemma meaning_of : forall E Ap Am x C D T,
+  wf_env E ->
+  type T ->
+  wf_typ E Ap Am T ->
+  subcapt E C D ->
+  ((x `notin` Am -> sub E (subst_ct x C T) (subst_ct x D T)) /\ 
+   (x `notin` Ap -> sub E (subst_ct x D T) (subst_ct x C T)))
+with pre_meaning_of : forall E Ap Am x C D T,
+  wf_env E ->
+  pretype T ->
+  wf_pretyp E Ap Am T ->
+  subcapt E C D ->
+  ((x `notin` Am -> sub_pre E (subst_cpt x C T) (subst_cpt x D T)) /\ 
+  (x `notin` Ap -> sub_pre E (subst_cpt x D T) (subst_cpt x C T))).
+Proof with eauto; fold subst_cpt.
+------
+  intros *.
+  intros HwfE Typ HwfT Hsc.
+  (* assert (type T) as Typ by auto. *)
+  induction Typ; inversion HwfT; subst.
+  - simpl. constructor...
+  - destruct (pre_meaning_of E Ap Am x C D P HwfE H0 H7 Hsc).
+    split; intros; constructor...
+    apply cheat.
+    apply cheat.
+------
+  intros *.
+  intros HwfE Typ HwfT Hsc.
+  (* assert (pretype T) as Typ by auto. *)
+  induction Typ; inversion HwfT; subst.
+  - simpl. constructor...
+  - (* specializing the hypothesis to the argument type of arrow *)
+    destruct (meaning_of E Am Ap x C D T1 HwfE H H6 Hsc).
+    split; intros.
+    + specialize (H2 H3).
+      pick fresh y and apply sub_arrow; fold subst_ct...
+      rewrite subst_ct_open_ct_var...
+      specialize (H7 y).
+      (* 
+       1) we need to know that `Ap subset dom E`
+       2) we need to show that subst_ct preserves wellformedness (wf_typ).
+       3) then we can apply wf_typ_ignores_bindings
+      *)
+      apply cheat.
+      apply cheat.
+      rewrite subst_ct_open_ct_var...
+      rewrite subst_ct_open_ct_var...
+      (* we cannot call meaning_of on anything that is larger than wf_typ.... *)
+      assert (y `notin` L) as NotIn by notin_solve.
+      specialize (H0 y NotIn).
+      unshelve epose proof (meaning_of 
+        ([(y, bind_typ (subst_ct x D T1))] ++ E)
+        (Ap `union` singleton y)
+        Am x C D (open_ct T2 y) _ H0 _).
+      * econstructor...
+      * rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
+        eapply wf_typ_ignores_bindings...
+      * destruct H4.
+        rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
+        apply subcapt_weakening...
+        econstructor...
+        apply H4...
+    + apply cheat.
+  - apply cheat.
+Qed.
+
+(* subst_ct_intro
+
+subst_ct X (open_ct T X) C = open_ct T C
+
+subcapt E C1 C2 ->
+sub E (open_ct T2 C1) (open_ct T2 C2) *)
 
 Lemma typing_narrowing : forall Q E F X P e T,
   sub E P Q ->
@@ -1556,7 +1548,34 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
       apply H2...
   - Case "typing_app".
     (* Alex: requires making use of well-formedness *)
-    admit.
+    pose proof (cv_exists_in (F ++ [(X, bind_sub P)] ++ E) T1') as Ex.
+    destruct Ex as [Cnarrow HCVnarrow]...
+    apply wf_typ_narrowing with (Q := Q)...
+    eapply typing_sub with (S := (open_ct T2 Cnarrow))...
+    pose proof (cv_narrowing _ _ _ _ _ _ _ _ PsubQ H0 HCVnarrow) as Subcapt.
+    specialize (IHTyp1 F ltac:(auto)).
+    (* inversion IHTyp1; subst. *)
+
+    pick fresh x.    
+    rewrite (subst_ct_intro x)...
+    replace (open_ct T2 Cv') with (subst_ct x Cv' (open_ct T2 x)).
+    2: { symmetry. apply subst_ct_intro... }
+
+    (* requires some inversion lemma
+       this will also give us a fresh generator L0 which we should use for the pick fresh above.
+     *)
+    assert (wf_typ_in (F ++ [(X, bind_sub P)] ++ E) (open_ct T2 x)) as WfTyp. { admit. }
+
+    unshelve epose proof (meaning_of 
+      (F ++ [(X, bind_sub P)] ++ E) 
+      (dom (F ++ [(X, bind_sub P)] ++ E))
+      (dom (F ++ [(X, bind_sub P)] ++ E)) x Cnarrow Cv' (open_ct T2 x) _ _ WfTyp _).
+    auto.
+    eapply type_from_wf_typ...
+    rewrite_env (empty ++ (F ++ [(X, bind_sub P)]) ++ E).
+    eapply subcapt_weakening...
+    simpl_env...
+    destruct H1...
   - Case "typing_tabs".
     assert (wf_env (F ++ [(X, bind_sub P)] ++ E)). {
       pick fresh y for L.
