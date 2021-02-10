@@ -1450,11 +1450,12 @@ Admitted.
 Lemma subst_cset_across_subcapt : forall E x C D C0 A,
   wf_env E ->
   wf_cset E A C0 ->
+  A `subset` dom E ->
   subcapt E C D ->
   subcapt E (subst_cset x C C0) (subst_cset x D C0).
 Proof with eauto.
   intros *.
-  intros WfEnv Wf Sub.
+  intros WfEnv Wf Subset Sub.
   remember C0.
   destruct C0...
   - destruct (AtomSet.F.mem x (cset_fvars c)) eqn:InAp.
@@ -1465,13 +1466,13 @@ Proof with eauto.
       replace (subst_cset x C c) with c.
       replace (subst_cset x D c) with c.
       apply subcapt_reflexivity with (A := A)...
-      (* is this problematic ??? *)
-      apply cheat.
       apply subst_cset_fresh. inversion Wf; subst...
       apply subst_cset_fresh. inversion Wf; subst...
   - destruct (AtomSet.F.mem x (cset_fvars c)) eqn:InAp.
     * inversion Sub; subst.      
       + simpl in InAp. unfold subst_cset. unfold cset_references_fvar_dec. rewrite InAp. constructor.
+        destruct C...
+        simpl. inversion Wf. inversion H. rewrite elim_empty_nat_set. subst.
         admit.
       + simpl in InAp. unfold subst_cset. unfold cset_references_fvar_dec. rewrite InAp. 
         inversion Wf; subst.
@@ -1485,8 +1486,6 @@ Proof with eauto.
       replace (subst_cset x C c) with c.
       replace (subst_cset x D c) with c.
       apply subcapt_reflexivity with (A := A)...
-      (* is this problematic ??? *)
-      apply cheat.
       apply subst_cset_fresh. unfold fv_cset; subst...
       apply subst_cset_fresh. unfold fv_cset; subst...
 Admitted.
@@ -1494,6 +1493,8 @@ Admitted.
 Lemma meaning_of : forall E Ap Am x C D T,
   wf_env E ->
   type T ->
+  Ap `subset` dom E ->
+  Am `subset` dom E ->
   wf_typ E Ap Am T ->
   subcapt E C D ->
   ((x `notin` Am -> sub E (subst_ct x C T) (subst_ct x D T)) /\ 
@@ -1501,6 +1502,8 @@ Lemma meaning_of : forall E Ap Am x C D T,
 with pre_meaning_of : forall E Ap Am x C D T,
   wf_env E ->
   pretype T ->
+  Ap `subset` dom E ->
+  Am `subset` dom E ->
   wf_pretyp E Ap Am T ->
   subcapt E C D ->
   ((x `notin` Am -> sub_pre E (subst_cpt x C T) (subst_cpt x D T)) /\ 
@@ -1508,28 +1511,26 @@ with pre_meaning_of : forall E Ap Am x C D T,
 Proof with eauto; fold subst_cpt.
 ------
   intros *.
-  intros HwfE Typ HwfT Hsc.
+  intros HwfE Typ SubAp SubAm HwfT Hsc.
   (* assert (type T) as Typ by auto. *)
   induction Typ; inversion HwfT; subst.
   - simpl. constructor...
-  - destruct (pre_meaning_of E Ap Am x C D P HwfE H0 H7 Hsc).
+  - destruct (pre_meaning_of E Ap Am x C D P HwfE H0 SubAp SubAm H7 Hsc).
     split; intros; constructor...
     + eapply subst_cset_across_subcapt...
     + replace (subst_cset x D C0) with C0.
       replace (subst_cset x C C0) with C0.
       apply subcapt_reflexivity with (A := Ap)...
-      (* is this problematic ??? *)
-      apply cheat.
       apply subst_cset_fresh. inversion H6...
       apply subst_cset_fresh. inversion H6...
 ------
   intros *.
-  intros HwfE Typ HwfT Hsc.
+  intros HwfE Typ SubAp SubAm HwfT Hsc.
   (* assert (pretype T) as Typ by auto. *)
   induction Typ; inversion HwfT; subst.
   - simpl. constructor...
   - (* specializing the hypothesis to the argument type of arrow *)
-    destruct (meaning_of E Am Ap x C D T1 HwfE H H6 Hsc).
+    destruct (meaning_of E Am Ap x C D T1 HwfE H SubAm SubAp H6 Hsc).
     split; intros.
     + specialize (H2 H3).
       pick fresh y and apply sub_arrow; fold subst_ct...
@@ -1550,8 +1551,10 @@ Proof with eauto; fold subst_cpt.
       unshelve epose proof (meaning_of 
         ([(y, bind_typ (subst_ct x D T1))] ++ E)
         (Ap `union` singleton y)
-        Am x C D (open_ct T2 y) _ H0 _).
+        Am x C D (open_ct T2 y) _ H0 _ _ _).
       * econstructor...
+      * apply cheat.
+      * apply cheat.
       * rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
         eapply wf_typ_ignores_bindings...
       * destruct H4.
@@ -1618,9 +1621,11 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
     unshelve epose proof (meaning_of 
       (F ++ [(X, bind_sub P)] ++ E) 
       (dom (F ++ [(X, bind_sub P)] ++ E))
-      (dom (F ++ [(X, bind_sub P)] ++ E)) x Cnarrow Cv' (open_ct T2 x) _ _ WfTyp _).
+      (dom (F ++ [(X, bind_sub P)] ++ E)) x Cnarrow Cv' (open_ct T2 x) _ _ _ _ WfTyp _).
     auto.
     eapply type_from_wf_typ...
+    fsetdec.
+    fsetdec.    
     rewrite_env (empty ++ (F ++ [(X, bind_sub P)]) ++ E).
     eapply subcapt_weakening...
     simpl_env...
