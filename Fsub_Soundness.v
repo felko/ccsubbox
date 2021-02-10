@@ -1387,7 +1387,7 @@ Lemma cheat_with : forall A B,
 Proof.
 Admitted.
 
-Lemma wf_cset_ignores_bindings : forall E F x T1 T2 Ap C,
+Lemma wf_cset_ignores_typ_bindings : forall E F x T1 T2 Ap C,
   wf_cset (F ++ [(x, bind_typ T1)] ++ E) Ap C ->
   wf_cset (F ++ [(x, bind_typ T2)] ++ E) Ap C.
 Proof with eauto.
@@ -1402,10 +1402,25 @@ Proof with eauto.
   binds_cases Hb...
 Qed.
 
-Lemma wf_typ_ignores_bindings : forall E F x T1 T2 Ap Am T,
+Lemma wf_cset_ignores_sub_bindings : forall E F x T1 T2 Ap C,
+  wf_cset (F ++ [(x, bind_sub T1)] ++ E) Ap C ->
+  wf_cset (F ++ [(x, bind_sub T2)] ++ E) Ap C.
+Proof with eauto.
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_sub T1)] ++ E).
+  generalize dependent F.  
+  induction H; intros F Eq; subst...
+  econstructor... unfold allbound_typ in *.
+  intros.
+  destruct (H x0 H1) as [T Hb].
+  binds_cases Hb...
+Qed.
+
+Lemma wf_typ_ignores_typ_bindings : forall E F x T1 T2 Ap Am T,
   wf_typ (F ++ [(x, bind_typ T1)] ++ E) Ap Am T ->
   wf_typ (F ++ [(x, bind_typ T2)] ++ E) Ap Am T
-with wf_pretyp_ignores_bindings : forall E F x T1 T2 Ap Am T,
+with wf_pretyp_ignores_typ_bindings : forall E F x T1 T2 Ap Am T,
   wf_pretyp (F ++ [(x, bind_typ T1)] ++ E) Ap Am T ->
   wf_pretyp (F ++ [(x, bind_typ T2)] ++ E) Ap Am T.
 Proof with eauto.
@@ -1418,7 +1433,7 @@ Proof with eauto.
   - apply wf_typ_var with (U := U)...
     binds_cases H...
   (* requires wf_cset_ignores_bindings *)
-  - econstructor... eapply wf_cset_ignores_bindings...
+  - econstructor... eapply wf_cset_ignores_typ_bindings...
 ------
   intros*.
   intros H.
@@ -1427,16 +1442,53 @@ Proof with eauto.
   induction H; intros F Eq; subst.
   - econstructor.
   - pick fresh X and apply wf_typ_arrow.  
-    + eapply wf_typ_ignores_bindings...
+    + eapply wf_typ_ignores_typ_bindings...
     + rewrite_parenthesise_binding.
-      eapply wf_typ_ignores_bindings with (T1 := T1)...
+      eapply wf_typ_ignores_typ_bindings with (T1 := T1)...
       eapply H0...
   - pick fresh X and apply wf_typ_all.  
-    + eapply wf_typ_ignores_bindings...
+    + eapply wf_typ_ignores_typ_bindings...
     + rewrite_parenthesise_binding.
-      eapply wf_typ_ignores_bindings with (T1 := T1)...
+      eapply wf_typ_ignores_typ_bindings with (T1 := T1)...
       eapply H0...
 Qed.
+
+
+Lemma wf_typ_ignores_sub_bindings : forall E F x T1 T2 Ap Am T,
+  wf_typ (F ++ [(x, bind_sub T1)] ++ E) Ap Am T ->
+  wf_typ (F ++ [(x, bind_sub T2)] ++ E) Ap Am T
+with wf_pretyp_ignores_sub_bindings : forall E F x T1 T2 Ap Am T,
+  wf_pretyp (F ++ [(x, bind_sub T1)] ++ E) Ap Am T ->
+  wf_pretyp (F ++ [(x, bind_sub T2)] ++ E) Ap Am T.
+Proof with eauto.
+------
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_sub T1)] ++ E).
+  generalize dependent F.  
+  induction H; intros F Eq; subst.
+  - apply wf_typ_var with (U := T2)...
+    admit.
+  (* requires wf_cset_ignores_bindings *)
+  - econstructor... eapply wf_cset_ignores_sub_bindings...
+------
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_sub T1)] ++ E).
+  generalize dependent F.  
+  induction H; intros F Eq; subst.
+  - econstructor.
+  - pick fresh X and apply wf_typ_arrow.  
+    + eapply wf_typ_ignores_sub_bindings...
+    + rewrite_parenthesise_binding.
+      eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
+      eapply H0...
+  - pick fresh X and apply wf_typ_all.  
+    + eapply wf_typ_ignores_sub_bindings...
+    + rewrite_parenthesise_binding.
+      eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
+      eapply H0...
+Admitted.
 
 (* Substituting the same capture set preserves subcapturing *)
 Lemma subcapt_through_subst_cset : forall F x U E C1 C2 D,
@@ -1539,7 +1591,7 @@ Proof with eauto; fold subst_cpt.
       (* 
        1) we need to know that `Ap subset dom E`
        2) we need to show that subst_ct preserves wellformedness (wf_typ).
-       3) then we can apply wf_typ_ignores_bindings
+       3) then we can apply wf_typ_ignores_typ_bindings
       *)
       apply cheat.
       apply cheat.
@@ -1557,7 +1609,7 @@ Proof with eauto; fold subst_cpt.
       * clear Fr. simpl. fsetdec.
       * clear Fr. simpl. fsetdec.
       * rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
-        eapply wf_typ_ignores_bindings...
+        eapply wf_typ_ignores_typ_bindings...
       * destruct H4.
         rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
         apply subcapt_weakening...
@@ -1570,7 +1622,7 @@ Proof with eauto; fold subst_cpt.
       (* 
         1) we need to know that `Ap subset dom E`
         2) we need to show that subst_ct preserves wellformedness (wf_typ).
-        3) then we can apply wf_typ_ignores_bindings
+        3) then we can apply wf_typ_ignores_typ_bindings
       *)
       apply cheat.
       apply cheat.
@@ -1588,7 +1640,7 @@ Proof with eauto; fold subst_cpt.
       * clear Fr. simpl. fsetdec.
       * clear Fr. simpl. fsetdec.
       * rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
-        eapply wf_typ_ignores_bindings...
+        eapply wf_typ_ignores_typ_bindings...
       * destruct H4.
         rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
         apply subcapt_weakening...
@@ -1604,7 +1656,7 @@ Proof with eauto; fold subst_cpt.
       (* 
        1) we need to know that `Ap subset dom E`
        2) we need to show that subst_ct preserves wellformedness (wf_typ).
-       3) then we can apply wf_typ_ignores_bindings
+       3) then we can apply wf_typ_ignores_typ_bindings
       *)
       apply cheat.
       apply cheat.
@@ -1622,16 +1674,7 @@ Proof with eauto; fold subst_cpt.
       * clear Fr. simpl. fsetdec.
       * clear Fr. simpl. fsetdec.
       * rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
-        (* this looks interesting... 
-          we have 
-            wf_typ ([(y, bind_sub T1)] ++ E) Ap Am (open_tt T2 y)
-          and need
-            wf_typ ([(y, bind_sub (subst_ct x D T1))] ++ E) Ap Am (open_tt T2 y)
-        *)
-        apply cheat.
-
-        (* rewrite <- subst_ct_fresh.
-        trivial... notin_solve. *)
+        eapply wf_typ_ignores_sub_bindings...
       * destruct H4.
         rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
         apply subcapt_weakening...
@@ -1644,7 +1687,7 @@ Proof with eauto; fold subst_cpt.
       (* 
         1) we need to know that `Ap subset dom E`
         2) we need to show that subst_ct preserves wellformedness (wf_typ).
-        3) then we can apply wf_typ_ignores_bindings
+        3) then we can apply wf_typ_ignores_typ_bindings
       *)
       apply cheat.
       apply cheat.
@@ -1662,7 +1705,7 @@ Proof with eauto; fold subst_cpt.
       * clear Fr. simpl. fsetdec.
       * clear Fr. simpl. fsetdec.
       * rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
-        apply cheat.
+        eapply wf_typ_ignores_sub_bindings...
       * destruct H4.
         rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
         apply subcapt_weakening...
