@@ -1387,6 +1387,21 @@ Lemma cheat_with : forall A B,
 Proof.
 Admitted.
 
+Lemma wf_cset_ignores_bindings : forall E F x T1 T2 Ap C,
+  wf_cset (F ++ [(x, bind_typ T1)] ++ E) Ap C ->
+  wf_cset (F ++ [(x, bind_typ T2)] ++ E) Ap C.
+Proof with eauto.
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_typ T1)] ++ E).
+  generalize dependent F.  
+  induction H; intros F Eq; subst...
+  econstructor... unfold allbound_typ in *.
+  intros.
+  destruct (H x0 H1) as [T Hb].
+  binds_cases Hb...
+Qed.
+
 Lemma wf_typ_ignores_bindings : forall E F x T1 T2 Ap Am T,
   wf_typ (F ++ [(x, bind_typ T1)] ++ E) Ap Am T ->
   wf_typ (F ++ [(x, bind_typ T2)] ++ E) Ap Am T
@@ -1400,9 +1415,10 @@ Proof with eauto.
   remember (F ++ [(x, bind_typ T1)] ++ E).
   generalize dependent F.  
   induction H; intros F Eq; subst.
-  - apply cheat.
+  - apply wf_typ_var with (U := U)...
+    binds_cases H.
   (* requires wf_cset_ignores_bindings *)
-  - econstructor... apply cheat.
+  - econstructor... eapply wf_cset_ignores_bindings...
 ------
   intros*.
   intros H.
