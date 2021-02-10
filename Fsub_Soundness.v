@@ -1594,7 +1594,80 @@ Proof with eauto; fold subst_cpt.
         apply subcapt_weakening...
         econstructor...
         apply H5...
-  - apply cheat.
+  - (* specializing the hypothesis to the argument type of arrow *)
+    destruct (meaning_of E Am Ap x C D T1 HwfE H SubAm SubAp H6 Hsc).
+    split; intros.
+    + specialize (H2 H3).
+      pick fresh y and apply sub_all; fold subst_ct...
+      rewrite subst_ct_open_tt_var...
+      specialize (H7 y).
+      (* 
+       1) we need to know that `Ap subset dom E`
+       2) we need to show that subst_ct preserves wellformedness (wf_typ).
+       3) then we can apply wf_typ_ignores_bindings
+      *)
+      apply cheat.
+      apply cheat.
+      rewrite subst_ct_open_tt_var...
+      rewrite subst_ct_open_tt_var...
+      (* we cannot call meaning_of on anything that is larger than wf_typ.... *)
+      assert (y `notin` L) as NotIn by notin_solve.
+      specialize (H0 y NotIn).
+      unshelve epose proof (meaning_of 
+        ([(y, bind_sub (subst_ct x D T1))] ++ E)
+        Ap
+        Am x C D (open_tt T2 y) _ H0 _ _ _).
+      * econstructor...
+      (* we need to help fsetdec here a little *)
+      * clear Fr. simpl. fsetdec.
+      * clear Fr. simpl. fsetdec.
+      * rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
+        (* this looks interesting... 
+          we have 
+            wf_typ ([(y, bind_sub T1)] ++ E) Ap Am (open_tt T2 y)
+          and need
+            wf_typ ([(y, bind_sub (subst_ct x D T1))] ++ E) Ap Am (open_tt T2 y)
+        *)
+        apply cheat.
+
+        (* rewrite <- subst_ct_fresh.
+        trivial... notin_solve. *)
+      * destruct H4.
+        rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
+        apply subcapt_weakening...
+        econstructor...
+        apply H4...
+    + specialize (H1 H3).
+      pick fresh y and apply sub_all; fold subst_ct...
+      rewrite subst_ct_open_tt_var...
+      specialize (H7 y).
+      (* 
+        1) we need to know that `Ap subset dom E`
+        2) we need to show that subst_ct preserves wellformedness (wf_typ).
+        3) then we can apply wf_typ_ignores_bindings
+      *)
+      apply cheat.
+      apply cheat.
+      rewrite subst_ct_open_tt_var...
+      rewrite subst_ct_open_tt_var...
+      (* we cannot call meaning_of on anything that is larger than wf_typ.... *)
+      assert (y `notin` L) as NotIn by notin_solve.
+      specialize (H0 y NotIn).
+      unshelve epose proof (meaning_of 
+        ([(y, bind_sub (subst_ct x C T1))] ++ E)
+        Ap
+        Am x C D (open_tt T2 y) _ H0 _ _ _).
+      * econstructor...
+      (* we need to help fsetdec here a little *)
+      * clear Fr. simpl. fsetdec.
+      * clear Fr. simpl. fsetdec.
+      * rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
+        apply cheat.
+      * destruct H4.
+        rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
+        apply subcapt_weakening...
+        econstructor...
+        apply H5...
 Qed.
 
 (* subst_ct_intro
