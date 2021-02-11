@@ -1100,6 +1100,26 @@ Proof with eauto using wf_typ_narrowing_typ.
   eapply sub_transitivity with (Q := Q)...
 Qed.
 
+Lemma value_typing_inv : forall E v T,
+  value v ->  
+  typing E v T ->
+  exists C, exists P, sub E (typ_capt C P) T.
+Proof with eauto using typing_cv.
+  intros*.
+  intros Val Typ.
+  assert (wf_env E) by auto.
+  assert (wf_cset_in E (free_for_cv v)) by eauto using typing_cv.
+  induction Typ; inversion Val; subst...
+  - exists (free_for_cv e1). exists (typ_arrow V T1).  
+    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+  - exists (free_for_cv e1). exists (typ_all V T1). 
+    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+  - destruct IHTyp as [C [P]]...
+    exists C. exists P. apply sub_transitivity with (Q := S)...
+  - destruct IHTyp as [C [P]]...
+    exists C. exists P. apply sub_transitivity with (Q := S)...
+Qed.
+
 (* ********************************************************************** *)
 (** ** Type substitution preserves subtyping (10) *)
 
