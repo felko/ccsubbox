@@ -225,27 +225,32 @@ Proof with eauto.
       eapply H0...
 Qed.
 
-
+(** Edward : OK, technically we don't need ok on the environment here,
+    but actually invoking the constructor wf_typ_var is hard if we can't
+    tell what type we're invoking it with. *)
 Lemma wf_typ_ignores_sub_bindings : forall E F x T1 T2 Ap Am T,
+  ok (F ++ [(x, bind_sub T1)] ++ E) ->
   wf_typ (F ++ [(x, bind_sub T1)] ++ E) Ap Am T ->
   wf_typ (F ++ [(x, bind_sub T2)] ++ E) Ap Am T
 with wf_pretyp_ignores_sub_bindings : forall E F x T1 T2 Ap Am T,
+  ok (F ++ [(x, bind_sub T1)] ++ E) ->
   wf_pretyp (F ++ [(x, bind_sub T1)] ++ E) Ap Am T ->
   wf_pretyp (F ++ [(x, bind_sub T2)] ++ E) Ap Am T.
 Proof with eauto.
 ------
   intros*.
-  intros H.
+  intros Hok H.
   remember (F ++ [(x, bind_sub T1)] ++ E).
   generalize dependent F.
   induction H; intros F Eq; subst.
-  - apply wf_typ_var with (U := T2)...
-    admit.
-  (* requires wf_cset_ignores_bindings *)
+  - destruct (X == x); subst; eapply wf_typ_var.
+    + binds_cases H...
+    + binds_cases H...
+    (* requires wf_cset_ignores_bindings *)
   - econstructor... eapply wf_cset_ignores_sub_bindings...
 ------
   intros*.
-  intros H.
+  intros Hok H.
   remember (F ++ [(x, bind_sub T1)] ++ E).
   generalize dependent F.
   induction H; intros F Eq; subst.
@@ -254,13 +259,15 @@ Proof with eauto.
     + eapply wf_typ_ignores_sub_bindings...
     + rewrite_parenthesise_binding.
       eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
+      simpl_env; constructor...
       eapply H0...
   - pick fresh X and apply wf_typ_all.
     + eapply wf_typ_ignores_sub_bindings...
     + rewrite_parenthesise_binding.
       eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
+      simpl_env; constructor...
       eapply H0...
-Admitted.
+Qed.
 
 Lemma capt_from_cv : forall E T C,
     cv E T C -> capt C.
