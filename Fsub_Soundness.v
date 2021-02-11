@@ -2218,7 +2218,7 @@ Proof with hint.
     + SCase "x0 <> x".
       binds_cases H0.
       * assert (x `notin` fv_ept P). {
-          assert (x `notin` dom E) as HA1. { eapply fresh_mid_tail... }.
+          assert (x `notin` dom E) as HA1. { eapply fresh_mid_tail... }
           unshelve epose proof (wf_typ_from_binds_typ _ _ _ _ H0)...
           assert (wf_pretyp_in E P) as HA2...
           epose proof (notin_fv_wf_pretyp _ _ _ HA2 HA1)...
@@ -2283,10 +2283,10 @@ Proof with hint.
         simpl_env in *.
         replace ((dom F `union` dom E) `union` singleton y)
           with (((dom F `union` singleton x `union` dom E) `union` singleton y) `remove` x).
-        2: { clear Fr. fsetdec. }.
+        2: { clear Fr. fsetdec. }
         replace (dom F `union` dom E)
           with ((dom F `union` singleton x `union` dom E) `remove` x).
-        2: { clear Fr. fsetdec. }.
+        2: { clear Fr. fsetdec. }
 
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ V)] ++ F) ++ E).
         apply (wf_typ_through_subst_ct_base (typ_capt (free_for_cv u) P)); simpl_env...
@@ -2306,10 +2306,10 @@ Proof with hint.
         simpl_env in *.
         replace ((dom F `union` dom E) `union` singleton y)
           with (((dom F `union` singleton x `union` dom E) `union` singleton y) `remove` x).
-        2: { clear Fr. fsetdec. }.
+        2: { clear Fr. fsetdec. }
         replace (dom F `union` dom E)
           with ((dom F `union` singleton x `union` dom E) `remove` x).
-        2: { clear Fr. fsetdec. }.
+        2: { clear Fr. fsetdec. }
 
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ V)] ++ F) ++ E).
         apply (wf_typ_through_subst_ct_base (typ_capt (free_for_cv u) P)); simpl_env...
@@ -2356,10 +2356,10 @@ Proof with hint.
         simpl_env in *.
         replace ((dom F `union` dom E) `union` singleton y)
           with (((dom F `union` singleton x `union` dom E) `union` singleton y) `remove` x).
-        2: { clear Fr. fsetdec. }.
+        2: { clear Fr. fsetdec. }
         replace (dom F `union` dom E)
           with ((dom F `union` singleton x `union` dom E) `remove` x).
-        2: { clear Fr. fsetdec. }.
+        2: { clear Fr. fsetdec. }
 
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_sub V)] ++ F) ++ E).
         apply (wf_typ_through_subst_ct_base (typ_capt (free_for_cv u) P)); simpl_env...
@@ -2379,10 +2379,10 @@ Proof with hint.
         simpl_env in *.
         replace ((dom F `union` dom E) `union` singleton y)
           with (((dom F `union` singleton x `union` dom E) `union` singleton y) `remove` x).
-        2: { clear Fr. fsetdec. }.
+        2: { clear Fr. fsetdec. }
         replace (dom F `union` dom E)
           with ((dom F `union` singleton x `union` dom E) `remove` x).
-        2: { clear Fr. fsetdec. }.
+        2: { clear Fr. fsetdec. }
 
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_sub V)] ++ F) ++ E).
         apply (wf_typ_through_subst_ct_base (typ_capt (free_for_cv u) P)); simpl_env...
