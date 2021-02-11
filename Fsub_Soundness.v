@@ -147,8 +147,15 @@ end : core.
 Lemma ok_ignores_binding : forall (F E: env) x b1 b2,
   ok (F ++ [(x, b1)] ++ E) ->
   ok (F ++ [(x, b2)] ++ E).
-Proof.
-Admitted.
+Proof with eauto*.
+  intros*.
+  induction F...
+  - simpl_env.
+    intros Hok. inversion Hok; subst. constructor...
+  - rewrite_env ([a] ++ F ++ [(x, b1)] ++ E).
+    rewrite_env ([a] ++ F ++ [(x, b2)] ++ E).
+    intros Hok. inversion Hok; subst. constructor...
+Qed.
 
 Hint Resolve ok_ignores_binding : core.
 
