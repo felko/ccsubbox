@@ -511,17 +511,6 @@ Proof with auto.
   - exists xs. exists {}N...
 Qed.
 
-(* Lemma cv_exists : forall E T Ap Am, *)
-(*   wf_env E -> *)
-(*   wf_typ E Ap Am T -> *)
-(*   exists C, cv E T C. *)
-(* Proof with eauto. *)
-(*   admit. *)
-(* Admitted. *)
-(*   induction E; induction T; intros; try inversion H0; try inversion H; subst... *)
-(*   - inversion H3... *)
-(*   - simpl_env in *. *)
-
 Lemma cv_exists_in : forall E T,
   wf_env E ->
   wf_typ_in E T ->
@@ -559,54 +548,35 @@ Proof with eauto*.
   inversion Hwf...
 Qed.
 
-Lemma cv_unique : forall E Ap Am T C1 C2,
+(* HINT: we had problems formalizing a version with Ap and Am since then the
+   IH requires us to show wf_typ Ap Am, while we only have wf_typ_in E.
+ *)
+Lemma cv_unique : forall E T C1 C2,
   wf_env E ->
-  wf_typ E Ap Am T ->
+  wf_typ_in E T ->
   cv E T C1 ->
   cv E T C2 ->
   C1 = C2.
 Proof with eauto*.
-  admit.
-Admitted.
-(*   intros E; induction E; intros T; induction T; intros... *)
-(*   { *)
-(*     inversion H1; inversion H2; subst... *)
-(*   } *)
-(*   { *)
-(*     (*contradiction *) *)
-(*     inversion H0. *)
-(*   } *)
-(*   { *)
-(*     (*contradiction*) *)
-(*     inversion H0... *)
-(*     inversion H5... *)
-(*   } *)
-(*   { *)
-(*     inversion H1... *)
-(*     inversion H2... *)
-(*   } *)
-(*   { *)
-(*     inversion H0. *)
-(*   } *)
-(*   { *)
-(*     destruct a as [a' B]. *)
-(*     simpl_env in *. *)
-(*     destruct (a' == a0); subst... *)
-(*     { *)
-(*       inversion H2; subst... *)
-(*       inversion H1; subst... *)
-(*       apply IHE with (T := T)... *)
-(*       pose proof (cv_regular E T C2 H8)... *)
-(*       pose proof (cv_regular E T C2 H8)... *)
-(*     } *)
-(*     { *)
-(*       inversion H1; subst... *)
-(*       inversion H2; subst... *)
-(*       apply IHE with (T := a0); *)
-(*       pose proof (cv_regular E a0 C2 H13)... *)
-(*     } *)
-(*   } *)
-(* Qed. *)
+  intros E; induction E; intros T; induction T; intros...
+  - inversion H1; inversion H2; subst...
+  - exfalso. inversion H0.
+  - exfalso.
+    inversion H0...
+    inversion H7...    
+  - inversion H1...
+    inversion H2...
+  - inversion H0.
+  - destruct a as [a' B].
+    simpl_env in *.
+    destruct (a' == a0); subst...
+    + inversion H2; subst...
+      inversion H1; subst...
+      apply IHE with (T := T)...
+    + inversion H1; subst...
+      inversion H2; subst...
+      apply IHE with (T := a0)...
+Qed.
 
 Lemma captures_transitivity : forall E xs ys x,
   (* E |- {x} <: {ys} *)
@@ -706,9 +676,9 @@ Proof with eauto using subcapt_reflexivity, cv_weakening_head.
   intros Hsub HssetA1 HssetA2 WfC WfD HcvC HcvD.
 
   induction Hsub; destruct C; destruct D; try solve [inversion HcvC; inversion HcvD; eauto].
-  - pose proof (cv_unique _ _ _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
-  - pose proof (cv_unique _ _ _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
-  - pose proof (cv_unique _ _ _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
+  - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
   -  assert (cv E U cset_universal). {
       (* clear IHHsub HssetA1 HssetA2 WfC WfD Hsub.
       induction H0.
@@ -766,7 +736,7 @@ Proof with auto.
       eapply cv_exists_in...
     }
     inversion H1 as [C3 H2].
-    epose proof (cv_unique _ _ _ _ _ _ _ _ HCv1 HCv2) as Eq; inversion Eq...
+    epose proof (cv_unique _ _ _ _ _ _ HCv1 HCv2) as Eq; inversion Eq...
     eapply subcapt_reflexivity with (A := dom (G ++ [(Z, bind_sub X)] ++ E))...
   - (*by definition. *)
     admit.
