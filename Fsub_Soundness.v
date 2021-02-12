@@ -788,7 +788,7 @@ Lemma cv_narrowing : forall S G Z Q E P C1 C2,
   sub E P Q ->
   cv (G ++ [(Z, bind_sub Q)] ++ E) S C2 ->
   cv (G ++ [(Z, bind_sub P)] ++ E) S C1 ->
-  subcapt E C1 C2.
+  subcapt (G ++ [(Z, bind_sub P)] ++ E) C1 C2.
 Proof with auto.
   intros S G Z Q E P C1 C2 HSub HCv2 HCv1.
   (*remember (G ++ [(Z, bind_sub Q)] ++ E).*)
@@ -809,8 +809,9 @@ Proof with auto.
       admit.
     }
     inversion H1 as [C3 H2].
-    (* Needs subcapt-transitivity -- C1 <: C3 <: C2 *)
-    admit.
+    epose proof (cv_unique _ _ _ _ _ _ _ _ HCv1 HCv2) as Eq; inversion Eq...
+    eapply subcapt_reflexivity with (A := dom (G ++ [(Z, bind_sub X)] ++ E))...
+    destruct cv_regular with (E := (G ++ [(Z, bind_sub X)] ++ E)) (T := S) (C := C2) as [WfEnv [_ _]]...    
   - (*by definition. *)
     admit.
   - (*by defininition. *)
@@ -886,9 +887,8 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
       (* A type bound in wf_env is definitely wf itself... *)
       admit.
     }
-    assert (subcapt (F ++ [(Z, bind_sub P)] ++ E) D (cset_set ys {}N)) as HscD. {
-      rewrite_env (empty ++ (F ++ [(Z, bind_sub P)]) ++ E).
-      apply subcapt_weakening; simpl_env...
+    assert (subcapt (F ++ [(Z, bind_sub P)] ++ E) D (cset_set ys {}N)) as HscD. {      
+      eapply cv_narrowing...
     }
     inversion HscD; subst.
     apply captures_var with (T := T) (ys := xs0)...
@@ -1881,8 +1881,7 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
     + trivial...
     + trivial...
     + trivial.
-    + rewrite_env (empty ++ (F ++ [(X, bind_sub P)]) ++ E).
-      eapply subcapt_weakening; simpl_env...
+    + trivial.
     + trivial...
   - Case "typing_tabs".
     assert (wf_env (F ++ [(X, bind_sub P)] ++ E)). {
