@@ -715,6 +715,67 @@ Proof with simpl_env; eauto.
   unfold wf_typ_in...
 Qed.
 
+
+Lemma wf_cset_narrowing : forall F E x Q P C,
+  wf_cset_in (F ++ [(x, bind_sub Q)] ++ E) C ->
+  ok (F ++ [(x, bind_sub P)] ++ E) ->
+  wf_cset_in (F ++ [(x, bind_sub P)] ++ E) C.
+Proof with eauto using wf_cset_narrowing_base.
+  intros.
+  unfold wf_cset_in in *.
+  simpl_env in *...
+Qed.
+
+Lemma wf_cset_narrowing_typ : forall F E x Q P C,
+  wf_cset_in (F ++ [(x, bind_typ Q)] ++ E) C ->
+  ok (F ++ [(x, bind_typ P)] ++ E) ->
+  wf_cset_in (F ++ [(x, bind_typ P)] ++ E) C.
+Proof with eauto using wf_cset_narrowing_typ_base.
+  intros.
+  unfold wf_cset_in in *.
+  simpl_env in *...
+Qed.
+
+Lemma wf_typ_narrowing : forall F E Z Q P T,
+  wf_typ_in (F ++ [(Z, bind_sub Q)] ++ E) T ->
+  ok (F ++ [(Z, bind_sub P)] ++ E) ->
+  wf_typ_in (F ++ [(Z, bind_sub P)] ++ E) T.
+Proof with eauto using wf_typ_narrowing_base.
+  intros.
+  unfold wf_typ_in in *.
+  simpl_env in *...
+Qed.
+
+Lemma wf_typ_narrowing_typ : forall F E Z Q P T,
+  wf_typ_in (F ++ [(Z, bind_typ Q)] ++ E) T ->
+  ok (F ++ [(Z, bind_typ P)] ++ E) ->
+  wf_typ_in (F ++ [(Z, bind_typ P)] ++ E) T.
+Proof with eauto using wf_typ_narrowing_typ_base.
+  intros *.
+  unfold wf_typ_in in *.
+  simpl_env in *...
+Qed.
+
+Lemma wf_pretyp_narrowing : forall F E Z Q P T,
+  wf_pretyp_in (F ++ [(Z, bind_sub Q)] ++ E) T ->
+  ok (F ++ [(Z, bind_sub P)] ++ E) ->
+  wf_pretyp_in (F ++ [(Z, bind_sub P)] ++ E) T.
+Proof with eauto using wf_pretyp_narrowing_base.
+  intros.
+  unfold wf_pretyp_in in *.
+  simpl_env in *...
+Qed.
+
+Lemma wf_pretyp_narrowing_typ : forall F E Z Q P T,
+  wf_pretyp_in (F ++ [(Z, bind_typ Q)] ++ E) T ->
+  ok (F ++ [(Z, bind_typ P)] ++ E) ->
+  wf_pretyp_in (F ++ [(Z, bind_typ P)] ++ E) T.
+Proof with eauto using wf_pretyp_narrowing_typ_base.
+  intros *.
+  unfold wf_pretyp_in in *.
+  simpl_env in *...
+Qed.
+
 (* ********************************************************************** *)
 (** * #<a name="oktwft"></a># Properties of [wf_env] and [wf_typ] *)
 
