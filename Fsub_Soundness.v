@@ -293,7 +293,7 @@ Proof with eauto using cv_regular.
     }
     inversion H; rewrite dom_concat in *; fsetdec.
 Qed.
-
+  
 Lemma cv_weakening : forall E F G T C,
   cv (G ++ E) T C ->
   wf_env (G ++ F ++ E) ->
@@ -845,6 +845,9 @@ Lemma captures_narrowing : forall F Z P Q E xs x,
 Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
   intros F Z P Q E xs x Ok Sub H.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
+  (* TODO here we get the premise x `in` ys from the definition of captures.
+     this can't work.
+   *)
   induction H; intros; subst...
   - assert (x <> Z). {
       unfold not. intros.
@@ -856,20 +859,29 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
         pose proof (fresh_mid_head _ _ _ _ _ H).
         pose proof (binds_In _ _ _ _ H5)...
     }
-    assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarr...
-    destruct (cv_exists_in (F ++ [(Z, bind_sub P)] ++ E) T) as [D HD]...
-    {
-      (* A type bound in wf_env is definitely wf itself... *)
+    
+    eapply captures_var with (ys := ys) (T := T)...
+    (*  This is the tricky case! *)
+    + assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarr...
+      destruct (cv_exists_in (F ++ [(Z, bind_sub P)] ++ E) T) as [D HD]... {
+        eapply wf_typ_from_binds_typ...
+      }
+      assert (subcapt (F ++ [(Z, bind_sub P)] ++ E) D (cset_set ys {}N)) as HscD. {      
+        eapply cv_narrowing...
+      }
+      (* 
+        cv T  = xs0
+        forall x in xs0. captures ys x
+        cv (F ++ [(Z, bind_sub Q)] ++ E) T = ys
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                old env
+        -------
+        cv T = ys
+      *)
       admit.
-    }
-    assert (subcapt (F ++ [(Z, bind_sub P)] ++ E) D (cset_set ys {}N)) as HscD. {      
-      eapply cv_narrowing...
-    }
-    inversion HscD; subst.
-    apply captures_var with (T := T) (ys := xs0)...
-    unfold AtomSet.F.For_all in *. intros.
-    apply H2...
-    admit.
+      
+    + unfold AtomSet.F.For_all in *. intros.
+      apply H2...
 Admitted.
 
 Lemma captures_narrowing_typ : forall F X P Q E xs x,
