@@ -1670,10 +1670,19 @@ Hint Extern 1 (expr ?e) =>
 
 (** * #<a name="auto"></a># Automation Tests *)
 
-Lemma test_cv_regular : forall E T C,
+Local Lemma test_cv_regular : forall E T C,
     cv E T C ->
     wf_env E /\ wf_typ_in E T /\ wf_cset_in E C.
 Proof.
+  intros.
+  repeat split.
+  all: auto.
+Qed.
+
+Local Lemma test_subcapt_regular : forall E C1 C2,
+  subcapt E C1 C2 ->
+  wf_cset E (dom E) C1 /\ wf_cset E (dom E) C2.
+Proof with eauto*.
   intros.
   repeat split.
   all: auto.
