@@ -1558,6 +1558,21 @@ Proof with auto*.
 (* Qed. *)
 Admitted.
 
+Lemma cv_regular : forall E T C,
+  cv E T C ->
+  wf_env E /\ wf_typ_in E T /\ wf_cset_in E C.
+Proof with eauto*.
+  intros. induction H...
+  * repeat split...
+    destruct IHcv as [_ [_ HC]].
+    rewrite_env (empty ++ [(X, bind_sub T)] ++ E).
+    eapply wf_cset_weakening...
+  * repeat split...
+    eapply wf_typ_weaken_head...
+    rewrite_env (empty ++ [(Y, B)] ++ E).
+    eapply wf_cset_weakening...
+Qed.
+
 (* *********************************************************************** *)
 (** * #<a name="auto"></a># Automation *)
 
@@ -1588,6 +1603,7 @@ Hint Extern 1 (wf_cset ?E _ ?C) =>
   match goal with
   | H: subcapt _ C _ |- _ => apply (proj1 (subcapt_regular _ _ _ H))
   | H: subcapt _ _ C |- _ => apply (proj2 (subcapt_regular _ _ _ H))
+  | H: cv E _ C |- _ => apply (proj2 (proj2 (cv_regular _ _ _ H)))
   end
 : core.
 
@@ -1596,6 +1612,7 @@ Hint Extern 1 (wf_env ?E) =>
   | H: sub _ _ _ |- _ => apply (proj1 (sub_regular _ _ _ H))
   | H: sub_pre _ _ _ |- _ => apply (proj1 (sub_pre_regular _ _ _ H))
   | H: typing _ _ _ |- _ => apply (proj1 (typing_regular _ _ _ H))
+  | H: cv E _ _ |- _ => apply (proj1 (cv_regular _ _ _ H))
   end
 : core.
 
@@ -1604,6 +1621,7 @@ Hint Extern 1 (wf_typ ?E _ _ ?T) =>
   | H: typing E _ T |- _ => apply (proj2 (proj2 (typing_regular _ _ _ H)))
   | H: sub E T _ |- _ => apply (proj1 (proj2 (sub_regular _ _ _ H)))
   | H: sub E _ T |- _ => apply (proj2 (proj2 (sub_regular _ _ _ H)))
+  | H: cv E T _ |- _ => apply (proj1 (proj2 (cv_regular _ _ _ H)))
   end
 : core.
 
@@ -1649,3 +1667,14 @@ Hint Extern 1 (expr ?e) =>
   | H: red _ ?e |- _ => apply (proj2 (red_regular _ _ H))
   end
 : core.
+
+(** * #<a name="auto"></a># Automation Tests *)
+
+Lemma test_cv_regular : forall E T C,
+    cv E T C ->
+    wf_env E /\ wf_typ_in E T /\ wf_cset_in E C.
+Proof.
+  intros.
+  repeat split.
+  all: auto.
+Qed.

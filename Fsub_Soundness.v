@@ -42,21 +42,6 @@ Ltac unsimpl_env_map f :=
     rewrite_env ((map (f Z P) ([(x, b)] ++ F)) ++ E)
   end.
 
-Lemma cv_regular : forall E T C,
-  cv E T C ->
-  wf_env E /\ wf_typ_in E T /\ wf_cset_in E C.
-Proof with eauto*.
-  intros. induction H...
-  * repeat split...
-    destruct IHcv as [_ [_ HC]].
-    rewrite_env (empty ++ [(X, bind_sub T)] ++ E).
-    eapply wf_cset_weakening...
-  * repeat split...
-    eapply wf_typ_weaken_head...
-    rewrite_env (empty ++ [(Y, B)] ++ E).
-    eapply wf_cset_weakening...
-Qed.
-
 Lemma wf_cset_narrowing : forall F E x Q P C,
   wf_cset_in (F ++ [(x, bind_sub Q)] ++ E) C ->
   ok (F ++ [(x, bind_sub P)] ++ E) ->
@@ -133,11 +118,6 @@ match goal with
   pose proof (proj2 (proj2 (typing_regular _ _ _ H))) as P; inversion P; assumption
 end : core.
 
-Hint Extern 1 (wf_cset ?E (dom ?E) ?C) =>
-match goal with
-| H : (cv E _ C) |- _ =>
-  apply (proj2 (proj2 (cv_regular _ _ _ H)))
-end : core.
 
 Hint Extern 1 (wf_env ?E) =>
 match goal with
@@ -803,15 +783,10 @@ Proof with auto.
         Probably should be a lemma.*)
     assert (exists C3, cv (G ++ [(Z, bind_sub X)] ++ E) S C3). {
       eapply cv_exists_in...
-      (** two wellformedness conditions.  Probably need to strengthen
-          conditions. *)
-      admit.
-      admit.
     }
     inversion H1 as [C3 H2].
     epose proof (cv_unique _ _ _ _ _ _ _ _ HCv1 HCv2) as Eq; inversion Eq...
     eapply subcapt_reflexivity with (A := dom (G ++ [(Z, bind_sub X)] ++ E))...
-    destruct cv_regular with (E := (G ++ [(Z, bind_sub X)] ++ E)) (T := S) (C := C2) as [WfEnv [_ _]]...    
   - (*by definition. *)
     admit.
   - (*by defininition. *)
