@@ -527,47 +527,28 @@ Lemma cv_exists_in : forall E T,
   wf_typ_in E T ->
   exists C, cv E T C.
 Proof with eauto.
-  induction E; induction T; intros; try inversion H0; subst.
-  - inversion H6...
-  - binds_cases H5...
-  - inversion H6...
-  - admit.
-Admitted.
-
-(*     binds_cases H3... *)
-(*     + assert (wf_typ E a0) by *)
-(*         (apply wf_typ_var with (U := U); eauto). *)
-(*       specialize (IHE a0 H6 H2) as [C' H']. *)
-(*       inversion H'; subst... *)
-(*       * exists C'. *)
-(*         apply cv_env_irrel... *)
-(*         rewrite dom_concat in *. *)
-(*         rewrite dom_single in *. *)
-(*         fsetdec. *)
-(*       * exists C'. *)
-(*         apply cv_env_irrel... *)
-(*         rewrite dom_concat in *. *)
-(*         rewrite dom_single in *. *)
-(*         fsetdec. *)
-(*     + specialize (IHE T H6 H7) as [C' H']. *)
-(*       exists C'. *)
-(*       apply cv_typ_var with (T := T)... *)
-(*   - simpl_env in *. *)
-(*     binds_cases H3... *)
-(*     assert (wf_typ E a0) by (apply wf_typ_var with (U := U); eauto). *)
-(*     specialize (IHE a0 H6 H2) as [C' H']. *)
-(*     inversion H'; subst... *)
-(*     * exists C'. *)
-(*       apply cv_env_irrel... *)
-(*       rewrite dom_concat in *. *)
-(*       rewrite dom_single in *. *)
-(*       fsetdec. *)
-(*     * exists C'. *)
-(*       apply cv_env_irrel... *)
-(*       rewrite dom_concat in *. *)
-(*       rewrite dom_single in *. *)
-(*       fsetdec. *)
-(* Qed. *)
+  induction E; induction T; intros; try inversion H0; try inversion H; subst...
+  - inversion H5.
+  - simpl_env in *.
+    binds_cases H5.
+    + destruct (a0 == X0).
+      * subst. 
+        specialize (IHE T H8 H9) as [C' H'].
+        exists C'. apply cv_typ_var...
+      * assert (wf_typ_in E a0). { inversion H0; subst... }
+        specialize (IHE a0 H8 H2) as [C' H'].
+        exists C'. apply cv_env_irrel...
+    + inversion H3; subst.
+      specialize (IHE T H8 H9) as [C' H'].
+      exists C'. apply cv_typ_var...
+  - simpl_env in *.
+    assert (wf_typ_in E a0). { inversion H0; subst... binds_cases H6... }
+    specialize (IHE a0 H8 H1) as [C' H'].
+    exists C'. apply cv_env_irrel...
+    assert (a0 `in` dom E)...
+    inversion H1; subst.
+    eapply binds_In...
+Qed.
 
 Lemma wf_env_weaken_head : forall E F,
   wf_env (F ++ E) ->
@@ -824,8 +805,7 @@ Proof with auto.
   intros HSub Ok HCv.
   remember (G ++ [(x, bind_typ Q)] ++ E). generalize dependent G.
   induction HCv ; intros ; subst...
-  destruct (X == x) ; subst.
-  all: admit.
+  destruct (X == x) ; subst.  
   (* - (* this can't happen, x is a variable not a type. *) *)
   (*   binds_get H. *)
   (* - apply cv_typ_var with (T := T)... *)
