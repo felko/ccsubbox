@@ -655,7 +655,7 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
       replace (Ap `remove` Z `union` singleton Y)
         with ((Ap `union` singleton Y) `remove` Z).
       2: {
-        assert (Y `notin` singleton Z) by fsetdec.
+        assert (Y `notin` singleton Z) by notin_solve.
         clear Fr.
         fsetdec.
       }
@@ -775,6 +775,118 @@ Proof with eauto using wf_pretyp_narrowing_typ_base.
   unfold wf_pretyp_in in *.
   simpl_env in *...
 Qed.
+
+
+Lemma wf_cset_ignores_typ_bindings : forall E F x T1 T2 Ap C,
+  wf_cset (F ++ [(x, bind_typ T1)] ++ E) Ap C ->
+  wf_cset (F ++ [(x, bind_typ T2)] ++ E) Ap C.
+Proof with eauto.
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_typ T1)] ++ E).
+  generalize dependent F.
+  induction H; intros F Eq; subst...
+  econstructor... unfold allbound_typ in *.
+  intros.
+  destruct (H x0 H1) as [T Hb].
+  binds_cases Hb...
+Qed.
+
+Lemma wf_cset_ignores_sub_bindings : forall E F x T1 T2 Ap C,
+  wf_cset (F ++ [(x, bind_sub T1)] ++ E) Ap C ->
+  wf_cset (F ++ [(x, bind_sub T2)] ++ E) Ap C.
+Proof with eauto.
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_sub T1)] ++ E).
+  generalize dependent F.
+  induction H; intros F Eq; subst...
+  econstructor... unfold allbound_typ in *.
+  intros.
+  destruct (H x0 H1) as [T Hb].
+  binds_cases Hb...
+Qed.
+
+Lemma wf_typ_ignores_typ_bindings : forall E F x T1 T2 Ap Am T,
+  wf_typ (F ++ [(x, bind_typ T1)] ++ E) Ap Am T ->
+  wf_typ (F ++ [(x, bind_typ T2)] ++ E) Ap Am T
+with wf_pretyp_ignores_typ_bindings : forall E F x T1 T2 Ap Am T,
+  wf_pretyp (F ++ [(x, bind_typ T1)] ++ E) Ap Am T ->
+  wf_pretyp (F ++ [(x, bind_typ T2)] ++ E) Ap Am T.
+Proof with eauto.
+------
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_typ T1)] ++ E).
+  generalize dependent F.
+  induction H; intros F Eq; subst.
+  - apply wf_typ_var with (U := U)...
+    binds_cases H...
+  (* requires wf_cset_ignores_bindings *)
+  - econstructor... eapply wf_cset_ignores_typ_bindings...
+------
+  intros*.
+  intros H.
+  remember (F ++ [(x, bind_typ T1)] ++ E).
+  generalize dependent F.
+  induction H; intros F Eq; subst.
+  - econstructor.
+  - pick fresh X and apply wf_typ_arrow.
+    + eapply wf_typ_ignores_typ_bindings...
+    + rewrite_parenthesise_binding.
+      eapply wf_typ_ignores_typ_bindings with (T1 := T1)...
+      eapply H0...
+  - pick fresh X and apply wf_typ_all.
+    + eapply wf_typ_ignores_typ_bindings...
+    + rewrite_parenthesise_binding.
+      eapply wf_typ_ignores_typ_bindings with (T1 := T1)...
+      eapply H0...
+Qed.
+
+(** Edward : OK, technically we don't need ok on the environment here,
+    but actually invoking the constructor wf_typ_var is hard if we can't
+    tell what type we're invoking it with. *)
+Lemma wf_typ_ignores_sub_bindings : forall E F x T1 T2 Ap Am T,
+  ok (F ++ [(x, bind_sub T1)] ++ E) ->
+  wf_typ (F ++ [(x, bind_sub T1)] ++ E) Ap Am T ->
+  wf_typ (F ++ [(x, bind_sub T2)] ++ E) Ap Am T
+with wf_pretyp_ignores_sub_bindings : forall E F x T1 T2 Ap Am T,
+  ok (F ++ [(x, bind_sub T1)] ++ E) ->
+  wf_pretyp (F ++ [(x, bind_sub T1)] ++ E) Ap Am T ->
+  wf_pretyp (F ++ [(x, bind_sub T2)] ++ E) Ap Am T.
+Proof with eauto.
+------
+  intros*.
+  intros Hok H.
+  remember (F ++ [(x, bind_sub T1)] ++ E).
+  generalize dependent F.
+  induction H; intros F Eq; subst.
+  - destruct (X == x); subst; eapply wf_typ_var.
+    + binds_cases H...
+    + binds_cases H...
+    (* requires wf_cset_ignores_bindings *)
+  - econstructor... eapply wf_cset_ignores_sub_bindings...
+------
+  intros*.
+  intros Hok H.
+  remember (F ++ [(x, bind_sub T1)] ++ E).
+  generalize dependent F.
+  induction H; intros F Eq; subst.
+  - econstructor.
+  - pick fresh X and apply wf_typ_arrow.
+    + eapply wf_typ_ignores_sub_bindings...
+    + rewrite_parenthesise_binding.
+      eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
+      simpl_env; constructor...
+      eapply H0...
+  - pick fresh X and apply wf_typ_all.
+    + eapply wf_typ_ignores_sub_bindings...
+    + rewrite_parenthesise_binding.
+      eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
+      simpl_env; constructor...
+      eapply H0...
+Qed.
+
 
 (* ********************************************************************** *)
 (** * #<a name="oktwft"></a># Properties of [wf_env] and [wf_typ] *)
