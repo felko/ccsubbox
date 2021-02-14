@@ -1981,13 +1981,6 @@ Proof.
   (* Use above. *)
 Admitted.
 
-Lemma wf_env_through_subst_cb : forall E F x U C,
-    wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-    cv E U C ->
-    wf_env (map (subst_cb x C) F ++ E).
-Proof.
-Admitted.
-
 Lemma cv_through_subst_ct : forall F x U E C T D,
     cv (F ++ [(x, bind_typ U)] ++ E) T C ->
     cv E U D ->
@@ -2012,7 +2005,7 @@ Proof with eauto.
     induction Hsub; intros F EQ; subst.
     - simpl.
       apply sub_refl_tvar...
-      + eapply wf_env_through_subst_cb...
+      + eapply wf_env_subst_cb...
       + unsimpl (subst_ct x C X).
         eapply wf_typ_through_subst_ct...
     - simpl.
@@ -2040,7 +2033,7 @@ Proof with eauto.
     induction Hsub; intros F EQ; subst.
     - simpl.
       apply sub_top.
-      + eapply wf_env_through_subst_cb...
+      + eapply wf_env_subst_cb...
       + eapply wf_pretyp_through_subst_cpt...
     - pick fresh y for L.
       (* specialize (H0 y Fr). *)
