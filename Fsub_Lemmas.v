@@ -1214,14 +1214,17 @@ Proof with auto.
   - apply notin_fv_ct_open_et with (C := C)...
 Qed.
 
-(* Lemma notin_fv_wf_typ : forall E (X : atom) T, *)
-(*   wf_typ_in E T -> *)
-(*   X `notin` dom E -> *)
-(*   X `notin` (fv_tt T `union` fv_et T) *)
-(* with notin_fv_wf_pretyp : forall E (X : atom) T, *)
-(*   wf_pretyp_in E T -> *)
-(*   X `notin` dom E -> *)
-(*   X `notin` (fv_tpt T `union` fv_ept T). *)
+Lemma notin_fv_wf_typ : forall E (X : atom) T,
+  wf_typ_in E T ->
+  X `notin` dom E ->
+  X `notin` (fv_tt T `union` fv_et T)
+with notin_fv_wf_pretyp : forall E (X : atom) T,
+  wf_pretyp_in E T ->
+  X `notin` dom E ->
+  X `notin` (fv_tpt T `union` fv_ept T).
+Proof with eauto.
+  all: admit.
+Admitted.
 (* Proof with eauto. *)
 (* ------ *)
 (*   intros E X T Wf_typ. *)
@@ -1277,30 +1280,31 @@ Qed.
 (*     + apply notin_fv_tt_open_et with (Y := Y)... *)
 (* Qed. *)
 
-(* Lemma notin_fv_wf : forall E (X : atom) T, *)
-(*   wf_typ E T -> *)
-(*   X `notin` dom E -> *)
-(*   X `notin` fv_tt T. *)
-(* Proof with eauto. *)
-(*   intros E X T Wf_typ F. *)
-(*   assert (X `notin` (fv_tt T `union` fv_et T)). { *)
-(*     eapply notin_fv_wf_typ... *)
-(*   } *)
-(*   fsetdec. *)
-(* Qed. *)
+Lemma notin_fv_wf : forall E (X : atom) T,
+  wf_typ_in E T ->
+  X `notin` dom E ->
+  X `notin` fv_tt T.
+Proof with eauto.
+  intros E X T Wf_typ F.
+  assert (X `notin` (fv_tt T `union` fv_et T)). {
+    eapply notin_fv_wf_typ...
+  }
+  fsetdec.
+Qed.
 
-(* Lemma map_subst_tb_id : forall G Z P, *)
-(*   wf_env G -> *)
-(*   Z `notin` dom G -> *)
-(*   G = map (subst_tb Z P) G. *)
-(* Proof with auto. *)
-(*   intros G Z P H. *)
-(*   induction H; simpl; intros Fr; simpl_env... *)
-(*   rewrite <- IHwf_env... *)
-(*     rewrite <- subst_tt_fresh... eapply notin_fv_wf; eauto. *)
-(*   rewrite <- IHwf_env... *)
-(*     rewrite <- subst_tt_fresh... eapply notin_fv_wf; eauto. *)
-(* Qed. *)
+Lemma map_subst_tb_id : forall G Z P,
+  wf_env G ->
+  Z `notin` dom G ->
+  G = map (subst_tb Z P) G.
+Proof with auto.
+  intros G Z P H.
+  induction H; simpl; intros Fr; simpl_env...
+  rewrite <- IHwf_env...
+    rewrite <- subst_tt_fresh... eapply notin_fv_wf; eauto.
+  rewrite <- IHwf_env...
+    rewrite <- subst_tt_fresh... eapply notin_fv_wf; eauto.
+Qed.
+
 
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)

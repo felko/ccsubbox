@@ -3,11 +3,11 @@ Require Export Fsub_Lemmas.
 
 Ltac rewrite_nil_concat :=
   match goal with
-  | _ : _ |- typing ?E0 _ _ =>
+  | |- _ ?E0 _ =>
     rewrite <- nil_concat with (E := E0)
-  | _ : _ |- sub ?E0 _ _ =>
+  | |- _ ?E0 _ _ =>
     rewrite <- nil_concat with (E := E0)
-  | _ : _ |- wf_typ ?E0 _ _ _ =>
+  | |- _ ?E0 _ _ _ =>
     rewrite <- nil_concat with (E := E0)
   end.
 
