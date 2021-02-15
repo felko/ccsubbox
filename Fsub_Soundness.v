@@ -694,6 +694,7 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing
         unfold AtomSet.F.For_all in *. intros.
         apply H2...
     }
+
 Admitted.
 
 
@@ -1060,26 +1061,6 @@ Proof with eauto using wf_typ_narrowing_typ.
   eapply sub_narrowing_typ_aux; eauto.
   unfold transitivity_on. intros.
   eapply sub_transitivity with (Q := Q)...
-Qed.
-
-Lemma value_typing_inv : forall E v T,
-  value v ->
-  typing E v T ->
-  exists C, exists P, sub E (typ_capt C P) T.
-Proof with eauto using typing_cv.
-  intros*.
-  intros Val Typ.
-  assert (wf_env E) by auto.
-  assert (wf_cset_in E (free_for_cv v)) by eauto using typing_cv.
-  induction Typ; inversion Val; subst...
-  - exists (free_for_cv e1). exists (typ_arrow V T1).
-    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-  - exists (free_for_cv e1). exists (typ_all V T1).
-    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-  - destruct IHTyp as [C [P]]...
-    exists C. exists P. apply sub_transitivity with (Q := S)...
-  - destruct IHTyp as [C [P]]...
-    exists C. exists P. apply sub_transitivity with (Q := S)...
 Qed.
 
 (* ********************************************************************** *)
@@ -1450,7 +1431,6 @@ Admitted.
 (************************************************************************ *)
 (** ** Narrowing for typing (7) *)
 
-
 Lemma subst_ct_open_ct_var : forall (x y:atom) c t,
   y <> x ->
   capt c ->
@@ -1467,13 +1447,93 @@ Proof with auto*.
     fsetdec.
 Qed.
 
-Lemma subst_ct_open_ct : forall x c1 t c2,
-  capt c1 ->
-  subst_ct x c1 (open_ct t c2) = (open_ct (subst_ct x c1 t) (subst_cset x c1 c2)).
+(* Alex: looking at the subst_tt_open_tt_* chain, there should be a better way to do this... *)
+Lemma subst_ct_open_ct : forall x c1 T c2,
+  (* not (cset_references_fvar x c2) -> *)
+  (* capt c1 -> *)
+  subst_ct x c1 (open_ct T c2) = (open_ct (subst_ct x c1 T) (subst_cset x c1 c2)).
+Proof with auto*.
+  intros *.
+  (* intros Hnotin Hc1. *)
+  induction T.
+  - unfold open_ct, open_ct_rec; simpl.
+    fold open_cpt_rec.
+    replace (subst_cset x c1 (open_cset 0 c2 c))
+      with (open_cset 0 (subst_cset x c1 c2) (subst_cset x c1 c)).
+    2: {
+      unfold open_cset.
+      destruct (cset_references_bvar_dec 0 c) eqn:EQ.
+      admit.
+      admit.
+    }
+    admit.
+  - admit.
+  - admit.
+Admitted.
+
+Lemma subst_ct_open_tt : forall x c t1 t2,
+  capt c ->
+  subst_ct x c (open_tt t1 t2) = (open_tt (subst_ct x c t1) (subst_ct x c t2)).
 Proof with auto*.
   intros.
   admit.
 Admitted.
+
+Lemma subst_tt_open_ct : forall x C S T,
+    type S ->
+    open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
+Proof.
+Admitted.
+
+Lemma subst_tt_open_ct_var : forall x y S T,
+    type S ->
+    open_ct (subst_tt x S T) (cset_fvar y) = subst_tt x S (open_ct T (cset_fvar y)).
+Proof.
+  intros.
+  apply subst_tt_open_ct; auto.
+Qed.
+
+Lemma subst_ct_useless_repetition : forall x C D T,
+  subst_ct x C (subst_ct x D T) = (subst_ct x D T).
+Proof.
+Admitted.
+
+Lemma self_subst_idempotent : forall F E x T D,
+  wf_env (F ++ [(x, bind_typ T)] ++ E) ->
+  subst_ct x D T = T.
+Proof.
+  (* Plan: *)
+  (*   - fv(T) subset E (should be prove-able using a simple lemma like bindin_uniq_from_* ) *)
+  (*   - therefore x not in fv(t) *)
+  (*   - therefore subst idempotent *)
+  admit.
+Admitted.
+
+Lemma cset_subst_self : forall C x,
+  subst_cset x C (cset_fvar x) = C.
+Proof.
+  intros.
+  unfold subst_cset.
+  destruct (cset_references_fvar_dec x x) eqn:EQ.
+  2: {
+    unfold cset_references_fvar_dec, cset_fvar in EQ.
+    rewrite <- AtomSetFacts.not_mem_iff in EQ.
+    exfalso.
+    fsetdec.
+  }
+  unfold cset_remove_fvar, cset_fvar.
+  replace (cset_set _ _) with {}C.
+  2: {
+    apply cset_eq_injectivity; [fsetdec|fnsetdec].
+  }
+  destruct C; simpl.
+  - easy.
+  - replace (cset_set _ _) with (cset_set t t0).
+    2: {
+      apply cset_eq_injectivity; [fsetdec|fnsetdec].
+    }
+    easy.
+Qed.
 
 Lemma wf_cset_remove_fvar : forall A E C x,
   wf_cset E A C ->
@@ -1885,28 +1945,6 @@ Admitted.
 (************************************************************************ *)
 (** ** Substitution preserves typing (8) *)
 
-Lemma self_subst_idempotent : forall F E x T D,
-  wf_env (F ++ [(x, bind_typ T)] ++ E) ->
-  subst_ct x D T = T.
-Proof.
-  (* Plan: *)
-  (*   - fv(T) subset E *)
-  (*   - therefore x not in fv(t) *)
-  (*   - therefore subst idempotent *)
-  admit.
-Admitted.
-
-Lemma wf_env_subst_cb : forall Q C x E F,
-  wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
-  wf_cset_in E C ->
-  wf_env (map (subst_cb x C) F ++ E).
-Proof.
-  (* with eauto 6 using wf_typ_subst_tb *)
-
-  admit.
-  (* induction F; intros Wf_env WP; simpl_env; *)
-  (*   inversion Wf_env; simpl_env in *; simpl subst_tb... *)
-Admitted.
 
 Lemma wf_env_strengthening : forall F E,
   wf_env (F ++ E) ->
@@ -1915,43 +1953,6 @@ Proof with eauto.
   induction F...
   intros.
   inversion H; subst...
-Qed.
-
-Lemma cset_subst_self : forall C x,
-  subst_cset x C (cset_fvar x) = C.
-Proof.
-  trivial.
-  admit.
-Admitted.
-
-Lemma subst_ct_open_tt : forall x c t1 t2,
-  capt c ->
-  subst_ct x c (open_tt t1 t2) = (open_tt (subst_ct x c t1) (subst_ct x c t2)).
-Proof with auto*.
-  intros.
-  admit.
-Admitted.
-
-Lemma value_therefore_fv_subcapt_cv : forall E t T C,
-  value t ->
-  typing E t T ->
-  cv E T C ->
-  subcapt E (free_for_cv t) C.
-Proof with subst; simpl; auto.
-  intros *.
-  intros Hv Htyp Hcv.
-  generalize dependent C.
-  pose proof (typing_regular _ _ _ Htyp) as [P1 [P2 P3]].
-  induction Htyp; intros C0 Hcv; try solve [ inversion Hv ].
-  - inversion Hcv...
-    apply subcapt_reflexivity with (A := dom E)...
-  - inversion Hcv.
-    apply subcapt_reflexivity with (A := dom E)...
-  - unshelve epose proof (cv_exists_in E S P1 _ ) as [D HcvS]...
-    unshelve epose proof (IHHtyp Hv _ _ _ D HcvS)...
-    apply subcapt_transitivity with (C2 := D)...
-    eapply sub_implies_subcapt with (S := S) (T := T)
-                                    (A1 := dom E) (A2 := dom E)...
 Qed.
 
 Lemma wf_typ_through_subst_ct_base : forall U Ap Am F x C E T,
@@ -1979,6 +1980,18 @@ with wf_pretyp_through_subst_cpt : forall F x U C E P,
     wf_pretyp_in (map (subst_cb x C) F ++ E) (subst_cpt x C P).
 Proof.
   (* Use above. *)
+Admitted.
+
+Lemma wf_env_subst_cb : forall Q C x E F,
+  wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
+  wf_cset_in E C ->
+  wf_env (map (subst_cb x C) F ++ E).
+Proof.
+  (* with eauto 6 using wf_typ_subst_tb *)
+
+  admit.
+  (* induction F; intros Wf_env WP; simpl_env; *)
+  (*   inversion Wf_env; simpl_env in *; simpl subst_tb... *)
 Admitted.
 
 Lemma cv_through_subst_ct : forall F x U E C T D,
@@ -2086,6 +2099,47 @@ Proof.
   trivial.
 Qed.
 
+Lemma value_therefore_fv_subcapt_cv : forall E t T C,
+  value t ->
+  typing E t T ->
+  cv E T C ->
+  subcapt E (free_for_cv t) C.
+Proof with subst; simpl; auto.
+  intros *.
+  intros Hv Htyp Hcv.
+  generalize dependent C.
+  pose proof (typing_regular _ _ _ Htyp) as [P1 [P2 P3]].
+  induction Htyp; intros C0 Hcv; try solve [ inversion Hv ].
+  - inversion Hcv...
+    apply subcapt_reflexivity with (A := dom E)...
+  - inversion Hcv.
+    apply subcapt_reflexivity with (A := dom E)...
+  - unshelve epose proof (cv_exists_in E S P1 _ ) as [D HcvS]...
+    unshelve epose proof (IHHtyp Hv _ _ _ D HcvS)...
+    apply subcapt_transitivity with (C2 := D)...
+    eapply sub_implies_subcapt with (S := S) (T := T)
+                                    (A1 := dom E) (A2 := dom E)...
+Qed.
+
+Lemma value_typing_inv : forall E v T,
+  value v ->
+  typing E v T ->
+  exists C, exists P, sub E (typ_capt C P) T.
+Proof with eauto using typing_cv.
+  intros*.
+  intros Val Typ.
+  assert (wf_env E) by auto.
+  assert (wf_cset_in E (free_for_cv v)) by eauto using typing_cv.
+  induction Typ; inversion Val; subst...
+  - exists (free_for_cv e1). exists (typ_arrow V T1).
+    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+  - exists (free_for_cv e1). exists (typ_all V T1).
+    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+  - destruct IHTyp as [C [P]]...
+    exists C. exists P. apply sub_transitivity with (Q := S)...
+  - destruct IHTyp as [C [P]]...
+    exists C. exists P. apply sub_transitivity with (Q := S)...
+Qed.
 
 Lemma values_have_precise_captures : forall E u T,
   value u ->
@@ -2367,11 +2421,6 @@ Proof with hint.
     + eapply sub_through_subst_ct...
 Admitted.
 
-Lemma subst_ct_useless_repetition : forall x C D T,
-  subst_ct x C (subst_ct x D T) = (subst_ct x D T).
-Proof.
-Admitted.
-
 Lemma typing_narrowing_typ : forall Q E F X P e T,
   typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
   sub E P Q ->
@@ -2462,6 +2511,7 @@ Qed.
 (*     eauto using (sub_transitivity T). *)
 (* Qed. *)
 
+(* TODO: move to other free_for_cv lemmas *)
 Lemma subst_te_idempotent_wrt_free_for_cv : forall e x C,
     free_for_cv (subst_te x C e) = free_for_cv e.
 Proof with eauto.
@@ -2470,20 +2520,6 @@ Proof with eauto.
   rewrite IHe1.
   rewrite IHe2.
   easy.
-Qed.
-
-Lemma subst_tt_open_ct : forall x C S T,
-    type S ->
-    open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
-Proof.
-Admitted.
-
-Lemma subst_tt_open_ct_var : forall x y S T,
-    type S ->
-    open_ct (subst_tt x S T) (cset_fvar y) = subst_tt x S (open_ct T (cset_fvar y)).
-Proof.
-  intros.
-  apply subst_tt_open_ct; auto.
 Qed.
 
 Lemma wf_typ_through_subst_tt_base : forall Q Ap Am Ap' Am' F X P E T,
