@@ -1943,8 +1943,124 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
 Admitted.
 
 (************************************************************************ *)
-(** ** Substitution preserves typing (8) *)
+(** ** Free_for_cv lemmas *)
 
+Lemma subst_commutes_with_free_for_cv : forall x u C e,
+    x `notin` (cset_fvars (free_for_cv e)) ->
+    (subst_cset x C (free_for_cv e)) = (free_for_cv (subst_ee x u C e)).
+Proof with eauto.
+  intros *.
+  intro Fr.
+  induction e.
+  - simpl.
+    admit.
+  - simpl in *.
+    admit.
+  - apply IHe...
+  - simpl in *.
+    rewrite <- IHe1...
+    rewrite <- IHe2...
+    all : admit.
+  - apply IHe...
+  - apply IHe...
+Admitted.
+
+Lemma free_for_cv_subst_ee_cset_irrelevancy: forall x u C D t,
+  free_for_cv (subst_ee x u C t) =
+  free_for_cv (subst_ee x u D t).
+Proof.
+  induction t.
+  all : simpl; eauto.
+  rewrite IHt1.
+  rewrite IHt2.
+  trivial.
+Qed.
+
+Lemma subst_te_idempotent_wrt_free_for_cv : forall e x C,
+    free_for_cv (subst_te x C e) = free_for_cv e.
+Proof with eauto.
+  intros.
+  induction e; simpl; eauto.
+  rewrite IHe1.
+  rewrite IHe2.
+  easy.
+Qed.
+
+(************************************************************************ *)
+(** ** Properties of values *)
+
+Lemma value_therefore_fv_subcapt_cv : forall E t T C,
+  value t ->
+  typing E t T ->
+  cv E T C ->
+  subcapt E (free_for_cv t) C.
+Proof with subst; simpl; auto.
+  intros *.
+  intros Hv Htyp Hcv.
+  generalize dependent C.
+  pose proof (typing_regular _ _ _ Htyp) as [P1 [P2 P3]].
+  induction Htyp; intros C0 Hcv; try solve [ inversion Hv ].
+  - inversion Hcv...
+    apply subcapt_reflexivity with (A := dom E)...
+  - inversion Hcv.
+    apply subcapt_reflexivity with (A := dom E)...
+  - unshelve epose proof (cv_exists_in E S P1 _ ) as [D HcvS]...
+    unshelve epose proof (IHHtyp Hv _ _ _ D HcvS)...
+    apply subcapt_transitivity with (C2 := D)...
+    eapply sub_implies_subcapt with (S := S) (T := T)
+                                    (A1 := dom E) (A2 := dom E)...
+Qed.
+
+Lemma value_typing_inv : forall E v T,
+  value v ->
+  typing E v T ->
+  exists C, exists P, sub E (typ_capt C P) T.
+Proof with eauto using typing_cv.
+  intros*.
+  intros Val Typ.
+  assert (wf_env E) by auto.
+  assert (wf_cset_in E (free_for_cv v)) by eauto using typing_cv.
+  induction Typ; inversion Val; subst...
+  - exists (free_for_cv e1). exists (typ_arrow V T1).
+    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+  - exists (free_for_cv e1). exists (typ_all V T1).
+    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+  - destruct IHTyp as [C [P]]...
+    exists C. exists P. apply sub_transitivity with (Q := S)...
+  - destruct IHTyp as [C [P]]...
+    exists C. exists P. apply sub_transitivity with (Q := S)...
+Qed.
+
+Lemma values_have_precise_captures : forall E u T,
+  value u ->
+  typing E u T ->
+  exists U, typing E u (typ_capt (free_for_cv u) U) /\ sub E (typ_capt (free_for_cv u) U) T.
+Local Ltac hint ::=
+    simpl; eauto.
+Proof with hint.
+  intros *.
+  intros Hv Htyp.
+  assert (wf_cset_in E (free_for_cv u)) by eauto using typing_cv.
+  assert (wf_env E) by auto.
+  induction Htyp; try solve [inversion Hv; subst].
+  - Case "exp_abs".
+    exists (typ_arrow V T1).
+    split.
+    + simpl; eapply typing_abs...
+    + simpl.
+      eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+  - Case "exp_tabs".
+    exists (typ_all V T1).
+    split.
+    + simpl; eapply typing_tabs...
+    + simpl.
+      eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+  - unshelve epose proof (IHHtyp _ _ _) as [U [HtypU HsubS]]...
+    exists U; eauto using (sub_transitivity S).
+Qed.
+
+(************************************************************************ *)
+(** ** Substitution preserves typing (8) *)
 
 Lemma wf_env_strengthening : forall F E,
   wf_env (F ++ E) ->
@@ -2067,107 +2183,6 @@ Local Lemma bar : forall x C e u,
         (free_for_cv (subst_ee x u C e)).
 Proof.
 Admitted.
-
-Lemma subst_commutes_with_free_for_cv : forall x u C e,
-    x `notin` (cset_fvars (free_for_cv e)) ->
-    (subst_cset x C (free_for_cv e)) = (free_for_cv (subst_ee x u C e)).
-Proof with eauto.
-  intros *.
-  intro Fr.
-  induction e.
-  - simpl.
-    admit.
-  - simpl in *.
-    admit.
-  - apply IHe...
-  - simpl in *.
-    rewrite <- IHe1...
-    rewrite <- IHe2...
-    all : admit.
-  - apply IHe...
-  - apply IHe...
-Admitted.
-
-Lemma free_for_cv_subst_ee_cset_irrelevancy: forall x u C D t,
-  free_for_cv (subst_ee x u C t) =
-  free_for_cv (subst_ee x u D t).
-Proof.
-  induction t.
-  all : simpl; eauto.
-  rewrite IHt1.
-  rewrite IHt2.
-  trivial.
-Qed.
-
-Lemma value_therefore_fv_subcapt_cv : forall E t T C,
-  value t ->
-  typing E t T ->
-  cv E T C ->
-  subcapt E (free_for_cv t) C.
-Proof with subst; simpl; auto.
-  intros *.
-  intros Hv Htyp Hcv.
-  generalize dependent C.
-  pose proof (typing_regular _ _ _ Htyp) as [P1 [P2 P3]].
-  induction Htyp; intros C0 Hcv; try solve [ inversion Hv ].
-  - inversion Hcv...
-    apply subcapt_reflexivity with (A := dom E)...
-  - inversion Hcv.
-    apply subcapt_reflexivity with (A := dom E)...
-  - unshelve epose proof (cv_exists_in E S P1 _ ) as [D HcvS]...
-    unshelve epose proof (IHHtyp Hv _ _ _ D HcvS)...
-    apply subcapt_transitivity with (C2 := D)...
-    eapply sub_implies_subcapt with (S := S) (T := T)
-                                    (A1 := dom E) (A2 := dom E)...
-Qed.
-
-Lemma value_typing_inv : forall E v T,
-  value v ->
-  typing E v T ->
-  exists C, exists P, sub E (typ_capt C P) T.
-Proof with eauto using typing_cv.
-  intros*.
-  intros Val Typ.
-  assert (wf_env E) by auto.
-  assert (wf_cset_in E (free_for_cv v)) by eauto using typing_cv.
-  induction Typ; inversion Val; subst...
-  - exists (free_for_cv e1). exists (typ_arrow V T1).
-    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-  - exists (free_for_cv e1). exists (typ_all V T1).
-    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-  - destruct IHTyp as [C [P]]...
-    exists C. exists P. apply sub_transitivity with (Q := S)...
-  - destruct IHTyp as [C [P]]...
-    exists C. exists P. apply sub_transitivity with (Q := S)...
-Qed.
-
-Lemma values_have_precise_captures : forall E u T,
-  value u ->
-  typing E u T ->
-  exists U, typing E u (typ_capt (free_for_cv u) U) /\ sub E (typ_capt (free_for_cv u) U) T.
-Local Ltac hint ::=
-    simpl; eauto.
-Proof with hint.
-  intros *.
-  intros Hv Htyp.
-  assert (wf_cset_in E (free_for_cv u)) by eauto using typing_cv.
-  assert (wf_env E) by auto.
-  induction Htyp; try solve [inversion Hv; subst].
-  - Case "exp_abs".
-    exists (typ_arrow V T1).
-    split.
-    + simpl; eapply typing_abs...
-    + simpl.
-      eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-  - Case "exp_tabs".
-    exists (typ_all V T1).
-    split.
-    + simpl; eapply typing_tabs...
-    + simpl.
-      eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-  - unshelve epose proof (IHHtyp _ _ _) as [U [HtypU HsubS]]...
-    exists U; eauto using (sub_transitivity S).
-Qed.
 
 Hint Extern 1 (wf_pretyp ?E (dom ?E) (dom ?E) ?P) =>
 match goal with
@@ -2472,55 +2487,44 @@ Qed.
 (************************************************************************ *)
 (** ** Type substitution preserves typing (11) *)
 
-(* Lemma typing_extract_typ_arrow : forall E e C T1 T2, *)
-(*   typing E e (typ_capt C (typ_arrow T1 T2)) -> *)
-(*   exists L, forall x, x `notin` L -> *)
-(*      wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x). *)
-(* Proof with auto. *)
-(*   intros *. *)
-(*   intro Htyp. *)
-(*   dependent induction Htyp. *)
-(*   - apply wf_typ_from_binds_typ in H0. *)
-(*     inversion H0; subst... *)
-(*     match goal with H : wf_pretyp _ _ _ _ |- _ => *)
-(*       inversion H; subst *)
-(*     end. *)
-(*     eexists. *)
-(*     apply H9. *)
-(*     assumption. *)
-(*   - eexists. apply H0. *)
-(*   - specialize (IHHtyp1 Cf T0 T3 ltac:(easy)). *)
-(*     apply IHHtyp1. *)
-(*   - *)
-(*   - Case "typing_abs". *)
-(*     inversion Hsub; subst. *)
-(*     match goal with H : sub_pre _ _ _ |- _ => *)
-(*       inversion H; subst *)
-(*     end. *)
-(*     split... *)
-(*     exists T1. *)
-(*     exists (L `union` L0). *)
-(*     intros y ?. *)
-(*     repeat split. *)
-(*     + apply H1... *)
-(*     + rewrite_nil_concat. *)
-(*       eapply wf_typ_ignores_typ_bindings. *)
-(*       apply H13... *)
-(*     + trivial... *)
-(*   - Case "typing_sub". *)
-(*     eauto using (sub_transitivity T). *)
-(* Qed. *)
-
-(* TODO: move to other free_for_cv lemmas *)
-Lemma subst_te_idempotent_wrt_free_for_cv : forall e x C,
-    free_for_cv (subst_te x C e) = free_for_cv e.
-Proof with eauto.
-  intros.
-  induction e; simpl; eauto.
-  rewrite IHe1.
-  rewrite IHe2.
-  easy.
-Qed.
+Lemma typing_extract_typ_arrow : forall E e C T1 T2,
+  typing E e (typ_capt C (typ_arrow T1 T2)) ->
+  exists L, forall x, x `notin` L ->
+     wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x).
+Proof with auto.
+  intros *.
+  intro Htyp.
+  remember (typ_capt C (typ_arrow T1 T2)).
+  induction Htyp; subst.
+  - apply wf_typ_from_binds_typ in H0...
+    rewrite Heqt in H0.
+    inversion H0; subst...
+    match goal with H : wf_pretyp _ _ _ _ |- _ =>
+      inversion H; subst
+    end.
+    eauto.
+  - injection Heqt.
+    intros. subst.
+    apply wf_typ_from_binds_typ in H0...
+    inversion H0; subst.
+    match goal with H : wf_pretyp _ _ _ _ |- _ =>
+      inversion H; subst
+    end.
+    eauto.
+  - inversion Heqt. subst.
+    eauto.
+  - inversion Heqt.
+    admit.                      (* is this even doable? do we need to do induction differently? *)
+    (* assert (type T3). { *)
+    (*   assert (type (typ_capt Cf (typ_arrow T0 T3))) as HA... *)
+    (*   inversion HA; subst. *)
+    (*   match goal with H : pretype _ |- _ => inversion H; subst end. *)
+    (* } *)
+    (* destruct T3. *)
+  - admit.
+  - admit.
+  - admit.
+Admitted.
 
 Lemma wf_typ_through_subst_tt_base : forall Q Ap Am Ap' Am' F X P E T,
     wf_env (F ++ [(X, bind_sub Q)] ++ E) ->
