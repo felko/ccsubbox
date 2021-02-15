@@ -1190,16 +1190,26 @@ Lemma cv_through_subst_tt : forall X P Q T E G C D,
   subcapt (map (subst_tb X P) G ++ E) D C.
 Proof with eauto.
   intros *. intros Hwf_env Hwf_typ HcvWide HcvNarr Hsub.
-  (* generalize dependent C. *)
-  remember (G ++ [(X, bind_sub Q)] ++ E).
-  generalize dependent G.
-  (* assert (type T) as Typ. { *)
-  (*   autounfold. *)
-  (*   eapply type_from_wf_typ... *)
-  (* } *)
-  (* Alex: ho boy, here we go! *)
-  admit.
+
+  assert (type T) as Typ. { eapply type_from_wf_typ... }
+
+  induction G.
+  - simpl_env in *.
+    dependent induction HcvWide; subst.
+    + unfold subst_tt in HcvNarr. destruct (X == X); try easy. 
+      eapply sub_implies_subcapt with (A1 := dom E) (A2 := dom E)...
+    + unfold subst_tt in HcvNarr. destruct (X0 == X); try easy.
+      epose proof (cv_unique _ _ _ _ _ _ HcvWide HcvNarr); subst.
+      eapply subcapt_reflexivity...
+    + simpl subst_tt in *.
+      inversion HcvNarr; subst. 
+      eapply subcapt_reflexivity...
+  (*  lunch break... *)
+  - admit.
+Admitted.
+
   (* induction HcvWide; intros G ? HcvNarr; subst... *)
+
   (* - admit. *)
   (* - admit. *)
   (* - simpl subst_tt in HcvNarr. *)
