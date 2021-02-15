@@ -57,7 +57,12 @@ Proof.
   assert (type T). eapply type_from_wf_typ; eauto.
 
   dependent induction Hcv.
-  * assert (X <> Y) by admit.
+  * assert (X <> Y). {
+      inversion HwfT; subst.
+      assert (X `in` dom E).
+      eapply binds_In. apply H6.
+      inversion HwfE; subst; notin_solve.
+    }
     apply cvx_typ_var with (T := T).
     unfold binds in H. unfold get in H. simpl in H.
     destruct (X == Y) eqn:HXY; subst; trivial.
@@ -66,13 +71,26 @@ Proof.
     inversion HwfE; trivial.
     eapply IHHcv with (Y0 := Y) (B0 := B).
     inversion HwfT; subst.
-    admit.
+  
+    {
+      pose proof H7.
+      unfold binds in H. unfold binds in H7.
+      simpl in *.
+      destruct (X == Y); subst; try easy.
+      rewrite H in H7; inversion H7; subst.
+      simpl_env in *.
+      eapply wf_typ_from_binds_sub.
+      inversion H0; trivial.
+      apply H3.
+    }
     trivial.
     trivial.
-    admit.
+    eapply type_from_wf_typ.
+    eapply wf_typ_from_binds_sub.
+    apply HwfE. apply H.
   * inversion HwfT; subst. constructor; trivial.
     inversion H; trivial.
-Admitted.
+Qed.
 
 Lemma cv_unique : forall E T C1 C2,
   wf_env E ->
