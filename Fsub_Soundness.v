@@ -1283,13 +1283,13 @@ Proof with eauto.
   induction G.
   - simpl_env in *.
     dependent induction HcvWide; subst.
-    + unfold subst_tt in HcvNarr. destruct (X == X); try easy. 
+    + unfold subst_tt in HcvNarr. destruct (X == X); try easy.
       eapply sub_implies_subcapt with (A1 := dom E) (A2 := dom E)...
     + unfold subst_tt in HcvNarr. destruct (X0 == X); try easy.
       epose proof (cv_unique _ _ _ _ _ _ HcvWide HcvNarr); subst.
       eapply subcapt_reflexivity...
     + simpl subst_tt in *.
-      inversion HcvNarr; subst. 
+      inversion HcvNarr; subst.
       eapply subcapt_reflexivity...
   (*  lunch break... *)
   - admit.
@@ -1302,7 +1302,7 @@ Admitted.
   (* - simpl subst_tt in HcvNarr. *)
   (*   inversion HcvNarr; subst. *)
   (*   apply subcapt_reflexivity with (A := dom (map (subst_tb X P) G ++ E))... *)
-    
+
   (* dependent induction Typ. *)
   (* 2: dependent induction H0. *)
   (* all: intros D Hcv_narrow C0 Hcv_wide. *)
@@ -1341,7 +1341,7 @@ Admitted.
   (*   apply union_under_subcapturing; trivial. *)
   (*   apply subcapt_reflexivity. *)
   (*   apply wf_env_subst_tb with (Q := Q); auto. *) *)
-Admitted.
+(* Admitted. *)
 
 (* Type substitution preserves subcapturing *)
 
@@ -1595,16 +1595,56 @@ Lemma subst_ct_useless_repetition : forall x C D T,
 Proof.
 Admitted.
 
-Lemma self_subst_idempotent : forall F E x T D,
-  wf_env (F ++ [(x, bind_typ T)] ++ E) ->
-  subst_ct x D T = T.
-Proof.
-  (* Plan: *)
-  (*   - fv(T) subset E (should be prove-able using a simple lemma like bindin_uniq_from_* ) *)
-  (*   - therefore x not in fv(t) *)
-  (*   - therefore subst idempotent *)
-  admit.
-Admitted.
+(* Alex: well all right, none of these are used now... *)
+(* Lemma fv_et_subset_dom_env : forall E T, *)
+(*   wf_typ_in E T -> *)
+(*   fv_et T `subset` dom E *)
+(* with fv_ept_subset_dom_env : forall E P, *)
+(*   wf_pretyp_in E P -> *)
+(*   fv_ept P `subset` dom E. *)
+(* Proof with eauto. *)
+(* { intros. *)
+(*   assert (type T) as Typ. { *)
+(*     apply type_from_wf_typ in H... *)
+(*   } *)
+(*   induction Typ. *)
+(*   - simpl. *)
+(*     fsetdec. *)
+(*   - simpl. *)
+(*     inversion H; subst. *)
+(*     match goal with H : wf_pretyp _ _ _ P |- _ => *)
+(*       apply fv_ept_subset_dom_env in H *)
+(*     end. *)
+(*     match goal with H : wf_cset _ _ C |- _ => *)
+(*       inversion H; subst; simpl; fsetdec *)
+(*     end. *)
+(* } *)
+(* { *)
+(*   intros. *)
+(*   assert (pretype P) as Pretyp. { *)
+(*     apply pretype_from_wf_pretyp in H... *)
+(*   } *)
+(*   induction Pretyp; simpl. *)
+(*   - fsetdec. *)
+(*   - inversion H; subst. *)
+(*     pick fresh X. *)
+(*     unshelve epose proof (H8 X _) as SpH8... *)
+(*     assert (fv_et (open_ct T2 X) `subset` dom E `union` singleton X). *)
+(*     (fv_et T2 `subset` dom E) *)
+
+(*     wf_typ *)
+(* } *)
+
+(* Lemma self_subst_idempotent : forall F E x T D, *)
+(*   wf_env (F ++ [(x, bind_typ T)] ++ E) -> *)
+(*   subst_ct x D T = T. *)
+(* Proof. *)
+(*   (* Plan: *) *)
+(*   (*   - fv(T) subset E (should be prove-able using a simple lemma like bindin_uniq_from_* ) *) *)
+(*   (*   - therefore x not in fv(t) *) *)
+(*   (*   - therefore subst idempotent *) *)
+(*   admit. *)
+(* Admitted. *)
 
 Lemma cset_subst_self : forall C x,
   subst_cset x C (cset_fvar x) = C.
@@ -2584,44 +2624,67 @@ Qed.
 (************************************************************************ *)
 (** ** Type substitution preserves typing (11) *)
 
+Lemma wf_typ_extract_typ_arrow : forall C E T1 T2,
+  wf_typ_in E (typ_capt C (typ_arrow T1 T2)) ->
+  exists L, forall x, x `notin` L ->
+     wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x).
+Proof with eauto.
+  intros *.
+  intro HWf.
+  (* type inversion *)
+  inversion HWf; subst.
+  (* pretype inversion *)
+  inversion H5; subst...
+Qed.
+
 Lemma typing_extract_typ_arrow : forall E e C T1 T2,
   typing E e (typ_capt C (typ_arrow T1 T2)) ->
   exists L, forall x, x `notin` L ->
      wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x).
-Proof with auto.
+Proof with eauto.
   intros *.
   intro Htyp.
-  remember (typ_capt C (typ_arrow T1 T2)).
-  induction Htyp; subst.
-  - apply wf_typ_from_binds_typ in H0...
-    rewrite Heqt in H0.
-    inversion H0; subst...
-    match goal with H : wf_pretyp _ _ _ _ |- _ =>
-      inversion H; subst
-    end.
-    eauto.
-  - injection Heqt.
-    intros. subst.
-    apply wf_typ_from_binds_typ in H0...
-    inversion H0; subst.
-    match goal with H : wf_pretyp _ _ _ _ |- _ =>
-      inversion H; subst
-    end.
-    eauto.
-  - inversion Heqt. subst.
-    eauto.
-  - inversion Heqt.
-    admit.                      (* is this even doable? do we need to do induction differently? *)
-    (* assert (type T3). { *)
-    (*   assert (type (typ_capt Cf (typ_arrow T0 T3))) as HA... *)
-    (*   inversion HA; subst. *)
-    (*   match goal with H : pretype _ |- _ => inversion H; subst end. *)
-    (* } *)
-    (* destruct T3. *)
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  apply (wf_typ_extract_typ_arrow C)...
+Qed.
+
+Lemma applied_meaning_of : forall E C1 C2 e D S T,
+  subcapt E C1 C2 ->
+  typing E e (typ_capt D (typ_arrow S T)) ->
+  sub E (open_ct T C1) (open_ct T C2).
+Proof.
+  intros *. intros Hsc Htyp.
+  pose proof (typing_extract_typ_arrow _ _ _ _ _ Htyp) as [L HRT].
+  pick fresh y.
+  replace (open_ct T C1) with (subst_ct y C1 (open_ct T y)).
+  replace (open_ct T C2) with (subst_ct y C2 (open_ct T y)).
+  2,3: solve [symmetry; apply subst_ct_intro; fsetdec].
+  pose proof (typing_regular _ _ _ Htyp) as [_ [_ Reg]].
+  inversion Reg.
+  match goal with
+  | H : wf_pretyp _ _ _ _ |- _ =>
+    inversion H
+  end.
+  subst.
+  assert (wf_typ ([(y, bind_typ S)] ++ E)
+                  (dom E `union` singleton y) (dom E)
+                  (open_ct T y)) by eauto.
+  enough (sub ([(y, bind_typ S)] ++ E)
+              (subst_ct y C1 (open_ct T y))
+              (subst_ct y C2 (open_ct T y))). {
+    assert (wf_typ_in E S) as HwfS by assumption.
+    unshelve epose proof (cv_exists_in E S _ _) as [C_S ?]; auto.
+    rewrite_env (map (subst_cb y C_S) empty ++ E).
+    replace (subst_ct y C1 (open_ct T y))
+      with (subst_ct y C_S (subst_ct y C1 (open_ct T y))).
+    replace (subst_ct y C2 (open_ct T y))
+      with (subst_ct y C_S (subst_ct y C2 (open_ct T y))).
+    2,3: solve [apply subst_ct_useless_repetition].
+    apply sub_through_subst_ct with (U := S); simpl_env; auto.
+  }
+  eapply true_meaning_of with (Ap := dom E `union` singleton y) (Am := dom E); eauto.
+  rewrite_nil_concat.
+  apply subcapt_weakening; simpl_env; eauto.
+Qed.
 
 Lemma wf_typ_through_subst_tt_base : forall Q Ap Am Ap' Am' F X P E T,
     wf_env (F ++ [(X, bind_sub Q)] ++ E) ->
@@ -2767,29 +2830,10 @@ Proof with simpl_env;
     + apply (wf_typ_through_subst_tt Q)...
     + rewrite <- subst_tt_open_ct...
       apply (typing_sub (open_ct (subst_tt Z P T2) D))...
-      pick fresh y.
-      replace (open_ct (subst_tt Z P T2) D)
-        with (subst_ct y D (open_ct (subst_tt Z P T2) y)).
-      replace (open_ct (subst_tt Z P T2) Cv')
-        with (subst_ct y Cv' (open_ct (subst_tt Z P T2) y)).
-      2, 3:
-        (* symmetry. apply subst_ct_intro; *)
-        admit.                  (*  auxiliary lemma about fv_et necessary? *)
-      assert
-        (wf_typ
-           ([(y, bind_typ (subst_tt Z P T1))] ++ map (subst_tb Z P) F ++ E)
-           (dom (map (subst_tb Z P) F ++ E) `union` singleton y)
-           (dom (map (subst_tb Z P) F ++ E))
-           (open_ct (subst_tt Z P T2) y)). {
-        admit.                  (* by inversion lemma on SpIHTyp1 *)
-      }
-      (* apply true_meaning_of *)
 
-      (* inversion SpIHTyp1; subst. *)
-      (* apply (sub_through_subst_tt Q). *)
-      (* cv_through_subst_tt *)
-    (* IMPORTANT! *)
-    admit.
+      eapply applied_meaning_of.
+      * apply cv_through_subst_tt with (Q := Q) (T := T1')...
+      * apply SpIHTyp1.
   - Case "typing_tabs".
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
     2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
