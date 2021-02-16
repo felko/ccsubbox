@@ -1083,6 +1083,36 @@ Proof with eauto.
     apply subcapt_expansion...
 Qed.
 
+Lemma binds_unique : forall b1 b2 x (E : env),
+  binds x b1 E ->
+  binds x b2 E ->
+  b1 = b2.
+Proof.
+  intros* Hb1 Hb2.
+  unfold binds in Hb1, Hb2.
+  congruence.
+Qed.
+
+Lemma binds_sub_unique : forall T1 T2 X E,
+  binds X (bind_sub T1) E ->
+  binds X (bind_sub T2) E ->
+  T1 = T2.
+Proof.
+  intros* Hb1 Hb2.
+  unfold binds in Hb1, Hb2.
+  congruence.
+Qed.
+
+Lemma binds_typ_unique : forall T1 T2 X E,
+  binds X (bind_typ T1) E ->
+  binds X (bind_typ T2) E ->
+  T1 = T2.
+Proof.
+  intros* Hb1 Hb2.
+  unfold binds in Hb1, Hb2.
+  congruence.
+Qed.
+
 Lemma cv_through_subst_tt : forall X P Q T E G C D,
   wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
   wf_typ_in (G ++ [(X, bind_sub Q)] ++ E) T ->
@@ -1094,26 +1124,95 @@ Proof with eauto.
   intros * Hwf_env Hwf_typ HcvWide HcvNarr Hsub.
   (* remember (G ++ [(X, bind_sub Q)] ++ E). *)
   assert (type T) as Typ by (eapply type_from_wf_typ; eauto).
-  induction Typ.
-  - simpl in HcvNarr.
-    destruct (X0 == X).
-    + subst.
-      let A := constr:(dom (map (subst_tb X P) G ++ E))
-      in eapply sub_implies_subcapt with (S := P) (T := Q) (A1 := A) (A2 := A)...
-      * rewrite_nil_concat.
-        apply sub_weakening...
-        eapply wf_env_subst_tb...
-      * admit.
-        (* wf_cset_subst_tb is borked, needs to shrink Ap in conclusion... *)
-        (* eapply wf_cset_subst_tb with (Q := Q)... *)
-      * assert (wf_typ_in E Q)...
-        apply extract_bind_cv_from_var_cv with (U := Q) in HcvWide...
-        (* we now need to strengthen HcvWide... *)
-        admit.
-    + admit.
-  - simpl in HcvNarr.
-    inversion HcvNarr; inversion HcvWide; subst.
-    eapply subcapt_reflexivity...
+  induction G.
+  - simpl_env in *.
+    induction Typ.
+    + simpl in HcvNarr.
+      destruct (X0 == X).
+      * subst.
+        let A := constr:(dom E)
+        in eapply sub_implies_subcapt with (S := P) (T := Q) (A1 := A) (A2 := A)...
+        -- admit.
+           (* wf_cset_subst_tb is borked, needs to shrink Ap in conclusion... *)
+           (* eapply wf_cset_subst_tb with (Q := Q)... *)
+        -- assert (wf_typ_in E Q)...
+           apply extract_bind_cv_from_var_cv with (U := Q) in HcvWide...
+           admit.               (* we now need to strengthen HcvWide... *)
+      * assert (wf_typ_in E X0)...
+        apply cv_unique_shrink in HcvWide...
+        unshelve epose proof (cv_unique _ _ _ _  _ _ HcvWide HcvNarr)...
+        subst.
+        eapply subcapt_reflexivity...
+    + simpl in HcvNarr.
+      inversion HcvNarr; inversion HcvWide; subst.
+      eapply subcapt_reflexivity...
+  - destruct a as [Z B].
+    simpl_env in *.
+    induction Typ.
+    + simpl in HcvNarr.
+      destruct (X0 == X).
+      * subst.
+        rewrite_env (map (subst_tb X P) ([(Z, B)] ++ G) ++ E).
+        rewrite_env (map (subst_tb X P) ([(Z, B)] ++ G) ++ E) in HcvNarr.
+        let A := constr:(dom (map (subst_tb X P) ([(Z, B)] ++ G) ++ E))
+        in eapply sub_implies_subcapt with (S := P) (T := Q) (A1 := A) (A2 := A)...
+        -- rewrite_nil_concat.
+           apply sub_weakening...
+           eapply (wf_env_subst_tb Q)...
+        -- (* wf_cset_subst_tb is borked, needs to shrink Ap in conclusion... *)
+           (* eapply wf_cset_subst_tb with (Q := Q)... *)
+           admit.
+        -- assert (wf_typ_in E Q)...
+           assert (binds X (bind_sub Q) ([(Z, B)] ++ G ++ [(X, bind_sub Q)] ++ E)). {
+             rewrite_env (([(Z, B)] ++ G) ++ [(X, bind_sub Q)] ++ E)...
+           }
+           apply extract_bind_cv_from_var_cv with (U := Q) in HcvWide...
+           (* we now need to strengthen HcvWide... *)
+           admit.
+      * inversion HcvWide; subst.
+        binds_cases H0...
+        -- admit.                  (* again, strengthen HcvWide *)
+        -- enough (subcapt (map (subst_tb X P) G ++ E) D C). {
+             rewrite_nil_concat.
+             (* rewrite_env (empty ++ [(Z, subst_tb X P B)] ++ (map (subst_tb X P) G ++ E)). *)
+             apply subcapt_weakening...
+             rewrite_env (map (subst_tb X P) ([(Z, B)] ++ G) ++ E).
+             apply (wf_env_subst_tb Q)...
+           }
+           assert (wf_env (G ++ [(X, bind_sub Q)] ++ E)). {
+             inversion Hwf_env...
+           }
+           assert (binds X0 (bind_sub T) (G ++ [(X, bind_sub Q)] ++ E)) as HA...
+           assert (binds X0 (bind_sub T) ([(Z, B)] ++ G ++ [(X, bind_sub Q)] ++ E)) as HA'...
+           apply wf_typ_from_binds_sub in HA as ?...
+           apply IHG...
+           ++ inversion HcvWide; subst.
+              eapply cv_typ_var...
+              erewrite (binds_sub_unique T0 T) in *...
+              eapply (cv_unique_shrink Z)...
+           ++ simpl.
+              destruct (X0 == X); try easy.
+              inversion HcvNarr; subst.
+              match goal with
+              | H : binds X0 (bind_sub T0) _ |- _ =>
+                rename H into HbindsNarr
+              end.
+              rewrite_env (map (subst_tb X P) ([(Z, B)] ++ G) ++ E) in HbindsNarr.
+              assert (wf_env (map (subst_tb X P) G ++ E)). {
+                apply wf_env_subst_tb with (Q := Q)...
+              }
+              assert (wf_typ_in (map (subst_tb X P) G ++ E) (subst_tt X P T)). {
+                eapply wf_typ_subst_tb' with (Q := Q)...
+              }
+              assert (binds X0 (bind_sub (subst_tt X P T)) (map (subst_tb X P) G ++ E))...
+              erewrite (binds_sub_unique T0 (subst_tt X P T)) in *...
+              eapply cv_typ_var...
+              eapply (cv_unique_shrink Z)...
+        -- subst.
+           admit.
+    + simpl in HcvNarr.
+      inversion HcvNarr; inversion HcvWide; subst.
+      eapply subcapt_reflexivity...
 Admitted.
 
 (* Type substitution preserves subcapturing *)

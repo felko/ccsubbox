@@ -240,6 +240,7 @@ Proof with eauto using allbound_typ_if.
     autounfold; constructor...
   - cbn in T1.
     subst T1.
+    f_equal.
     cbv [open_cset cset_references_bvar_dec].
     replace_if_cond_with true.
     2: {
@@ -254,6 +255,5 @@ Proof with eauto using allbound_typ_if.
       end.
     }
     cbn.
-    replace (cset_set _ _) with (cset_fvar x) by cset_eq_dec.
-    reflexivity.
+    cset_eq_dec.
 Qed.
