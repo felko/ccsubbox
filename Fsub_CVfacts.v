@@ -2,14 +2,11 @@ Require Import Coq.Program.Equality.
 Require Export Fsub_Hints.
 Require Export Fsub_Lemmas.
 
-(* HINT: we had problems formalizing a version with Ap and Am since then the
-   IH requires us to show wf_typ Ap Am, while we only have wf_typ_in E.
- *)
- Lemma cv_unique_shrink : forall Y B E T C,
- wf_env ([(Y, B)] ++ E) ->
- wf_typ_in E T ->
- cv ([(Y, B)] ++ E) T C ->
- cv E T C.
+Lemma cv_unique_shrink : forall Y B E T C,
+  wf_env ([(Y, B)] ++ E) ->
+  wf_typ_in E T ->
+  cv ([(Y, B)] ++ E) T C ->
+  cv E T C.
 Proof.
  intros*.
  intros HwfE HwfT Hcv.
@@ -31,7 +28,6 @@ Proof.
    inversion HwfE; trivial.
    eapply IHHcv with (Y0 := Y) (B0 := B).
    inversion HwfT; subst.
- 
    {
      pose proof H7.
      unfold binds in H. unfold binds in H7.
@@ -53,11 +49,11 @@ Proof.
 Qed.
 
 Lemma cv_unique : forall E T C1 C2,
- wf_env E ->
- wf_typ_in E T ->
- cv E T C1 ->
- cv E T C2 ->
- C1 = C2.
+  wf_env E ->
+  wf_typ_in E T ->
+  cv E T C1 ->
+  cv E T C2 ->
+  C1 = C2.
 Proof with eauto*.
  intros E; induction E; intros T; induction T; intros...
  - inversion H1; inversion H2; subst...
@@ -74,47 +70,28 @@ Proof with eauto*.
    + inversion H2; subst...
      inversion H1; subst...
      apply IHE with (T := T)...
-     {inversion H5; trivial. }
-     {binds_cases H4; subst; simpl_env in *; try notin_solve...
-       inversion H; trivial. }
-     {
-       binds_cases H4; subst; simpl_env in *; try notin_solve...
+     * inversion H5; trivial.
+     * binds_cases H4; subst; simpl_env in *; try notin_solve...
+       inversion H; trivial.
+     * binds_cases H4; subst; simpl_env in *; try notin_solve...
        binds_cases H6; subst; simpl_env in *; try notin_solve...
        inversion H6; subst...
-
-       eapply cv_unique_shrink.
-       apply H8.
-       inversion H. trivial.
-       trivial.
-     }
-     {
-       binds_cases H4; subst; simpl_env in *; try notin_solve...
+       eapply cv_unique_shrink...
+       inversion H...
+     * binds_cases H4; subst; simpl_env in *; try notin_solve...
        binds_cases H6; subst; simpl_env in *; try notin_solve...
        inversion H6; subst...
-
-       eapply cv_unique_shrink.
-       apply H8.
-       inversion H. trivial.
-       trivial.
-     }
+       eapply cv_unique_shrink...
+       inversion H...
    + inversion H1; subst...
      inversion H2; subst...
      apply IHE with (T := a0)...
-     {inversion H5; trivial. }
-     {binds_cases H4; subst; simpl_env in *; try notin_solve...
-      }
-     {
-       eapply cv_unique_shrink.
-       apply H5.
-       binds_cases H4. eapply wf_typ_var.
-       apply H3.
-       apply H1.
-     }
-     {
-       eapply cv_unique_shrink.
-       apply H5.
-       binds_cases H4. eapply wf_typ_var.
-       apply H3.
-       apply H2.
-     }
+     * inversion H5; trivial.
+     * binds_cases H4; subst; simpl_env in *; try notin_solve...
+     * eapply cv_unique_shrink...
+       binds_cases H4.
+       eapply wf_typ_var...
+     * eapply cv_unique_shrink...
+       binds_cases H4.
+       eapply wf_typ_var...
 Qed.

@@ -26,10 +26,6 @@ Admitted.
 Local Lemma cheat_with : forall A B, A -> B.
 Admitted.
 
-
-
-
-
 Lemma capt_from_cv : forall E T C,
     cv E T C -> capt C.
 Proof with eauto.
@@ -70,17 +66,18 @@ Hint Resolve capt_from_cv : core.
 (** ** Weakening (2) *)
 
 Lemma cv_weakening_head : forall E F T C,
-    cv E T C ->
-    wf_env (F ++ E) ->
-    cv (F ++ E) T C.
+  cv E T C ->
+  wf_env (F ++ E) ->
+  cv (F ++ E) T C.
 Proof with eauto using cv_regular.
   intros E F T C Hcv.
   induction F...
 
   intros; destruct a; simpl_env in *...
   pose proof (cv_regular E T C Hcv).
-  assert (wf_env (F ++ E)).
+  assert (wf_env (F ++ E)). {
     inversion H...
+  }
   specialize (IHF H1).
   induction T...
   * inversion IHF; subst...
@@ -98,7 +95,6 @@ Proof with eauto using cv_regular.
     }
     rewrite_env (empty ++ ([(a, b)] ++ F) ++ E).
     apply binds_weaken; simpl_env in *; eauto.
-    
 Admitted.
 
 Lemma cv_weakening : forall E F G T C,
@@ -107,54 +103,55 @@ Lemma cv_weakening : forall E F G T C,
   cv (G ++ F ++ E) T C.
 Proof with eauto using cv_regular, cv_weakening_head.
   intros E F G T C Hcv Hwf.
-  dependent induction Hcv...
-  * induction G...
-    (* base case *)
-    {
-      simpl_env in *.
-      rewrite x in *.
-      apply cv_weakening_head...
-      rewrite <- x in *.
-      constructor...
-    }
+  admit.
+  (* dependent induction Hcv... *)
+  (* * induction G... *)
+  (*   (* base case *) *)
+  (*   { *)
+  (*     simpl_env in *. *)
+  (*     rewrite x in *. *)
+  (*     apply cv_weakening_head... *)
+  (*     rewrite <- x in *. *)
+  (*     constructor... *)
+  (*   } *)
 
-    destruct a as [Y B]; simpl_env in *...
-    destruct (Y == X); subst...
-    {
-      rewrite x in *.
-      inversion x; subst...
-      specialize (IHHcv E G).
-      constructor...
-      apply IHHcv...
-      inversion Hwf...
-    }
-    {
-      rewrite x in *.
-      inversion x; subst...
-      specialize (IHHcv E G).
-      constructor...
-      apply IHHcv...
-      inversion Hwf...
-    }
-  * rewrite x in *.
-    destruct G.
-    + apply cv_weakening_head with (F := empty ++ F)...
-      destruct E; simpl_env in *.
-      -- inversion x...
-      -- inversion x; subst...
-         simpl_env in *...
-    + destruct p. simpl_env in *.
-      inversion x; subst...
-      apply cv_env_irrel...
-      apply IHHcv...
-      inversion x...
-      inversion Hwf...
-  * apply cv_typ_capt...
-    + apply wf_pretyp_weakening with (Ap := dom (G ++ E)) (Am := dom (G ++ E))...
-      all : repeat rewrite dom_concat...
-    + apply wf_cset_weakening with (A := dom (G ++ E))...
-      all : repeat rewrite dom_concat...
-Qed.
+  (*   destruct a as [Y B]; simpl_env in *... *)
+  (*   destruct (Y == X); subst... *)
+  (*   { *)
+  (*     rewrite x in *. *)
+  (*     inversion x; subst... *)
+  (*     specialize (IHHcv E G). *)
+  (*     constructor... *)
+  (*     apply IHHcv... *)
+  (*     inversion Hwf... *)
+  (*   } *)
+  (*   { *)
+  (*     rewrite x in *. *)
+  (*     inversion x; subst... *)
+  (*     specialize (IHHcv E G). *)
+  (*     constructor... *)
+  (*     apply IHHcv... *)
+  (*     inversion Hwf... *)
+  (*   } *)
+  (* * rewrite x in *. *)
+  (*   destruct G. *)
+  (*   + apply cv_weakening_head with (F := empty ++ F)... *)
+  (*     destruct E; simpl_env in *. *)
+  (*     -- inversion x... *)
+  (*     -- inversion x; subst... *)
+  (*        simpl_env in *... *)
+  (*   + destruct p. simpl_env in *. *)
+  (*     inversion x; subst... *)
+  (*     apply cv_env_irrel... *)
+  (*     apply IHHcv... *)
+  (*     inversion x... *)
+  (*     inversion Hwf... *)
+  (* * apply cv_typ_capt... *)
+  (*   + apply wf_pretyp_weakening with (Ap := dom (G ++ E)) (Am := dom (G ++ E))... *)
+  (*     all : repeat rewrite dom_concat... *)
+  (*   + apply wf_cset_weakening with (A := dom (G ++ E))... *)
+  (*     all : repeat rewrite dom_concat... *)
+Admitted.
 
 Lemma captures_weakening : forall E F G xs x,
   captures (G ++ E) xs x ->
@@ -324,20 +321,20 @@ Proof with eauto.
     + destruct (a0 == X0).
       * subst.
         specialize (IHE T H8 H9) as [C' H'].
-        exists C'. apply cv_typ_var...
+        exists C'.
+        eapply cv_typ_var...
+        apply cv_weakening_head...
       * assert (wf_typ_in E a0). { inversion H0; subst... }
         specialize (IHE a0 H8 H2) as [C' H'].
-        exists C'. apply cv_env_irrel...
+        exists C'. apply cv_weakening_head...
     + inversion H3; subst.
       specialize (IHE T H8 H9) as [C' H'].
-      exists C'. apply cv_typ_var...
+      exists C'. eapply cv_typ_var...
+      apply cv_weakening_head...
   - simpl_env in *.
     assert (wf_typ_in E a0). { inversion H0; subst... binds_cases H6... }
     specialize (IHE a0 H8 H1) as [C' H'].
-    exists C'. apply cv_env_irrel...
-    assert (a0 `in` dom E)...
-    inversion H1; subst.
-    eapply binds_In...
+    exists C'. apply cv_weakening_head...
 Qed.
 
 Lemma wf_env_weaken_head : forall E F,
@@ -348,7 +345,6 @@ Proof with eauto*.
   induction F...
   inversion Hwf...
 Qed.
-
 
 Lemma captures_transitivity : forall E xs ys x,
   (* E |- {x} <: {ys} *)
@@ -440,21 +436,9 @@ Lemma extract_bind_cv_from_var_cv : forall X E U C,
 Proof with eauto using cv_weakening_head.
   intros *. intros Hbinds Hcv.
   dependent induction Hcv.
-  - subst.
-    pose proof Hbinds as H'.
-    unfold binds in H'.
-    simpl in H'.
-    destruct (X == X); try easy.
-    injection H'.
-    intros.
-    subst...
-  - pose proof Hbinds as H'.
-    unfold binds in H'.
-    simpl in H'.
-    destruct (X == Y).
-    + subst.
-      easy.
-    + apply cv_weakening_head...
+  unfold binds in H, Hbinds.
+  rewrite Hbinds in H.
+  inversion H...
 Qed.
 
 (* Subtyping implies subcapturing *)
@@ -673,7 +657,6 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing
         unfold AtomSet.F.For_all in *. intros.
         apply H2...
     }
-
 Admitted.
 
 
@@ -1168,75 +1151,32 @@ Lemma cv_through_subst_tt : forall X P Q T E G C D,
   sub E P Q ->
   subcapt (map (subst_tb X P) G ++ E) D C.
 Proof with eauto.
-  intros *. intros Hwf_env Hwf_typ HcvWide HcvNarr Hsub.
-
-  assert (type T) as Typ. { eapply type_from_wf_typ... }
-
-  induction G.
-  - simpl_env in *.
-    dependent induction HcvWide; subst.
-    + unfold subst_tt in HcvNarr. destruct (X == X); try easy.
-      eapply sub_implies_subcapt with (A1 := dom E) (A2 := dom E)...
-    + unfold subst_tt in HcvNarr. destruct (X0 == X); try easy.
-      epose proof (cv_unique _ _ _ _ _ _ HcvWide HcvNarr); subst.
-      eapply subcapt_reflexivity...
-    + simpl subst_tt in *.
-      inversion HcvNarr; subst.
-      eapply subcapt_reflexivity...
-  (*  lunch break... *)
-  - admit.
+  intros * Hwf_env Hwf_typ HcvWide HcvNarr Hsub.
+  (* remember (G ++ [(X, bind_sub Q)] ++ E). *)
+  assert (type T) as Typ by (eapply type_from_wf_typ; eauto).
+  induction Typ.
+  - simpl in HcvNarr.
+    destruct (X0 == X).
+    + subst.
+      let A := constr:(dom (map (subst_tb X P) G ++ E))
+      in eapply sub_implies_subcapt with (S := P) (T := Q) (A1 := A) (A2 := A)...
+      * rewrite_nil_concat.
+        apply sub_weakening...
+        eapply wf_env_subst_tb...
+      * admit.
+        (* wf_cset_subst_tb is borked, needs to shrink Ap in conclusion... *)
+        (* eapply wf_cset_subst_tb with (Q := Q)... *)
+      * assert (wf_typ_in E Q)...
+        apply extract_bind_cv_from_var_cv with (U := Q) in HcvWide...
+        (* we now need to strengthen HcvWide... *)
+        admit.
+    + admit.
+  - simpl in HcvNarr.
+    inversion HcvNarr; inversion HcvWide; subst.
+    eapply subcapt_reflexivity...
 Admitted.
 
-  (* induction HcvWide; intros G ? HcvNarr; subst... *)
-
-  (* - admit. *)
-  (* - admit. *)
-  (* - simpl subst_tt in HcvNarr. *)
-  (*   inversion HcvNarr; subst. *)
-  (*   apply subcapt_reflexivity with (A := dom (map (subst_tb X P) G ++ E))... *)
-
-  (* dependent induction Typ. *)
-  (* 2: dependent induction H0. *)
-  (* all: intros D Hcv_narrow C0 Hcv_wide. *)
-  (* - simpl subst_tt in Hsub. *)
-  (*   destruct (X0 == X). *)
-  (*   + subst. *)
-  (*     eapply extract_bind_cv_from_var_cv in Hcv_wide as HcvQ... *)
-  (*     destruct C0... *)
-  (*     destruct D... *)
-
-  (* -  *)
-  (* - inversion Hcv_wide; subst. *)
-  (*   inversion Hcv_narrow; subst. *)
-  (*   admit. *)
-  (*   (* apply subcapt_split. *)
-  (*   apply cset_subset_reflexivity. *) *)
-  (* - Case "bvar". *)
-  (*   (* What's going on here, why do I get a bvar? Doesn't this mean that T would be simply ill-formed? *) *)
-  (*   admit. *)
-  (* - Case "fvar". *)
-  (*   admit. *)
-  (* - inversion Hcv_narrow; subst. *)
-  (*   inversion Hcv_wide; subst. *)
-  (*   admit. *)
-  (*   (* apply subcapt_split. *) *)
-  (*   (* apply cset_subset_reflexivity. *) *)
-  (* - inversion Hcv_narrow; subst. *)
-  (*   inversion Hcv_wide; subst. *)
-  (*   admit. *)
-  (*   (* apply subcapt_split. *)
-  (*   apply cset_subset_reflexivity. *) *)
-  (* (* - inversion Hwf_typ; subst. *)
-  (*   inversion Hcv_narrow; subst. *)
-  (*   inversion Hcv_wide; subst. *)
-  (*   specialize (IHT H2 C2 H5 C0 H6). *)
-  (*   apply union_under_subcapturing; trivial. *)
-  (*   apply subcapt_reflexivity. *)
-  (*   apply wf_env_subst_tb with (Q := Q); auto. *) *)
-(* Admitted. *)
-
 (* Type substitution preserves subcapturing *)
-
 Lemma captures_through_subst_tt : forall Q E F Z P C x,
   captures (F ++ [(Z, bind_sub Q)] ++ E) C x ->
   wf_typ_in E P ->
