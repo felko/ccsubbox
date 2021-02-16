@@ -257,3 +257,121 @@ Proof with eauto using allbound_typ_if.
     cbn.
     cset_eq_dec.
 Qed.
+
+Definition CC_List (c : captureset) (t : typ) :=
+  (typ_capt
+     c
+     (typ_all
+        (typ_capt cset_universal typ_top)
+        (typ_capt
+           c
+           (typ_arrow
+              (typ_capt
+                 {}C
+                 (typ_arrow
+                    t
+                    (typ_capt
+                       {}C
+                       (typ_arrow 0 0))))
+              (typ_capt
+                 {}C
+                 (typ_arrow 0 0))))))
+
+.
+
+Definition CC_empty (c : captureset) (t : typ) :=
+  (exp_tabs
+     (typ_capt cset_universal typ_top)
+     (exp_abs
+        (typ_capt
+           {}C
+           (typ_arrow
+              t
+              (typ_capt
+                 {}C
+                 (typ_arrow 0 0))))
+        (exp_abs 0 0))).
+
+Lemma fast_and_furious : forall c t,
+  typing empty (CC_empty c t) (CC_List c t).
+Proof with eauto.
+  intros.
+  unfold CC_empty, CC_List.
+  Ltac subst_type tp :=
+    match goal with
+    | |- typing _ _ ?T =>
+      replace T with tp
+    end;
+    unfold tp.
+  epose (T1 := (typ_capt _ _)).
+  subst_type T1.
+  pick fresh x and apply typing_tabs...
+  2: {
+    simpl_env.
+    cbn.
+    epose (T2 := (typ_capt _ _)).
+    subst_type T2.
+    pick fresh y and apply typing_abs...
+    3: {
+      cbn.
+      epose (T3 := (typ_capt _ _)).
+      subst_type T3.
+      pick fresh z and apply typing_abs...
+      3: {
+        cbn.
+        simpl_env.
+        epose (T4 := _). subst_type T4.
+        apply typing_var_tvar...
+        - admit.
+        - replace (open_ct _ z) with (open_ct x z).
+          cbn.
+          reflexivity.
+          reflexivity.
+      }
+      - admit.
+      - cbn. simpl_env.
+        econstructor.
+        cbv [binds get].
+        simpl.
+        assert (x <> y) by notin_solve.
+        assert (y <> z) by notin_solve.
+        assert (x <> z) by notin_solve.
+        destruct (x == z); try easy.
+        destruct (x == y); try easy.
+        destruct (x == x); try easy.
+      - replace (open_ct _ y)
+          with (open_ct (typ_capt (free_for_cv 0) (typ_arrow x x)) y).
+        cbv.
+        Ltac fnset_rl_mem_dec :=
+          match goal with
+          | |- true = _ => symmetry
+          | |- false = _ => symmetry
+          | |- _ => idtac
+          end;
+          match goal with
+          | |- NatSet.F.mem _ _ = true => rewrite <- NatSetFacts.mem_iff; fnsetdec
+          | |- NatSet.F.mem _ _ = false => rewrite <- NatSetFacts.not_mem_iff; fnsetdec
+          end.
+        replace_if_cond_with false by fnset_rl_mem_dec.
+        reflexivity.
+        reflexivity.
+    }
+    - admit.
+    - admit.
+    - cbn.
+      replace (open_tt _ x)
+        with (open_tt
+                (typ_capt
+                   {}C
+                   (typ_arrow (typ_capt {}C (typ_arrow (open_tt_rec 0 x t) (typ_capt {}C (typ_arrow x x))))
+                              (typ_capt {}C (typ_arrow x x))))
+                x
+             ).
+      cbn.
+      admit.                    (* undoable, need closedness *)
+      admit.
+  }
+  admit.
+  cbn.
+  admit.                        (* ok, need subtyping slack at the top... *)
+Admitted.
