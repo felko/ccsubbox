@@ -507,7 +507,7 @@ Proof with auto.
 Admitted.
 
 Lemma captures_narrowing_forall : forall F Z P Q E xs ys,
-  wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
+  ok (F ++ [(Z, bind_sub P)] ++ E) ->
   sub E P Q ->   
   AtomSet.F.For_all (captures (F ++ [(Z, bind_sub Q)] ++ E) xs) ys ->
   AtomSet.F.For_all (captures (F ++ [(Z, bind_sub P)] ++ E) xs) ys.
@@ -532,10 +532,8 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
 Qed.
     
 
-(* Alex: subcapt_narrowing should be true so this one should be true as well,
- it's just a pain to prove it *)
 Lemma captures_narrowing : forall F Z P Q E xs x,
-  wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
+  ok (F ++ [(Z, bind_sub P)] ++ E) ->
   sub E P Q ->
   captures (F ++ [(Z, bind_sub Q)] ++ E) xs x ->
   captures (F ++ [(Z, bind_sub P)] ++ E) xs x.
@@ -615,6 +613,11 @@ Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   subcapt (F ++ [(Z, bind_sub P)] ++ E) C1 C2.
 Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
   intros F E Z P Q C1 C2 SubPQ Ok SubCap.
+
+  inversion SubCap; subst...
+  eapply subcapt_set...
+  eapply captures_narrowing_forall with (Q := Q)...
+
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
   admit.
   (* induction SubCap ; intros ; subst... *)
