@@ -1811,26 +1811,6 @@ Proof with eauto using wf_cset_set_strengthen.
 }
 Qed.
 
-Lemma capt_from_cv : forall E T C,
-    cv E T C -> capt C.
-Proof with eauto.
-  intros.
-  assert (wf_cset_in E C) as HA by auto.
-  eapply capt_from_wf_cset...
-Qed.
-
-
-
-Lemma binding_uniq_from_wf_env : forall F E x b,
-  wf_env (F ++ ([(x, b)]) ++ E) ->
-  x `notin` (dom F `union` dom E).
-Proof.
-  intros.
-  apply ok_from_wf_env in H.
-  eapply binding_uniq_from_ok; eauto.
-Qed.
-
-Hint Resolve capt_from_cv : core.
 
 Lemma wf_cset_in_subst_tb : forall Q F E Z P C,
   ok (F ++ [(Z, bind_sub Q)] ++ E) ->
@@ -2005,6 +1985,26 @@ Hint Extern 1 (expr ?e) =>
   | H: red _ ?e |- _ => apply (proj2 (red_regular _ _ H))
   end
 : core.
+
+(** More automation *)
+Lemma capt_from_cv : forall E T C,
+    cv E T C -> capt C.
+Proof with eauto.
+  intros.
+  assert (wf_cset_in E C) as HA by auto.
+  eapply capt_from_wf_cset...
+Qed.
+
+Lemma binding_uniq_from_wf_env : forall F E x b,
+  wf_env (F ++ ([(x, b)]) ++ E) ->
+  x `notin` (dom F `union` dom E).
+Proof.
+  intros.
+  apply ok_from_wf_env in H.
+  eapply binding_uniq_from_ok; eauto.
+Qed.
+
+Hint Resolve capt_from_cv : core.
 
 (** * #<a name="auto"></a># Automation Tests *)
 
