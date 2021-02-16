@@ -70,32 +70,16 @@ Lemma cv_weakening_head : forall E F T C,
   wf_env (F ++ E) ->
   cv (F ++ E) T C.
 Proof with eauto using cv_regular.
-  intros E F T C Hcv.
-  induction F...
+  intros E F T C Hcv Wf.
 
-  intros; destruct a; simpl_env in *...
-  pose proof (cv_regular E T C Hcv).
-  assert (wf_env (F ++ E)). {
-    inversion H...
-  }
-  specialize (IHF H1).
-  induction T...
-  * inversion IHF; subst...
-    constructor; rewrite_env (empty ++ [(a, b)] ++ (F ++ E))...
+  induction Hcv.
+  - apply cv_typ_var with (T := T)...
+  - apply cv_typ_capt...
+    rewrite_nil_concat.
     eapply wf_pretyp_weakening...
+    rewrite_nil_concat.
     eapply wf_cset_weakening...
-  * inversion Hcv...
-  * inversion Hcv; subst.
-    apply cv_typ_var with (T := T); try easy.
-    destruct H0 as [_ [Ha _]].
-    (** from wellformedness -- later *)
-    assert (a0 `in` dom E). {
-      inversion Ha; subst.
-      eapply binds_In...
-    }
-    rewrite_env (empty ++ ([(a, b)] ++ F) ++ E).
-    apply binds_weaken; simpl_env in *; eauto.
-Admitted.
+Qed.
 
 Lemma cv_weakening : forall E F G T C,
   cv (G ++ E) T C ->
