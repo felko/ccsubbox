@@ -506,7 +506,7 @@ Proof with auto.
   (*   + apply binds_head... *)
 Admitted.
 
-Lemma captures_narrowing : forall F Z P Q E xs ys,
+Lemma captures_narrowing_forall : forall F Z P Q E xs ys,
   wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
   sub E P Q ->   
   AtomSet.F.For_all (captures (F ++ [(Z, bind_sub Q)] ++ E) xs) ys ->
@@ -541,45 +541,13 @@ Lemma captures_narrowing : forall F Z P Q E xs x,
   captures (F ++ [(Z, bind_sub P)] ++ E) xs x.
 Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
   intros F Z P Q E xs x Ok Sub H.
-  remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
-  (* TODO here we get the premise x `in` ys from the definition of captures.
-     this can't work.
-   *)
-  induction H; intros; subst...
-  - assert (x <> Z). {
-      unfold not. intros.
-      binds_cases H.
-      * subst. unfold dom in Fr0. fsetdec.
-      * subst.
-        assert (ok (F ++ [(Z, bind_sub P)] ++ E)) by auto.
-        exfalso.
-        pose proof (fresh_mid_head _ _ _ _ _ H).
-        pose proof (binds_In _ _ _ _ H5)...
-    }
+  eapply captures_narrowing_forall with (Q := Q) (ys := singleton x)...
+  - unfold AtomSet.F.For_all; intros. 
+    assert (x = x0) by fsetdec; subst. 
+    trivial.
+  - fsetdec.
+Qed.
 
-    eapply captures_var with (ys := ys) (T := T)...
-    (*  This is the tricky case! *)
-    + assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarr...
-      destruct (cv_exists_in (F ++ [(Z, bind_sub P)] ++ E) T) as [D HD]... {
-        eapply wf_typ_from_binds_typ...
-      }
-      assert (subcapt (F ++ [(Z, bind_sub P)] ++ E) D (cset_set ys {}N)) as HscD. {
-        eapply cv_narrowing...
-      }
-      (*
-        cv T  = xs0
-        forall x in xs0. captures ys x
-        cv (F ++ [(Z, bind_sub Q)] ++ E) T = ys
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                old env
-        -------
-        cv T = ys
-      *)
-      admit.
-
-    + unfold AtomSet.F.For_all in *. intros.
-      apply H2...
-Admitted.
 
 Lemma captures_narrowing_typ : forall F X P Q E xs x,
   ok (F ++ [(X, bind_typ Q)] ++ E) ->
