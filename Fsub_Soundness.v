@@ -1113,6 +1113,62 @@ Proof.
   congruence.
 Qed.
 
+Lemma cv_through_subst_tt_exists : forall X P Q T E G C,
+  wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
+  wf_typ_in (G ++ [(X, bind_sub Q)] ++ E) T ->
+  cv (G ++ [(X, bind_sub Q)] ++ E) T C ->  
+  sub E P Q ->
+  exists D, cv (map (subst_tb X P) G ++ E) (subst_tt X P T) D /\ subcapt (map (subst_tb X P) G ++ E) D C.
+Proof with eauto using wf_env_subst_tb, wf_pretyp_subst_tb, wf_cset_subst_tb.
+  intros * Hwf_env Hwf_typ HcvWide Hsub.
+  (* assert (type T) as Typ by (eapply type_from_wf_typ; eauto). *)
+  dependent induction HcvWide.
+  (* Variable Case *)
+  - destruct (IHHcvWide _ _ _ _ H0 ltac:(eauto) ltac:(eauto) Hsub) as [D [Cv' Subcapt]].
+    simpl; destruct (X0 == X); subst; simpl in *; simpl_env in *.    
+    + epose proof (cv_exists_in (map (subst_tb X P) G ++ E) P _ _) as [C Cv].
+      exists C. split...
+      binds_get H; inversion H2; subst.
+      
+      (* WORK IN E HERE!!! *)
+      rewrite_nil_concat.
+
+      
+      (*  since we know that P and Q are wellformed in E we can shrink and widen! *)
+      apply subcapt_weakening; simpl_env...
+
+
+      assert (cv E P C). { apply cv_unique_shrink with (F := map (subst_tb X P) G)... }
+
+      assert (cv (map (subst_tb X P) G ++ E) Q CT). {
+        assert (wf_typ_in E Q) by auto.
+        apply cv_weakening_head...
+        apply cv_unique_shrink with (F := G ++ [(X, bind_sub Q)]); simpl_env...
+      }
+      assert (cv E Q CT). { apply cv_unique_shrink with (F := map (subst_tb X P) G)... }      
+      
+      eapply sub_implies_subcapt with (S := P) (T := Q) (A1 := dom E) (A2 := dom E); simpl_env...
+    + binds_cases H.
+      * admit.
+      * unshelve epose proof (IHHcvWide _ _ _ _ H0 ltac:(eauto) ltac:(eauto) Hsub) as [D2 [Cv2 Subcapt2]].
+        admit.
+        exists D2. split... eapply cv_typ_var with (T := (subst_tt X P T))...
+      
+  (* Capt Case *)
+  - inversion Hwf_typ; subst.
+    simpl. exists C. split... 
+    + eapply cv_typ_capt...
+      (* eapply wf_pretyp_subst_tb with (Q := Q)... 
+        JONA: looks like we need to fix wf_pretyp_subst_tb and wf_cset_subst_tb before proving this...
+      *)
+      admit.
+      admit.
+    + eapply subcapt_reflexivity with (A := dom ((map (subst_tb X P) G ++ E)))...
+      (* same problem with wf_cset_subst_tb as above *)
+      admit.
+Admitted.
+
+
 Lemma cv_through_subst_tt : forall X P Q T E G C D,
   wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
   wf_typ_in (G ++ [(X, bind_sub Q)] ++ E) T ->
@@ -1189,7 +1245,7 @@ Proof with eauto.
            ++ inversion HcvWide; subst.
               eapply cv_typ_var...
               erewrite (binds_sub_unique T0 T) in *...
-              eapply (cv_unique_shrink Z)...
+              eapply (cv_unique_shrink_head Z)...
            ++ simpl.
               destruct (X0 == X); try easy.
               inversion HcvNarr; subst.
@@ -1207,7 +1263,7 @@ Proof with eauto.
               assert (binds X0 (bind_sub (subst_tt X P T)) (map (subst_tb X P) G ++ E))...
               erewrite (binds_sub_unique T0 (subst_tt X P T)) in *...
               eapply cv_typ_var...
-              eapply (cv_unique_shrink Z)...
+              eapply (cv_unique_shrink_head Z)...
         -- subst.
            admit.
     + simpl in HcvNarr.
