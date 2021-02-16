@@ -286,6 +286,13 @@ Proof with eauto*.
   inversion Hwf...
 Qed.
 
+Lemma captures_transitivity_forall : forall E xs ys zs,
+  AtomSet.F.For_all (captures E ys) xs ->
+  AtomSet.F.For_all (captures E zs) ys ->
+  AtomSet.F.For_all (captures E zs) xs.
+Proof with auto.
+Admitted.
+
 Lemma captures_transitivity : forall E xs ys x,
   (* E |- {x} <: {ys} *)
   captures E ys x ->
@@ -422,6 +429,13 @@ Qed.
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
 
+Lemma cv_narrowing_exists : forall S G Z Q E P C1,
+  sub E P Q ->
+  cv (G ++ [(Z, bind_sub Q)] ++ E) S C1 ->
+  exists C2, cv (G ++ [(Z, bind_sub P)] ++ E) S C2 /\ subcapt (G ++ [(Z, bind_sub P)] ++ E) C2 C1.
+Proof with auto.
+Admitted.
+
 Lemma cv_narrowing : forall S G Z Q E P C1 C2,
   sub E P Q ->
   cv (G ++ [(Z, bind_sub Q)] ++ E) S C2 ->
@@ -491,6 +505,32 @@ Proof with auto.
   (*   + apply binds_tail. apply binds_tail... trivial. *)
   (*   + apply binds_head... *)
 Admitted.
+
+Lemma captures_narrowing : forall F Z P Q E xs ys,
+  wf_env (F ++ [(Z, bind_sub P)] ++ E) ->
+  sub E P Q ->   
+  AtomSet.F.For_all (captures (F ++ [(Z, bind_sub Q)] ++ E) xs) ys ->
+  AtomSet.F.For_all (captures (F ++ [(Z, bind_sub P)] ++ E) xs) ys.
+Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
+  intros * Wf Sub H.
+  unfold AtomSet.F.For_all in *; intros.
+  specialize (H x H0).
+  generalize dependent ys.
+  dependent induction H; intros ys' In...
+  - destruct (cv_narrowing_exists _ _ _ _ _ _ _ Sub H0) as [C2 [CvC2 SubcaptC2]].
+    destruct C2.
+    + exfalso. inversion SubcaptC2.
+    + inversion SubcaptC2; subst...
+      eapply captures_var with (T := T) (ys := t).
+      * binds_cases H.
+        ** apply binds_tail; trivial. apply binds_tail...
+        ** apply binds_head; trivial.
+      * trivial.
+      * eapply captures_transitivity_forall with (ys := ys)...
+        unfold AtomSet.F.For_all; intros.
+        destruct (x == x0); subst...
+Qed.
+    
 
 (* Alex: subcapt_narrowing should be true so this one should be true as well,
  it's just a pain to prove it *)
