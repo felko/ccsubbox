@@ -134,6 +134,28 @@ Qed.
 
 Hint Resolve capt_from_cv : core.
 
+Lemma wf_cset_in_subst_tb : forall Q F E Z P C,
+  ok (F ++ [(Z, bind_sub Q)] ++ E) ->
+  wf_typ_in E P ->
+  wf_cset_in (F ++ [(Z, bind_sub Q)] ++ E) C ->
+  wf_cset_in (map (subst_tb Z P) F ++ E) C.
+Proof with eauto.
+  intros* Ok WfP WfC.
+  apply (wf_cset_set_strengthen Z Q) in WfC...
+  eapply wf_cset_subst_tb with (Q := Q) (Am := dom E).
+  - apply (wf_cset_come_on WfC)...
+    apply binding_uniq_from_ok in Ok.
+    simpl_env.
+    fsetdec.
+  - rewrite_env (empty ++ empty ++ E).
+    eapply wf_typ_weakening; simpl_env in *.
+    + apply WfP.
+    + eapply ok_tail...
+    + fsetdec.
+    + fsetdec.
+  - trivial...
+Qed.
+
 Lemma wf_typ_in_subst_tb : forall Q F E Z P T,
   ok (F ++ [(Z, bind_sub Q)] ++ E) ->
   wf_typ_in E P ->
@@ -1271,7 +1293,6 @@ Lemma binds_unique : forall b1 b2 x (E : env),
   b1 = b2.
 Proof.
   intros* Hb1 Hb2.
-  unfold binds in Hb1, Hb2.
   congruence.
 Qed.
 
@@ -1281,7 +1302,6 @@ Lemma binds_sub_unique : forall T1 T2 X E,
   T1 = T2.
 Proof.
   intros* Hb1 Hb2.
-  unfold binds in Hb1, Hb2.
   congruence.
 Qed.
 
@@ -1291,14 +1311,13 @@ Lemma binds_typ_unique : forall T1 T2 X E,
   T1 = T2.
 Proof.
   intros* Hb1 Hb2.
-  unfold binds in Hb1, Hb2.
   congruence.
 Qed.
 
-Lemma cv_through_subst_tt_exists : forall X P Q T E G C,
+Lemma cv_through_subst_tt_exists : forall Q X P T E G C,
   wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
   wf_typ_in (G ++ [(X, bind_sub Q)] ++ E) T ->
-  cv (G ++ [(X, bind_sub Q)] ++ E) T C ->  
+  cv (G ++ [(X, bind_sub Q)] ++ E) T C ->
   sub E P Q ->
   exists D, cv (map (subst_tb X P) G ++ E) (subst_tt X P T) D /\ subcapt (map (subst_tb X P) G ++ E) D C.
 Proof with eauto using wf_env_subst_tb, wf_pretyp_subst_tb, wf_cset_subst_tb.
@@ -1307,51 +1326,57 @@ Proof with eauto using wf_env_subst_tb, wf_pretyp_subst_tb, wf_cset_subst_tb.
   dependent induction HcvWide.
   (* Variable Case *)
   - destruct (IHHcvWide _ _ _ _ H0 ltac:(eauto) ltac:(eauto) Hsub) as [D [Cv' Subcapt]].
-    simpl; destruct (X0 == X); subst; simpl in *; simpl_env in *.    
-    + epose proof (cv_exists_in (map (subst_tb X P) G ++ E) P _ _) as [C Cv].
+    simpl; destruct (X0 == X); subst; simpl in *; simpl_env in *.
+    + unshelve epose proof (cv_exists_in E P _ _) as [C Cv]...
+      assert (cv (map (subst_tb X P) G ++ E) P C). {
+        rewrite_nil_concat.
+        apply cv_weakening; simpl_env...
+      }
       exists C. split...
-      binds_get H; inversion H2; subst.
-      
+      binds_get H. inversion H3; subst.
       (* WORK IN E HERE!!! *)
       rewrite_nil_concat.
-
-      
       (*  since we know that P and Q are wellformed in E we can shrink and widen! *)
       apply subcapt_weakening; simpl_env...
-
-
-      assert (cv E P C). { apply cv_unique_shrink with (F := map (subst_tb X P) G)... }
-
+      assert (cv E P C). {
+        apply cv_unique_shrink with (F := map (subst_tb X P) G)...
+      }
       assert (cv (map (subst_tb X P) G ++ E) Q CT). {
         assert (wf_typ_in E Q) by auto.
         apply cv_weakening_head...
         apply cv_unique_shrink with (F := G ++ [(X, bind_sub Q)]); simpl_env...
       }
-      assert (cv E Q CT). { apply cv_unique_shrink with (F := map (subst_tb X P) G)... }      
-      
+      assert (cv E Q CT). {
+        apply cv_unique_shrink with (F := map (subst_tb X P) G)...
+      }
+
       eapply sub_implies_subcapt with (S := P) (T := Q) (A1 := dom E) (A2 := dom E); simpl_env...
     + binds_cases H.
-      * admit.
+      * assert (wf_typ_in E T). {
+          eapply wf_typ_from_binds_sub...
+        }
+        exists CT. split.
+        -- eapply cv_typ_var...
+           rewrite_nil_concat.
+           apply cv_weakening; simpl_env...
+           apply cv_unique_shrink with (F := (G ++ [(X, bind_sub Q)])); simpl_env...
+        -- eapply subcapt_reflexivity...
       * unshelve epose proof (IHHcvWide _ _ _ _ H0 ltac:(eauto) ltac:(eauto) Hsub) as [D2 [Cv2 Subcapt2]].
-        admit.
+        simpl_env...
         exists D2. split... eapply cv_typ_var with (T := (subst_tt X P T))...
-      
+
   (* Capt Case *)
   - inversion Hwf_typ; subst.
-    simpl. exists C. split... 
+    simpl. exists C. split...
     + eapply cv_typ_capt...
-      (* eapply wf_pretyp_subst_tb with (Q := Q)... 
-        JONA: looks like we need to fix wf_pretyp_subst_tb and wf_cset_subst_tb before proving this...
-      *)
-      admit.
-      admit.
+      * eapply (wf_pretyp_in_subst_tb Q)...
+      * eapply (wf_cset_in_subst_tb Q)...
     + eapply subcapt_reflexivity with (A := dom ((map (subst_tb X P) G ++ E)))...
       (* same problem with wf_cset_subst_tb as above *)
-      admit.
-Admitted.
+      eapply (wf_cset_in_subst_tb Q)...
+Qed.
 
-
-Lemma cv_through_subst_tt : forall X P Q T E G C D,
+Lemma cv_through_subst_tt : forall Q X P T E G C D,
   wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
   wf_typ_in (G ++ [(X, bind_sub Q)] ++ E) T ->
   cv (G ++ [(X, bind_sub Q)] ++ E) T C ->
@@ -1360,98 +1385,13 @@ Lemma cv_through_subst_tt : forall X P Q T E G C D,
   subcapt (map (subst_tb X P) G ++ E) D C.
 Proof with eauto.
   intros * Hwf_env Hwf_typ HcvWide HcvNarr Hsub.
-  (* remember (G ++ [(X, bind_sub Q)] ++ E). *)
-  assert (type T) as Typ by (eapply type_from_wf_typ; eauto).
-  induction G.
-  - simpl_env in *.
-    induction Typ.
-    + simpl in HcvNarr.
-      destruct (X0 == X).
-      * subst.
-        let A := constr:(dom E)
-        in eapply sub_implies_subcapt with (S := P) (T := Q) (A1 := A) (A2 := A)...
-        -- admit.
-           (* wf_cset_subst_tb is borked, needs to shrink Ap in conclusion... *)
-           (* eapply wf_cset_subst_tb with (Q := Q)... *)
-        -- assert (wf_typ_in E Q)...
-           apply extract_bind_cv_from_var_cv with (U := Q) in HcvWide...
-           admit.               (* we now need to strengthen HcvWide... *)
-      * assert (wf_typ_in E X0)...
-        apply cv_unique_shrink in HcvWide...
-        unshelve epose proof (cv_unique _ _ _ _  _ _ HcvWide HcvNarr)...
-        subst.
-        eapply subcapt_reflexivity...
-    + simpl in HcvNarr.
-      inversion HcvNarr; inversion HcvWide; subst.
-      eapply subcapt_reflexivity...
-  - destruct a as [Z B].
-    simpl_env in *.
-    induction Typ.
-    + simpl in HcvNarr.
-      destruct (X0 == X).
-      * subst.
-        rewrite_env (map (subst_tb X P) ([(Z, B)] ++ G) ++ E).
-        rewrite_env (map (subst_tb X P) ([(Z, B)] ++ G) ++ E) in HcvNarr.
-        let A := constr:(dom (map (subst_tb X P) ([(Z, B)] ++ G) ++ E))
-        in eapply sub_implies_subcapt with (S := P) (T := Q) (A1 := A) (A2 := A)...
-        -- rewrite_nil_concat.
-           apply sub_weakening...
-           eapply (wf_env_subst_tb Q)...
-        -- (* wf_cset_subst_tb is borked, needs to shrink Ap in conclusion... *)
-           (* eapply wf_cset_subst_tb with (Q := Q)... *)
-           admit.
-        -- assert (wf_typ_in E Q)...
-           assert (binds X (bind_sub Q) ([(Z, B)] ++ G ++ [(X, bind_sub Q)] ++ E)). {
-             rewrite_env (([(Z, B)] ++ G) ++ [(X, bind_sub Q)] ++ E)...
-           }
-           apply extract_bind_cv_from_var_cv with (U := Q) in HcvWide...
-           (* we now need to strengthen HcvWide... *)
-           admit.
-      * inversion HcvWide; subst.
-        binds_cases H0...
-        -- admit.                  (* again, strengthen HcvWide *)
-        -- enough (subcapt (map (subst_tb X P) G ++ E) D C). {
-             rewrite_nil_concat.
-             (* rewrite_env (empty ++ [(Z, subst_tb X P B)] ++ (map (subst_tb X P) G ++ E)). *)
-             apply subcapt_weakening...
-             rewrite_env (map (subst_tb X P) ([(Z, B)] ++ G) ++ E).
-             apply (wf_env_subst_tb Q)...
-           }
-           assert (wf_env (G ++ [(X, bind_sub Q)] ++ E)). {
-             inversion Hwf_env...
-           }
-           assert (binds X0 (bind_sub T) (G ++ [(X, bind_sub Q)] ++ E)) as HA...
-           assert (binds X0 (bind_sub T) ([(Z, B)] ++ G ++ [(X, bind_sub Q)] ++ E)) as HA'...
-           apply wf_typ_from_binds_sub in HA as ?...
-           apply IHG...
-           ++ inversion HcvWide; subst.
-              eapply cv_typ_var...
-              erewrite (binds_sub_unique T0 T) in *...
-              eapply (cv_unique_shrink_head Z)...
-           ++ simpl.
-              destruct (X0 == X); try easy.
-              inversion HcvNarr; subst.
-              match goal with
-              | H : binds X0 (bind_sub T0) _ |- _ =>
-                rename H into HbindsNarr
-              end.
-              rewrite_env (map (subst_tb X P) ([(Z, B)] ++ G) ++ E) in HbindsNarr.
-              assert (wf_env (map (subst_tb X P) G ++ E)). {
-                apply wf_env_subst_tb with (Q := Q)...
-              }
-              assert (wf_typ_in (map (subst_tb X P) G ++ E) (subst_tt X P T)). {
-                eapply wf_typ_subst_tb' with (Q := Q)...
-              }
-              assert (binds X0 (bind_sub (subst_tt X P T)) (map (subst_tb X P) G ++ E))...
-              erewrite (binds_sub_unique T0 (subst_tt X P T)) in *...
-              eapply cv_typ_var...
-              eapply (cv_unique_shrink_head Z)...
-        -- subst.
-           admit.
-    + simpl in HcvNarr.
-      inversion HcvNarr; inversion HcvWide; subst.
-      eapply subcapt_reflexivity...
-Admitted.
+  unshelve epose proof (cv_through_subst_tt_exists Q X P T E G C _ _ _ _ ) as [D' [HcvD HscD]]...
+  assert (D' = D). {
+    apply (cv_unique (map (subst_tb X P) G ++ E) (subst_tt X P T))...
+  }
+  subst.
+  assumption.
+Qed.
 
 (* Type substitution preserves subcapturing *)
 Lemma captures_through_subst_tt : forall Q E F Z P C x,
@@ -1951,6 +1891,115 @@ Proof with eauto.
       apply subst_cset_fresh. unfold fv_cset; subst...
 Admitted.
 
+Lemma wf_env_strengthening : forall F E,
+  wf_env (F ++ E) ->
+  wf_env E.
+Proof with eauto.
+  induction F...
+  intros.
+  inversion H; subst...
+Qed.
+
+Lemma wf_typ_through_subst_ct_base : forall U Ap Am F x C E T,
+  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
+  cv E U C ->
+  wf_typ (F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
+  wf_typ (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_ct x C T)
+with wf_pretyp_through_subst_cpt_base : forall U Ap Am F x C E P,
+  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
+  cv E U C ->
+  wf_pretyp (F ++ [(x, bind_typ U)] ++ E) Ap Am P ->
+  wf_pretyp (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_cpt x C P).
+Proof.
+Admitted.
+
+Lemma wf_typ_through_subst_ct : forall F x U C E T,
+    wf_env (F ++ [(x, bind_typ U)] ++ E) ->
+    cv E U C ->
+    wf_typ_in (F ++ [(x, bind_typ U)] ++ E) T ->
+    wf_typ_in (map (subst_cb x C) F ++ E) (subst_ct x C T)
+with wf_pretyp_through_subst_cpt : forall F x U C E P,
+    wf_env (F ++ [(x, bind_typ U)] ++ E) ->
+    cv E U C ->
+    wf_pretyp_in (F ++ [(x, bind_typ U)] ++ E) P ->
+    wf_pretyp_in (map (subst_cb x C) F ++ E) (subst_cpt x C P).
+Proof.
+  (* Use above. *)
+Admitted.
+
+Lemma wf_env_subst_cb : forall Q C x E F,
+  wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
+  wf_cset_in E C ->
+  wf_env (map (subst_cb x C) F ++ E).
+Proof.
+  (* with eauto 6 using wf_typ_subst_tb *)
+
+  admit.
+  (* induction F; intros Wf_env WP; simpl_env; *)
+  (*   inversion Wf_env; simpl_env in *; simpl subst_tb... *)
+Admitted.
+
+Lemma cv_through_subst_ct : forall F x U E C T D,
+    cv (F ++ [(x, bind_typ U)] ++ E) T C ->
+    cv E U D ->
+    cv (map (subst_cb x D) F ++ E) (subst_ct x D T) (subst_cset x D C).
+Proof.
+  admit.
+Admitted.
+
+Lemma sub_through_subst_ct : forall E F x U C S T,
+  sub (F ++ [(x, bind_typ U)] ++ E) S T ->
+  cv E U C ->
+  sub (map (subst_cb x C) F ++ E) (subst_ct x C S) (subst_ct x C T)
+with sub_pre_through_subst_cpt : forall E F x U C P Q,
+  sub_pre (F ++ [(x, bind_typ U)] ++ E) Q P ->
+  cv E U C ->
+  sub_pre (map (subst_cb x C) F ++ E) (subst_cpt x C Q) (subst_cpt x C P).
+Proof with eauto.
+  { intros *.
+    intros Hsub HcvU.
+    remember (F ++ [(x, bind_typ U)] ++ E).
+    generalize dependent F.
+    induction Hsub; intros F EQ; subst.
+    - simpl.
+      apply sub_refl_tvar...
+      + eapply wf_env_subst_cb...
+      + unsimpl (subst_ct x C X).
+        eapply wf_typ_through_subst_ct...
+    - simpl.
+      destruct (x == X).
+      + SCase "x == X".
+        subst.
+        binds_get H.
+      + SCase "x <> X".
+        binds_cases H.
+        * assert (x `notin` fv_et U0) as FrXinU0. {
+            (* by larger env binding x being wf *)
+            apply cheat.
+          }
+          unshelve epose proof (IHHsub F _) as IHHsub0...
+          rewrite <- (subst_ct_fresh x C U0) in IHHsub0...
+        * apply sub_trans_tvar with (U := (subst_ct x C U0))...
+    - apply sub_capt.
+      + eapply subcapt_through_subst_cset...
+      + eapply sub_pre_through_subst_cpt...
+  }
+  { intros *.
+    intros Hsub HcvU.
+    remember (F ++ [(x, bind_typ U)] ++ E).
+    generalize dependent F.
+    induction Hsub; intros F EQ; subst.
+    - simpl.
+      apply sub_top.
+      + eapply wf_env_subst_cb...
+      + eapply wf_pretyp_through_subst_cpt...
+    - pick fresh y for L.
+      (* specialize (H0 y Fr). *)
+      apply cheat.
+    - apply cheat.
+  }
+Qed.
+
 Lemma meaning_of : forall E Ap Am x C D T,
   wf_env E ->
   type T ->
@@ -2132,12 +2181,63 @@ Proof with eauto.
   eapply (proj1 (meaning_of _ Ap Am _ _ _ _ H H0 H1 H2 H3 H4))...
 Qed.
 
-(* subst_ct_intro
+Lemma wf_typ_extract_typ_arrow : forall C E T1 T2,
+  wf_typ_in E (typ_capt C (typ_arrow T1 T2)) ->
+  exists L, forall x, x `notin` L ->
+     wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x).
+Proof with eauto.
+  intros *.
+  intro HWf.
+  (* type inversion *)
+  inversion HWf; subst.
+  (* pretype inversion *)
+  inversion H5; subst...
+Qed.
 
-subst_ct X (open_ct T X) C = open_ct T C
+Lemma typing_extract_typ_arrow : forall E e C T1 T2,
+  typing E e (typ_capt C (typ_arrow T1 T2)) ->
+  exists L, forall x, x `notin` L ->
+     wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x).
+Proof with eauto.
+  intros *.
+  intro Htyp.
+  apply (wf_typ_extract_typ_arrow C)...
+Qed.
 
-subcapt E C1 C2 ->
-sub E (open_ct T2 C1) (open_ct T2 C2) *)
+Lemma applied_meaning_of : forall E C1 C2 e D S T,
+  subcapt E C1 C2 ->
+  typing E e (typ_capt D (typ_arrow S T)) ->
+  sub E (open_ct T C1) (open_ct T C2).
+Proof.
+  intros *. intros Hsc Htyp.
+  pose proof (typing_extract_typ_arrow _ _ _ _ _ Htyp) as [L HRT].
+  pick fresh y.
+  replace (open_ct T C1) with (subst_ct y C1 (open_ct T y)).
+  replace (open_ct T C2) with (subst_ct y C2 (open_ct T y)).
+  2,3: solve [symmetry; apply subst_ct_intro; fsetdec].
+  pose proof (typing_regular _ _ _ Htyp) as [_ [_ Reg]].
+  wf_typ_inversion Reg.
+  subst.
+  assert (wf_typ ([(y, bind_typ S)] ++ E)
+                  (dom E `union` singleton y) (dom E)
+                  (open_ct T y)) by eauto.
+  enough (sub ([(y, bind_typ S)] ++ E)
+              (subst_ct y C1 (open_ct T y))
+              (subst_ct y C2 (open_ct T y))). {
+    assert (wf_typ_in E S) as HwfS by assumption.
+    unshelve epose proof (cv_exists_in E S _ _) as [C_S ?]; auto.
+    rewrite_env (map (subst_cb y C_S) empty ++ E).
+    replace (subst_ct y C1 (open_ct T y))
+      with (subst_ct y C_S (subst_ct y C1 (open_ct T y))).
+    replace (subst_ct y C2 (open_ct T y))
+      with (subst_ct y C_S (subst_ct y C2 (open_ct T y))).
+    2,3: solve [apply subst_ct_useless_repetition].
+    apply sub_through_subst_ct with (U := S); simpl_env; auto.
+  }
+  eapply true_meaning_of with (Ap := dom E `union` singleton y) (Am := dom E); eauto.
+  rewrite_nil_concat.
+  apply subcapt_weakening; simpl_env; eauto.
+Qed.
 
 Lemma typing_narrowing : forall Q E F X P e T,
   sub E P Q ->
@@ -2172,30 +2272,10 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
     eapply typing_sub with (S := (open_ct T2 Cnarrow))...
     pose proof (cv_narrowing _ _ _ _ _ _ _ _ PsubQ H0 HCVnarrow) as Subcapt.
     specialize (IHTyp1 F ltac:(auto)).
-    (* inversion IHTyp1; subst. *)
 
-    pick fresh x.
-    rewrite (subst_ct_intro x)...
-    replace (open_ct T2 Cv') with (subst_ct x Cv' (open_ct T2 x)).
-    2: { symmetry. apply subst_ct_intro... }
-
-    (* requires some inversion lemma
-       this will also give us a fresh generator L0 which we should use for the pick fresh above.
-     *)
-    assert (wf_typ_in (F ++ [(X, bind_sub P)] ++ E) (open_ct T2 x)) as WfTyp. { admit. }
-    apply (true_meaning_of
-             (F ++ [(X, bind_sub P)] ++ E)
-             (dom (F ++ [(X, bind_sub P)] ++ E))
-             (dom (F ++ [(X, bind_sub P)] ++ E))
-             x Cnarrow Cv' (open_ct T2 x)
-          ).
-    + auto.
-    + eapply type_from_wf_typ...
-    + trivial...
-    + trivial...
-    + trivial.
-    + trivial.
-    + trivial...
+    eapply applied_meaning_of.
+    + assumption.
+    + eauto.
   - Case "typing_tabs".
     assert (wf_env (F ++ [(X, bind_sub P)] ++ E)). {
       pick fresh y for L.
@@ -2208,7 +2288,7 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
       eapply wf_typ_narrowing_base; simpl_env...
     + rewrite <- concat_assoc.
       apply H2...
-Admitted.
+Qed.
 
 (************************************************************************ *)
 (** ** Free_for_cv lemmas *)
@@ -2329,115 +2409,6 @@ Qed.
 
 (************************************************************************ *)
 (** ** Substitution preserves typing (8) *)
-
-Lemma wf_env_strengthening : forall F E,
-  wf_env (F ++ E) ->
-  wf_env E.
-Proof with eauto.
-  induction F...
-  intros.
-  inversion H; subst...
-Qed.
-
-Lemma wf_typ_through_subst_ct_base : forall U Ap Am F x C E T,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  cv E U C ->
-  wf_typ (F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
-  wf_typ (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_ct x C T)
-with wf_pretyp_through_subst_cpt_base : forall U Ap Am F x C E P,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  cv E U C ->
-  wf_pretyp (F ++ [(x, bind_typ U)] ++ E) Ap Am P ->
-  wf_pretyp (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_cpt x C P).
-Proof.
-Admitted.
-
-Lemma wf_typ_through_subst_ct : forall F x U C E T,
-    wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-    cv E U C ->
-    wf_typ_in (F ++ [(x, bind_typ U)] ++ E) T ->
-    wf_typ_in (map (subst_cb x C) F ++ E) (subst_ct x C T)
-with wf_pretyp_through_subst_cpt : forall F x U C E P,
-    wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-    cv E U C ->
-    wf_pretyp_in (F ++ [(x, bind_typ U)] ++ E) P ->
-    wf_pretyp_in (map (subst_cb x C) F ++ E) (subst_cpt x C P).
-Proof.
-  (* Use above. *)
-Admitted.
-
-Lemma wf_env_subst_cb : forall Q C x E F,
-  wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
-  wf_cset_in E C ->
-  wf_env (map (subst_cb x C) F ++ E).
-Proof.
-  (* with eauto 6 using wf_typ_subst_tb *)
-
-  admit.
-  (* induction F; intros Wf_env WP; simpl_env; *)
-  (*   inversion Wf_env; simpl_env in *; simpl subst_tb... *)
-Admitted.
-
-Lemma cv_through_subst_ct : forall F x U E C T D,
-    cv (F ++ [(x, bind_typ U)] ++ E) T C ->
-    cv E U D ->
-    cv (map (subst_cb x D) F ++ E) (subst_ct x D T) (subst_cset x D C).
-Proof.
-  admit.
-Admitted.
-
-Lemma sub_through_subst_ct : forall E F x U C S T,
-  sub (F ++ [(x, bind_typ U)] ++ E) S T ->
-  cv E U C ->
-  sub (map (subst_cb x C) F ++ E) (subst_ct x C S) (subst_ct x C T)
-with sub_pre_through_subst_cpt : forall E F x U C P Q,
-  sub_pre (F ++ [(x, bind_typ U)] ++ E) Q P ->
-  cv E U C ->
-  sub_pre (map (subst_cb x C) F ++ E) (subst_cpt x C Q) (subst_cpt x C P).
-Proof with eauto.
-  { intros *.
-    intros Hsub HcvU.
-    remember (F ++ [(x, bind_typ U)] ++ E).
-    generalize dependent F.
-    induction Hsub; intros F EQ; subst.
-    - simpl.
-      apply sub_refl_tvar...
-      + eapply wf_env_subst_cb...
-      + unsimpl (subst_ct x C X).
-        eapply wf_typ_through_subst_ct...
-    - simpl.
-      destruct (x == X).
-      + SCase "x == X".
-        subst.
-        binds_get H.
-      + SCase "x <> X".
-        binds_cases H.
-        * assert (x `notin` fv_et U0) as FrXinU0. {
-            (* by larger env binding x being wf *)
-            apply cheat.
-          }
-          unshelve epose proof (IHHsub F _) as IHHsub0...
-          rewrite <- (subst_ct_fresh x C U0) in IHHsub0...
-        * apply sub_trans_tvar with (U := (subst_ct x C U0))...
-    - apply sub_capt.
-      + eapply subcapt_through_subst_cset...
-      + eapply sub_pre_through_subst_cpt...
-  }
-  { intros *.
-    intros Hsub HcvU.
-    remember (F ++ [(x, bind_typ U)] ++ E).
-    generalize dependent F.
-    induction Hsub; intros F EQ; subst.
-    - simpl.
-      apply sub_top.
-      + eapply wf_env_subst_cb...
-      + eapply wf_pretyp_through_subst_cpt...
-    - pick fresh y for L.
-      (* specialize (H0 y Fr). *)
-      apply cheat.
-    - apply cheat.
-  }
-Qed.
 
 Local Lemma foo : forall x C e,
     AtomSet.F.In x (cset_fvars (free_for_cv e)) ->
@@ -2755,124 +2726,49 @@ Qed.
 (************************************************************************ *)
 (** ** Type substitution preserves typing (11) *)
 
-Lemma wf_typ_extract_typ_arrow : forall C E T1 T2,
-  wf_typ_in E (typ_capt C (typ_arrow T1 T2)) ->
-  exists L, forall x, x `notin` L ->
-     wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x).
-Proof with eauto.
-  intros *.
-  intro HWf.
-  (* type inversion *)
-  inversion HWf; subst.
-  (* pretype inversion *)
-  inversion H5; subst...
-Qed.
-
-Lemma typing_extract_typ_arrow : forall E e C T1 T2,
-  typing E e (typ_capt C (typ_arrow T1 T2)) ->
-  exists L, forall x, x `notin` L ->
-     wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x).
-Proof with eauto.
-  intros *.
-  intro Htyp.
-  apply (wf_typ_extract_typ_arrow C)...
-Qed.
-
-Lemma applied_meaning_of : forall E C1 C2 e D S T,
-  subcapt E C1 C2 ->
-  typing E e (typ_capt D (typ_arrow S T)) ->
-  sub E (open_ct T C1) (open_ct T C2).
-Proof.
-  intros *. intros Hsc Htyp.
-  pose proof (typing_extract_typ_arrow _ _ _ _ _ Htyp) as [L HRT].
-  pick fresh y.
-  replace (open_ct T C1) with (subst_ct y C1 (open_ct T y)).
-  replace (open_ct T C2) with (subst_ct y C2 (open_ct T y)).
-  2,3: solve [symmetry; apply subst_ct_intro; fsetdec].
-  pose proof (typing_regular _ _ _ Htyp) as [_ [_ Reg]].
-  inversion Reg.
-  match goal with
-  | H : wf_pretyp _ _ _ _ |- _ =>
-    inversion H
-  end.
-  subst.
-  assert (wf_typ ([(y, bind_typ S)] ++ E)
-                  (dom E `union` singleton y) (dom E)
-                  (open_ct T y)) by eauto.
-  enough (sub ([(y, bind_typ S)] ++ E)
-              (subst_ct y C1 (open_ct T y))
-              (subst_ct y C2 (open_ct T y))). {
-    assert (wf_typ_in E S) as HwfS by assumption.
-    unshelve epose proof (cv_exists_in E S _ _) as [C_S ?]; auto.
-    rewrite_env (map (subst_cb y C_S) empty ++ E).
-    replace (subst_ct y C1 (open_ct T y))
-      with (subst_ct y C_S (subst_ct y C1 (open_ct T y))).
-    replace (subst_ct y C2 (open_ct T y))
-      with (subst_ct y C_S (subst_ct y C2 (open_ct T y))).
-    2,3: solve [apply subst_ct_useless_repetition].
-    apply sub_through_subst_ct with (U := S); simpl_env; auto.
-  }
-  eapply true_meaning_of with (Ap := dom E `union` singleton y) (Am := dom E); eauto.
-  rewrite_nil_concat.
-  apply subcapt_weakening; simpl_env; eauto.
-Qed.
-
-Lemma wf_typ_through_subst_tt_base : forall Q Ap Am Ap' Am' F X P E T,
-    wf_env (F ++ [(X, bind_sub Q)] ++ E) ->
-    sub E P Q ->
-    wf_typ (F ++ [(X, bind_sub Q)] ++ E) Ap Am T ->
-    wf_typ E Ap' Am' P ->
-    Ap' `subset` Ap ->
-    Am' `subset` Am ->
-    wf_typ (map (subst_tb X P) F ++ E) (Ap `remove` X) (Am `remove` X) (subst_tt X P T)
-with wf_pretyp_through_subst_tpt_base : forall Q Ap Am Ap' Am' F X P E R,
-    wf_env (F ++ [(X, bind_sub Q)] ++ E) ->
-    sub E P Q ->
-    wf_pretyp (F ++ [(X, bind_sub Q)] ++ E) Ap Am R ->
-    wf_typ E Ap' Am' P ->
-    Ap' `subset` Ap ->
-    Am' `subset` Am ->
-    wf_pretyp (map (subst_tb X P) F ++ E) (Ap `remove` X) (Am `remove` X) (subst_tpt X P R).
-Proof with eauto.
-
-(* { intros *. *)
-(*   intros HwfEnv Hsub HwfT HwfP HssetAp HssetAm. *)
-(*   dependent induction HwfT. *)
-(*   - simpl. *)
-(*     destruct (X0 == X). *)
-(*     + rewrite_nil_concat. *)
-(*       apply wf_typ_weakening with (Ap := Ap') (Am := Am')... *)
-
-(* } *)
-Admitted.
-
-Lemma wf_typ_through_subst_tt : forall Q F x P E T,
-    wf_env (F ++ [(x, bind_sub Q)] ++ E) ->
-    sub E P Q ->
-    wf_typ_in (F ++ [(x, bind_sub Q)] ++ E) T ->
-    wf_typ_in (map (subst_tb x P) F ++ E) (subst_tt x P T)
-with wf_pretyp_through_subst_tpt : forall Q F x P E R,
-    wf_env (F ++ [(x, bind_sub Q)] ++ E) ->
-    sub E P Q ->
-    wf_pretyp_in (F ++ [(x, bind_sub Q)] ++ E) R ->
-    wf_pretyp_in (map (subst_tb x P) F ++ E) (subst_tpt x P R).
-Proof.
-  (* Use above. *)
-Admitted.
-
 Lemma wf_cset_from_binds : forall b x E,
   wf_env E ->
   binds x (bind_typ b) E ->
   wf_cset_in E x.
 Proof.
-Admitted.
+  intros.
+  econstructor.
+  - unfold allbound_typ.
+    intros x0 HIn.
+    rewrite AtomSetFacts.singleton_iff in HIn.
+    subst.
+    eauto.
+  - apply binds_In in H0.
+    fsetdec.
+Qed.
 
 Lemma captures_from_binds : forall P x C E,
   wf_env E ->
   binds x (bind_typ (typ_capt C P)) E ->
   subcapt E x C.
-Proof.
-Admitted.
+Proof with eauto.
+  intros* ? Binds.
+  eapply wf_cset_from_binds in Binds as WfC...
+  destruct C...
+  eapply wf_typ_from_binds_typ in Binds as WfT...
+  inversion WfT;
+    match goal with
+    | H : wf_cset _ _ _ |- _ =>
+      inversion H
+    end;
+    subst.
+  apply subcapt_set...
+  unfold AtomSet.F.For_all.
+  intros x0 HIn.
+  rewrite AtomSetFacts.singleton_iff in HIn.
+  symmetry in HIn.
+  subst.
+  eapply captures_var...
+  unfold AtomSet.F.For_all.
+  intros.
+  apply captures_in.
+  assumption.
+Qed.
 
 Lemma typing_through_subst_te : forall Q E F Z e T P,
   typing (F ++ [(Z, bind_sub Q)] ++ E) e T ->
@@ -2958,7 +2854,7 @@ Proof with simpl_env;
     assert (wf_typ_in (map (subst_tb Z P) F ++ E)
                       (typ_capt Cf (typ_arrow (subst_tt Z P T1) (subst_tt Z P T2))))...
     unshelve epose proof (cv_exists_in (map (subst_tb Z P) F ++ E) (subst_tt Z P T1) _ _) as [? ?]...
-    + apply (wf_typ_through_subst_tt Q)...
+    + apply (wf_typ_in_subst_tb Q)...
     + rewrite <- subst_tt_open_ct...
       apply (typing_sub (open_ct (subst_tt Z P T2) D))...
 
