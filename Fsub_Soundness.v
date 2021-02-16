@@ -85,57 +85,13 @@ Lemma cv_weakening : forall E F G T C,
   cv (G ++ E) T C ->
   wf_env (G ++ F ++ E) ->
   cv (G ++ F ++ E) T C.
-Proof with eauto using cv_regular, cv_weakening_head.
+Proof with eauto using cv_regular, wf_pretyp_weakening, wf_cset_weakening.
   intros E F G T C Hcv Hwf.
-  admit.
-  (* dependent induction Hcv... *)
-  (* * induction G... *)
-  (*   (* base case *) *)
-  (*   { *)
-  (*     simpl_env in *. *)
-  (*     rewrite x in *. *)
-  (*     apply cv_weakening_head... *)
-  (*     rewrite <- x in *. *)
-  (*     constructor... *)
-  (*   } *)
 
-  (*   destruct a as [Y B]; simpl_env in *... *)
-  (*   destruct (Y == X); subst... *)
-  (*   { *)
-  (*     rewrite x in *. *)
-  (*     inversion x; subst... *)
-  (*     specialize (IHHcv E G). *)
-  (*     constructor... *)
-  (*     apply IHHcv... *)
-  (*     inversion Hwf... *)
-  (*   } *)
-  (*   { *)
-  (*     rewrite x in *. *)
-  (*     inversion x; subst... *)
-  (*     specialize (IHHcv E G). *)
-  (*     constructor... *)
-  (*     apply IHHcv... *)
-  (*     inversion Hwf... *)
-  (*   } *)
-  (* * rewrite x in *. *)
-  (*   destruct G. *)
-  (*   + apply cv_weakening_head with (F := empty ++ F)... *)
-  (*     destruct E; simpl_env in *. *)
-  (*     -- inversion x... *)
-  (*     -- inversion x; subst... *)
-  (*        simpl_env in *... *)
-  (*   + destruct p. simpl_env in *. *)
-  (*     inversion x; subst... *)
-  (*     apply cv_env_irrel... *)
-  (*     apply IHHcv... *)
-  (*     inversion x... *)
-  (*     inversion Hwf... *)
-  (* * apply cv_typ_capt... *)
-  (*   + apply wf_pretyp_weakening with (Ap := dom (G ++ E)) (Am := dom (G ++ E))... *)
-  (*     all : repeat rewrite dom_concat... *)
-  (*   + apply wf_cset_weakening with (A := dom (G ++ E))... *)
-  (*     all : repeat rewrite dom_concat... *)
-Admitted.
+  dependent induction Hcv.
+  * apply cv_typ_var with (T := T)...
+  * apply cv_typ_capt...
+Qed.
 
 Lemma captures_weakening : forall E F G xs x,
   captures (G ++ E) xs x ->
@@ -1207,7 +1163,9 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb, captures_through_subst
   subst.
   binds_cases H...
   - constructor...
-    (* Alex: requires wf_cset_through_subst_ct *)
+    (* Alex: requires wf_cset_through_subst_ct 
+       Jona: maybe we can use wf_cset_in_subst_cb?
+    *)
     admit.
   - subst.
     constructor...
