@@ -647,6 +647,20 @@ Proof.
   intros. simpl_env in *. eauto using binds_remove_mid.
 Qed.
 
+Lemma binding_uniq_from_ok : forall F E x b,
+  ok (F ++ ([(x, b)]) ++ E) ->
+  ~ In x (union (dom F) (dom E)).
+Proof.
+  intros.
+  induction F.
+  - simpl_env in *.
+    inversion H; subst; eauto.
+  - inversion H; subst.
+    specialize (IHF ltac:(auto)).
+    simpl_env in *.
+    notin_solve.
+Qed.
+
 End AdditionalBindsProperties.
 
 

@@ -1735,6 +1735,182 @@ Proof with eauto*.
   intros. induction H...
 Qed.
 
+(** Moved from Soundness *)
+Lemma wf_cset_set_strengthen : forall X S E A C,
+  binds X (bind_sub S) E ->
+  wf_cset E A C ->
+  wf_cset E (A `remove` X) C.
+Proof with eauto.
+  intros* Hb WfCs.
+  inversion WfCs.
+  - eauto.
+  - assert (fvars `subset` (A `remove` X)). {
+      assert (X `notin` fvars). {
+        intro.
+        specialize (H X ltac:(trivial)) as [? ?].
+        congruence.
+      }
+      fsetdec.
+    }
+    constructor...
+Qed.
+
+Lemma wf_cset_come_on : forall {A' E A C},
+  wf_cset E A' C ->
+  A' = A ->
+  wf_cset E A C.
+Proof.
+  intros.
+  congruence.
+Qed.
+
+Lemma wf_pretyp_come_on : forall {Ap' Am' E Ap Am T},
+  wf_pretyp E Ap' Am' T ->
+  Ap' = Ap ->
+  Am' = Am ->
+  wf_pretyp E Ap Am T.
+Proof.
+  intros.
+  congruence.
+Qed.
+
+Lemma wf_typ_come_on : forall {Ap' Am' E Ap Am T},
+  wf_typ E Ap' Am' T ->
+  Ap' = Ap ->
+  Am' = Am ->
+  wf_typ E Ap Am T.
+Proof.
+  intros.
+  congruence.
+Qed.
+
+Lemma wf_typ_set_strengthen : forall X S Ap Am E T,
+  binds X (bind_sub S) E ->
+  wf_typ E Ap Am T ->
+  wf_typ E (Ap `remove` X) (Am `remove` X) T
+with wf_pretyp_set_strengthen : forall X S Ap Am E P,
+  binds X (bind_sub S) E ->
+  wf_pretyp E Ap Am P ->
+  wf_pretyp E (Ap `remove` X) (Am `remove` X) P.
+Proof with eauto using wf_cset_set_strengthen.
+{ intros * XinE WfT.
+  induction WfT.
+  - econstructor...
+  - econstructor...
+}
+{ intros * XinE WfP.
+  induction WfP.
+  - econstructor...
+  - pick fresh Y and apply wf_typ_arrow...
+    specialize (H0 Y ltac:(notin_solve)).
+    apply (wf_typ_set_strengthen X S) in H0...
+    assert (Y `notin` (Ap `union` Am `union` singleton X)) by notin_solve.
+    clear Fr.
+    apply (wf_typ_come_on H0); fsetdec.
+  - pick fresh Y and apply wf_typ_all...
+}
+Qed.
+
+Lemma capt_from_cv : forall E T C,
+    cv E T C -> capt C.
+Proof with eauto.
+  intros.
+  assert (wf_cset_in E C) as HA by auto.
+  eapply capt_from_wf_cset...
+Qed.
+
+
+
+Lemma binding_uniq_from_wf_env : forall F E x b,
+  wf_env (F ++ ([(x, b)]) ++ E) ->
+  x `notin` (dom F `union` dom E).
+Proof.
+  intros.
+  apply ok_from_wf_env in H.
+  eapply binding_uniq_from_ok; eauto.
+Qed.
+
+Hint Resolve capt_from_cv : core.
+
+Lemma wf_cset_in_subst_tb : forall Q F E Z P C,
+  ok (F ++ [(Z, bind_sub Q)] ++ E) ->
+  wf_typ_in E P ->
+  wf_cset_in (F ++ [(Z, bind_sub Q)] ++ E) C ->
+  wf_cset_in (map (subst_tb Z P) F ++ E) C.
+Proof with eauto.
+  intros* Ok WfP WfC.
+  apply (wf_cset_set_strengthen Z Q) in WfC...
+  eapply wf_cset_subst_tb with (Q := Q) (Am := dom E).
+  - apply (wf_cset_come_on WfC)...
+    apply binding_uniq_from_ok in Ok.
+    simpl_env.
+    fsetdec.
+  - rewrite_env (empty ++ empty ++ E).
+    eapply wf_typ_weakening; simpl_env in *.
+    + apply WfP.
+    + eapply ok_tail...
+    + fsetdec.
+    + fsetdec.
+  - trivial...
+Qed.
+
+Lemma wf_typ_in_subst_tb : forall Q F E Z P T,
+  ok (F ++ [(Z, bind_sub Q)] ++ E) ->
+  wf_typ_in E P ->
+  wf_typ_in (F ++ [(Z, bind_sub Q)] ++ E) T ->
+  wf_typ_in (map (subst_tb Z P) F ++ E) (subst_tt Z P T)
+with wf_pretyp_in_subst_tb : forall Q F E Z P T,
+  ok (F ++ [(Z, bind_sub Q)] ++ E) ->
+  wf_typ_in E P ->
+  wf_pretyp_in (F ++ [(Z, bind_sub Q)] ++ E) T ->
+  wf_pretyp_in (map (subst_tb Z P) F ++ E) (subst_tpt Z P T).
+Proof with eauto.
+{ intros* Ok WfP WfT.
+  apply (wf_typ_set_strengthen Z Q) in WfT.
+  2: trivial...
+  assert (Z `notin` (dom F `union` dom E)). {
+    eapply binding_uniq_from_ok...
+  }
+  unshelve epose proof (wf_typ_subst_tb _ _ _ _ _ _ P _ WfT _ _ _) as HA.
+  - eapply wf_typ_set_weakening.
+    + apply WfP.
+    + eapply ok_tail...
+    + simpl_env; fsetdec.
+    + simpl_env; fsetdec.
+  - eapply wf_typ_set_weakening.
+    + apply WfP.
+    + eapply ok_tail...
+    + simpl_env; fsetdec.
+    + simpl_env; fsetdec.
+  - eauto.
+  - apply (wf_typ_come_on HA).
+    + simpl_env; fsetdec.
+    + simpl_env; fsetdec.
+}
+{ intros* Ok WfP WfT.
+  apply (wf_pretyp_set_strengthen Z Q) in WfT.
+  2: trivial...
+  assert (Z `notin` (dom F `union` dom E)). {
+    eapply binding_uniq_from_ok...
+  }
+  unshelve epose proof (wf_pretyp_subst_tb _ _ _ _ _ _ P _ WfT _ _ _) as HA.
+  - eapply wf_typ_set_weakening; simpl_env.
+    + apply WfP.
+    + eapply ok_tail...
+    + simpl_env; fsetdec.
+    + simpl_env; fsetdec.
+  - eapply wf_typ_set_weakening; simpl_env.
+    + apply WfP.
+    + eapply ok_tail...
+    + simpl_env; fsetdec.
+    + simpl_env; fsetdec.
+  - eauto.
+  - apply (wf_pretyp_come_on HA).
+    + simpl_env; fsetdec.
+    + simpl_env; fsetdec.
+}
+Qed.
+
 (* *********************************************************************** *)
 (** * #<a name="auto"></a># Automation *)
 
