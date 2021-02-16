@@ -660,17 +660,15 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
   generalize dependent ys.
   dependent induction H; intros ys' In...
   - destruct (cv_narrowing_exists _ _ _ _ _ _ _ Sub H0) as [C2 [CvC2 SubcaptC2]].
-    destruct C2.
-    + exfalso. inversion SubcaptC2.
-    + inversion SubcaptC2; subst...
-      eapply captures_var with (T := T) (ys := t).
-      * binds_cases H.
-        ** apply binds_tail; trivial. apply binds_tail...
-        ** apply binds_head; trivial.
-      * trivial.
-      * eapply captures_transitivity_forall with (ys := ys)...
-        unfold AtomSet.F.For_all; intros.
-        destruct (x == x0); subst...
+    inversion SubcaptC2; subst.  
+    eapply captures_var with (T := T) (ys := xs0).
+    * binds_cases H.
+      ** apply binds_tail; trivial. apply binds_tail...
+      ** apply binds_head; trivial.
+    * trivial.
+    * eapply captures_transitivity_forall with (ys := ys)...
+      unfold AtomSet.F.For_all; intros.
+      destruct (x == x0); subst...
 Qed.
 
 Lemma captures_narrowing : forall F Z P Q E xs x,
@@ -686,6 +684,45 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing, cv_narrowing.
     trivial.
   - fsetdec.
 Qed.
+
+Lemma captures_narrowing_typ_forall : forall F Z P Q E xs ys,
+  ok (F ++ [(Z, bind_typ P)] ++ E) ->
+  sub E P Q ->
+  AtomSet.F.For_all (captures (F ++ [(Z, bind_typ Q)] ++ E) xs) ys ->
+  AtomSet.F.For_all (captures (F ++ [(Z, bind_typ P)] ++ E) xs) ys.
+Local Ltac hint ::=
+  eauto using wf_env_narrowing_typ, wf_typ_narrowing_typ,
+  wf_pretyp_narrowing_typ, wf_cset_narrowing_typ.
+Proof with simpl_env; hint.
+  intros * Wf Sub H.
+  unfold AtomSet.F.For_all in *; intros.
+  specialize (H x H0).
+  generalize dependent ys.
+  dependent induction H; intros ys' In...
+
+  - unshelve epose proof (cv_narrowing_typ _ _ _ _ _ _ _ Sub ltac:(admit) H0) as CvNarrow.
+    admit.
+
+    destruct (x == Z); subst.
+    + (* T is Q *)
+      unshelve epose proof (binds_mid_eq_cons _ _ _ _ _ _ H ltac:(admit)) as TQ.
+      admit.
+      inversion TQ; subst.
+      epose proof (cv_exists_in E P _ _) as [C' CVP].
+      assert (cv E Q (cset_set ys {}N)) as CVQ by admit.
+      unshelve epose proof (sub_implies_subcapt E (dom E) (dom E) _ _ _ _ Sub _ _ _ _ CVP CVQ); try fsetdec.
+      admit.
+      admit.
+      inversion H3; subst.
+      eapply captures_var with (T := P) (ys := xs0)...
+      admit.
+      unfold AtomSet.F.For_all; intros.
+      admit.
+    + eapply captures_var with (T := T) (ys := ys)...
+      unfold AtomSet.F.For_all; intros.
+      eapply H2 with (ys := ys) (Q0 := Q) (x := x0)...
+Admitted.
+
 
 Lemma captures_narrowing_typ : forall F X P Q E xs x,
   ok (F ++ [(X, bind_typ Q)] ++ E) ->
