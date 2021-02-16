@@ -617,14 +617,8 @@ Proof with eauto using wf_cset_narrowing, wf_env_narrowing.
   inversion SubCap; subst...
   eapply subcapt_set...
   eapply captures_narrowing_forall with (Q := Q)...
+Qed.
 
-  remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
-  admit.
-  (* induction SubCap ; intros ; subst... *)
-  (* - econstructor... unfold AtomSet.F.For_all. intros. *)
-  (*   specialize (H1 x H2). *)
-  (*   eapply captures_narrowing... *)
-Admitted.
 
 Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
   sub E P Q ->
