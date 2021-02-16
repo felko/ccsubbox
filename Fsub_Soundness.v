@@ -14,6 +14,7 @@
 
 Require Import Coq.Program.Equality.
 Require Export Fsub_Hints.
+Require Import Fsub_CVfacts.
 
 Set Nested Proofs Allowed.
 
@@ -26,138 +27,8 @@ Local Lemma cheat_with : forall A B, A -> B.
 Admitted.
 
 
-(** Dealing with cv -- as a fixpoint is problematic. *)
-Inductive cvx : env -> typ -> captureset -> Prop :=
-  (** Looking up in the environment; we ask that T is wf in the environment
-      and that the environment is well formed so lookup is well defined. *)
-  | cvx_typ_var : forall (X : atom) T E CT,
-    binds X (bind_sub T) E ->
-    wf_env E ->
-    cvx E T CT ->
-    cvx E (typ_fvar X) CT
-  | cvx_typ_capt : forall E C P,
-    wf_env E ->
-    wf_pretyp_in E P ->
-    wf_cset_in E C ->
-    cvx E (typ_capt C P) C.
 
 
-(* HINT: we had problems formalizing a version with Ap and Am since then the
-   IH requires us to show wf_typ Ap Am, while we only have wf_typ_in E.
- *)
-Lemma cv_unique_shrink : forall Y B E T C,
-  wf_env ([(Y, B)] ++ E) ->
-  wf_typ_in E T ->
-  cvx ([(Y, B)] ++ E) T C ->
-  cvx E T C.
-Proof.
-  intros*.
-  intros HwfE HwfT Hcv.
-
-  assert (type T). eapply type_from_wf_typ; eauto.
-
-  dependent induction Hcv.
-  * assert (X <> Y). {
-      inversion HwfT; subst.
-      assert (X `in` dom E).
-      eapply binds_In. apply H6.
-      inversion HwfE; subst; notin_solve.
-    }
-    apply cvx_typ_var with (T := T).
-    unfold binds in H. unfold get in H. simpl in H.
-    destruct (X == Y) eqn:HXY; subst; trivial.
-    easy.
-
-    inversion HwfE; trivial.
-    eapply IHHcv with (Y0 := Y) (B0 := B).
-    inversion HwfT; subst.
-  
-    {
-      pose proof H7.
-      unfold binds in H. unfold binds in H7.
-      simpl in *.
-      destruct (X == Y); subst; try easy.
-      rewrite H in H7; inversion H7; subst.
-      simpl_env in *.
-      eapply wf_typ_from_binds_sub.
-      inversion H0; trivial.
-      apply H3.
-    }
-    trivial.
-    trivial.
-    eapply type_from_wf_typ.
-    eapply wf_typ_from_binds_sub.
-    apply HwfE. apply H.
-  * inversion HwfT; subst. constructor; trivial.
-    inversion H; trivial.
-Qed.
-
-Lemma cv_unique : forall E T C1 C2,
-  wf_env E ->
-  wf_typ_in E T ->
-  cvx E T C1 ->
-  cvx E T C2 ->
-  C1 = C2.
-Proof with eauto*.
-  intros E; induction E; intros T; induction T; intros...
-  - inversion H1; inversion H2; subst...
-  - exfalso. inversion H0.
-  - exfalso.
-    inversion H0...
-    inversion H7...
-  - inversion H1...
-    inversion H2...
-  - inversion H0.
-  - destruct a as [Y B].
-    simpl_env in *.
-    destruct (Y == a0); subst...
-    + inversion H2; subst...
-      inversion H1; subst...
-      apply IHE with (T := T)...
-      {inversion H5; trivial. }
-      {binds_cases H4; subst; simpl_env in *; try notin_solve...
-        inversion H; trivial. }
-      {
-        binds_cases H4; subst; simpl_env in *; try notin_solve...
-        binds_cases H6; subst; simpl_env in *; try notin_solve...
-        inversion H6; subst...
-
-        eapply cv_unique_shrink.
-        apply H8.
-        inversion H. trivial.
-        trivial.
-      }
-      {
-        binds_cases H4; subst; simpl_env in *; try notin_solve...
-        binds_cases H6; subst; simpl_env in *; try notin_solve...
-        inversion H6; subst...
-
-        eapply cv_unique_shrink.
-        apply H8.
-        inversion H. trivial.
-        trivial.
-      }
-    + inversion H1; subst...
-      inversion H2; subst...
-      apply IHE with (T := a0)...
-      {inversion H5; trivial. }
-      {binds_cases H4; subst; simpl_env in *; try notin_solve...
-       }
-      {
-        eapply cv_unique_shrink.
-        apply H5.
-        binds_cases H4. eapply wf_typ_var.
-        apply H3.
-        apply H1.
-      }
-      {
-        eapply cv_unique_shrink.
-        apply H5.
-        binds_cases H4. eapply wf_typ_var.
-        apply H3.
-        apply H2.
-      }
-Qed.
 
 Lemma capt_from_cv : forall E T C,
     cv E T C -> capt C.
@@ -211,21 +82,24 @@ Proof with eauto using cv_regular.
   assert (wf_env (F ++ E)).
     inversion H...
   specialize (IHF H1).
-  destruct T...
+  induction T...
   * inversion IHF; subst...
     constructor; rewrite_env (empty ++ [(a, b)] ++ (F ++ E))...
     eapply wf_pretyp_weakening...
     eapply wf_cset_weakening...
   * inversion Hcv...
-  * apply cv_env_irrel...
+  * inversion Hcv; subst.
+    apply cv_typ_var with (T := T); try easy.
     destruct H0 as [_ [Ha _]].
     (** from wellformedness -- later *)
     assert (a0 `in` dom E). {
       inversion Ha; subst.
       eapply binds_In...
     }
-    inversion H; rewrite dom_concat in *; fsetdec.
-Qed.
+    rewrite_env (empty ++ ([(a, b)] ++ F) ++ E).
+    apply binds_weaken; simpl_env in *; eauto.
+    
+Admitted.
 
 Lemma cv_weakening : forall E F G T C,
   cv (G ++ E) T C ->
