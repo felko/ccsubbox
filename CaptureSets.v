@@ -290,6 +290,27 @@ Proof with auto*.
   * intro H. rewrite eliminate_false in H. contradict H. apply cset_subset_iff...
 Qed.
 
+(* TODO move to CaptureSets. *)
+Lemma cset_subset_reflexivity (c : captureset) : cset_subset_prop c c.
+Proof with auto.
+  rewrite cset_subset_iff.
+  unfold cset_subset_dec.
+  destruct c...
+  assert (AtomSet.F.subset t t = true). { rewrite <- AtomSetFacts.subset_iff. fsetdec. }
+  assert (NatSet.F.subset t0 t0 = true). { rewrite <- NatSetFacts.subset_iff. fnsetdec. }
+  intuition.
+Qed.
+
+(* unversals can't be subcaptres of concrete capture sets. *)
+Lemma cset_universal_subset : forall tf tb,
+  cset_subset_prop cset_universal (cset_set tf tb) ->
+  False.
+Proof with auto.
+  intros tf tb H.
+  inversion H...
+Qed.
+
+
 (* Some simple tactics to work with capture sets *)
 
 (* Uses hypothesis about capture set inclusion to rewrite hyps and goal *)
