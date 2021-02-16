@@ -286,13 +286,6 @@ Proof with eauto*.
   inversion Hwf...
 Qed.
 
-Lemma captures_transitivity_forall : forall E xs ys zs,
-  AtomSet.F.For_all (captures E ys) xs ->
-  AtomSet.F.For_all (captures E zs) ys ->
-  AtomSet.F.For_all (captures E zs) xs.
-Proof with auto.
-Admitted.
-
 Lemma captures_transitivity : forall E xs ys x,
   (* E |- {x} <: {ys} *)
   captures E ys x ->
@@ -314,6 +307,19 @@ Proof with auto.
   apply H0.
   unfold AtomSet.F.For_all. intros.
   eapply H2...
+Qed.
+
+Lemma captures_transitivity_forall : forall E xs ys zs,
+  AtomSet.F.For_all (captures E ys) xs ->
+  AtomSet.F.For_all (captures E zs) ys ->
+  AtomSet.F.For_all (captures E zs) xs.
+Proof with auto.
+  intros * XsYs YsZs.
+  unfold AtomSet.F.For_all in *; intros.
+  eapply captures_transitivity with (ys := ys).
+  apply XsYs...
+  unfold AtomSet.F.For_all in *; intros.
+  apply YsZs...
 Qed.
 
 Lemma subcapt_transitivity : forall E C1 C2 C3,
