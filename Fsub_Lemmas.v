@@ -702,14 +702,20 @@ Proof with eauto.
     with ((dom F `union` singleton Z `union` dom E) `remove` Z).
   2: {
     (* Z is not in dom F nor in dom E. *)
-    assert (Z `notin` dom F) by admit.
-    assert (Z `notin` dom E) by admit.
+    assert (Z `notin` dom F). {
+      apply fresh_mid_head in H1.
+      assumption.
+    }
+    assert (Z `notin` dom E). {
+      apply fresh_mid_tail in H1.
+      assumption.
+    }
     fsetdec.
   }
   apply wf_typ_subst_cb with (Q := Q)...
   eapply wf_cset_set_weakening...
   eapply wf_cset_set_weakening...
-Admitted.
+Qed.
 
 Lemma wf_typ_open_capt : forall E C T1 T2,
   ok E ->
