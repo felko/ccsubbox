@@ -442,32 +442,6 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing,
       eapply sub_narrowing_aux...
 Qed.
 
-Lemma empty_cset_implies_no_captures : forall E xs,
-  wf_cset_in E (cset_set xs {}N) ->
-  AtomSet.F.For_all (captures E {}) xs ->
-  xs = {}.
-Proof.
-  intros E xs Wf H.
-  unfold AtomSet.F.For_all in H.
-
-  destruct (AtomSet.F.is_empty xs) eqn:Heq.
-  - rewrite <- AtomSetFacts.is_empty_iff in Heq.
-    fsetdec.
-  - destruct (AtomSet.F.choose xs) eqn:InEq.
-    + pose proof (AtomSet.F.choose_1 InEq).
-      admit.
-    + admit.
-Admitted.
-
-Lemma empty_subcapt_implies_empty_cset : forall E C,
-  subcapt E C {}C ->
-  C = {}C.
-Proof with auto.
-  intros.
-  inversion H; subst.
-  assert (xs = {}). { apply (empty_cset_implies_no_captures E)... }
-  subst...
-Qed.
 
 Lemma empty_cset_union : forall C1 C2,
   cset_union C1 C2 = {}C ->
