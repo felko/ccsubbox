@@ -519,7 +519,17 @@ Proof with eauto.
         csethyp.
         fsetdec.
       }
-    + unfold subst_cset...
+    +
+      assert (fvars `subset` dom E). {
+        unfold allbound_typ in *. intros fv Hfv.
+        specialize (H fv Hfv) as [T Hbinds].
+        apply binds_In in Hbinds. assumption.
+      }
+      assert (Z `notin` dom E). {
+        apply fresh_mid_tail in Hok.
+        assumption.  
+      }
+      unfold subst_cset...
       cset_split; inversion HwfC; inversion HwfC';
       try rewrite cset_not_references_fvar_eq in H_destruct;
       try rewrite cset_references_fvar_eq in H_destruct;
@@ -527,23 +537,27 @@ Proof with eauto.
       try rewrite Hunion in *; constructor; unfold allbound_typ in *; intros...
       {
         assert (x `in` (fvars `union` fvars0)) as Hfv by fsetdec.
+        assert (x <> Z) by fsetdec.
         rewrite AtomSetFacts.union_iff in Hfv...
         inversion Hfv...
-        + specialize (H _ H3).
+        + specialize (H _ H8).
           inversion H as [T H10].
           exists T...
-        + admit.
+        + specialize (H4 _ H8).
+          destruct H4 as [T Hbinds].
+          binds_cases Hbinds; subst...
+          eexists (subst_ct Z _ T).
+          apply binds_head...
       }
       {
         assert ((fvars `union` fvars0) `subset` A) by fsetdec.
         assert (((fvars `union` fvars0) `remove` Z) `subset` (A `remove` Z)) by fsetdec.
         (** Z is not in fvars as Z is not in dom(E) *)
-        assert (Z `notin` fvars) by admit.
         fsetdec.
       }
       {
-        specialize (H9 _ H1)...
-        inversion H9 as [T H10].
+        specialize (H11 _ H3)...
+        inversion H11 as [T H10].
         binds_cases H10; subst...
         {
           csethyp.
@@ -557,7 +571,7 @@ Proof with eauto.
         csethyp.
         fsetdec.
       }
-Admitted.
+Qed.
 (*   intros *. *)
 (*   intros HOK HwfC HwfC' HokZ . *)
 (*   inversion HwfC; subst; inversion HwfC'; subst... *)
