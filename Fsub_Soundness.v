@@ -711,9 +711,19 @@ Qed.
 (** ** Type substitution preserves subtyping (10) *)
 
 Lemma cv_subst_empty : forall S G Z Q E P,
+  wf_typ_in E P ->
   cv (G ++ [(Z, bind_sub Q)] ++ E) S {}C ->
-  cv (map (subst_tb Z P) G ++ E) (subst_tt Z P S){}C.
-Proof.
+  cv (map (subst_tb Z P) G ++ E) (subst_tt Z P S) {}C.
+Proof with eauto using wf_env_subst_tb, wf_pretyp_subst_tb, wf_cset_subst_tb.
+  intros * Wf CV.
+  dependent induction CV.
+  - simpl. destruct (X == Z).
+    admit.
+    admit.
+  - simpl. apply cv_typ_capt...
+    eapply wf_pretyp_subst_tb with (Q := Q)...
+    admit.
+    admit.
 Admitted.
 
 Lemma captures_expansion : forall D2 E x D1,
