@@ -293,6 +293,8 @@ Definition CC_empty (c : captureset) (t : typ) :=
         (exp_abs 0 0))).
 
 Lemma fast_and_furious : forall c t,
+  wf_typ_in empty t ->
+  wf_cset_in empty c ->
   typing empty (CC_empty c t) (CC_List c t).
 Proof with eauto.
   intros.
@@ -303,7 +305,8 @@ Proof with eauto.
       replace T with tp
     end;
     unfold tp.
-  epose (T1 := (typ_capt _ _)).
+
+  epose (T1 := (typ_capt ?[AllS1] ?[AllT1])).
   subst_type T1.
   pick fresh x and apply typing_tabs...
   2: {
@@ -322,7 +325,14 @@ Proof with eauto.
         simpl_env.
         epose (T4 := _). subst_type T4.
         apply typing_var_tvar...
-        - admit.
+        - econstructor...
+          econstructor...
+          econstructor...
+          econstructor...
+          econstructor...
+          apply allbound_typ_if...
+          econstructor...
+          1,2 : admit.
         - replace (open_ct _ z) with (open_ct x z).
           cbn.
           reflexivity.

@@ -2240,20 +2240,6 @@ Inductive syn_cat_agree : typ -> typ -> Prop :=
     syn_cat_agree (typ_capt C P) (typ_capt D U)
 .
 
-Lemma typing_narrowing_typ_type_variables : forall E F x X Y e T,
-  typing (F ++ [(x, bind_typ X)] ++ E) e T ->
-  sub E X Y ->
-  typing (F ++ [(x, bind_typ Y)] ++ E) e T.
-Proof.
-Admitted.
-
-Lemma typing_narrowing_typ' : forall Q E F X C P e T,
-  typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
-  sub E (typ_capt C P) Q ->
-  typing (F ++ [(X, bind_typ (typ_capt C P))] ++ E) e T.
-Proof.
-Admitted.
-
 Lemma typing_narrowing_typ : forall Q E F X P e T,
   typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
   sub E P Q ->
@@ -2322,6 +2308,27 @@ Proof with simpl_env; eauto using
       eapply wf_typ_narrowing_typ_base...
     + rewrite_parenthesise_binding.
       eapply H2...
+Qed.
+
+Lemma typing_narrowing_typ_tvars : forall (X Y : atom) E F x e T,
+  typing (F ++ [(x, bind_typ X)] ++ E) e T ->
+  sub E Y X ->
+  typing (F ++ [(x, bind_typ Y)] ++ E) e T.
+Proof with eauto.
+  intros.
+  eapply typing_narrowing_typ...
+  constructor.
+Qed.
+
+Lemma typing_narrowing_typ' : forall Q E F X C P e T,
+  typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
+  sub E (typ_capt C P) Q ->
+  typing (F ++ [(X, bind_typ (typ_capt C P))] ++ E) e T.
+Proof with eauto.
+  intros* ? Hsub.
+  inversion Hsub; subst.
+  eapply typing_narrowing_typ...
+  constructor.
 Qed.
 
 Lemma typing_through_subst_ee' : forall U E Ap Am x T C e u,
@@ -2462,28 +2469,97 @@ Proof with simpl_env;
            end.
            apply sub_capt.
            ++ destruct C; eauto using wf_cset_from_binds, captures_from_binds.
-           ++ apply sub_pre_reflexivity with
-                  (Ap := dom (map (subst_tb Z (typ_capt C P)) F ++ map (subst_tb Z (typ_capt C P)) E))
-                  (Am := dom (map (subst_tb Z (typ_capt C P)) F ++ map (subst_tb Z (typ_capt C P)) E))...
-      * admit.
+           ++ let d :=
+                  constr:(
+                    dom (map (subst_tb Z (typ_capt C P)) F ++ map (subst_tb Z (typ_capt C P)) E))
+              in apply sub_pre_reflexivity with (Ap := d) (Am := d)...
+      * rewrite <- (map_subst_tb_id E Z P);
+          [ | auto | eapply fresh_mid_tail; eauto ].
+        assert (binds x (subst_tb Z P (bind_typ Z)) (map (subst_tb Z P) F)) as HA...
+        simpl in HA.
+        destruct (Z == Z); try easy.
+        assert (type P) as Typ...
+        destruct Typ.
+        -- apply typing_var_tvar...
+        -- eapply typing_sub.
+           ++ eapply typing_var...
+           ++ apply sub_capt.
+              1: {
+                eapply captures_from_binds...
+              }
+              let d := constr:(dom (map (subst_tb Z (typ_capt C P)) F ++ E))
+              in apply sub_pre_reflexivity with (Ap := d) (Am := d)...
+              apply sub_regular, proj2, proj1 in PsubQ.
+              inversion PsubQ; subst.
+              rewrite_nil_concat.
+              eapply wf_pretyp_weakening; simpl_env.
+              1: {
+                match goal with
+                | H : wf_pretyp _ _ _ P |- _ =>
+                  apply H
+                end.
+              }
+              all: trivial...
     + subst.
       apply typing_var_tvar...
-      admit.
-      (* rewrite (map_subst_tb_id E Z P); *)
-      (*   [ | auto | eapply fresh_mid_tail; eauto ]. *)
-      (* binds_cases H0... *)
-      (* * enough (binds x (subst_tb Z P (bind_typ X)) (map (subst_tb Z P) E))... *)
-      (*   simpl in H1... *)
-      (*   admit. *)
-      (* * admit. *)
+      rewrite (map_subst_tb_id E Z P);
+        [ | auto | eapply fresh_mid_tail; eauto ].
+      binds_cases H0...
+      * enough (binds x (subst_tb Z P (bind_typ X)) (map (subst_tb Z P) E)) as HA...
+        simpl in HA...
+        destruct (X == Z); try easy...
+      * enough (binds x (subst_tb Z P (bind_typ X)) (map (subst_tb Z P) (F ++ E))) as HA...
+        simpl in HA...
+        rewrite_env (map (subst_tb Z P) F ++ map (subst_tb Z P) E) in HA.
+        destruct (X == Z); try easy...
   - Case "typing_var".
-    admit.
+    apply typing_var with (C := C)...
+    rewrite (map_subst_tb_id E Z P);
+      [ | auto | eapply fresh_mid_tail; eauto ].
+    binds_cases H0.
+    + enough (binds x (subst_tb Z P (bind_typ (typ_capt C P0))) (map (subst_tb Z P) E))...
+    + enough (binds x (subst_tb Z P (bind_typ (typ_capt C P0))) (map (subst_tb Z P) (F ++ E))) as HA...
+      simpl in HA.
+      rewrite_env (map (subst_tb Z P) F ++ map (subst_tb Z P) E) in HA...
   - Case "typing_abs".
+    assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
+      pick fresh z for L.
+      pose proof (H1 z Fr)...
+      enough (wf_env ([(z, bind_typ V)] ++ F ++ [(Z, bind_sub Q)] ++ E)) as HwfHugeE...
+      inversion HwfHugeE...
+    }
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
     2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
     pick fresh y and apply typing_abs.
-    + admit.
-    + admit.
+    + eapply wf_typ_in_subst_tb...
+    + specialize (H0 y ltac:(notin_solve)).
+      rewrite subst_tt_open_ct_var...
+      rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E).
+      apply binding_uniq_from_wf_env in HwfNarrE as ?.
+      assert (y `notin` (dom F `union` singleton Z `union` dom E)) by notin_solve.
+      eapply (wf_typ_set_strengthen Z Q) in H0.
+      2: {
+        apply binds_tail. apply binds_tail.
+        all: trivial...
+      }
+      simpl_env in H0.
+      apply wf_typ_subst_tb with (Q := Q).
+      * apply (wf_typ_come_on H0); clear Fr; fsetdec.
+      * apply sub_regular, proj2, proj1 in PsubQ.
+        eapply wf_typ_set_weakening.
+        -- apply PsubQ.
+        -- apply ok_from_wf_env, ok_tail, ok_tail in HwfNarrE.
+           assumption.
+        -- clear Fr; fsetdec.
+        -- clear Fr; fsetdec.
+      * apply sub_regular, proj2, proj1 in PsubQ.
+        eapply wf_typ_set_weakening.
+        -- apply PsubQ.
+        -- apply ok_from_wf_env, ok_tail, ok_tail in HwfNarrE.
+           assumption.
+        -- clear Fr; fsetdec.
+        -- clear Fr; fsetdec.
+      * pose proof (H1 y ltac:(notin_solve))...
     + rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E).
       rewrite subst_te_open_ee_var...
       rewrite subst_tt_open_ct_var...
@@ -2503,18 +2579,51 @@ Proof with simpl_env;
       * apply cv_through_subst_tt with (Q := Q) (T := T1')...
       * apply SpIHTyp1.
   - Case "typing_tabs".
+    assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
+      pick fresh z for L.
+      pose proof (H1 z Fr)...
+      enough (wf_env ([(z, bind_sub V)] ++ F ++ [(Z, bind_sub Q)] ++ E)) as HwfHugeE...
+      inversion HwfHugeE...
+    }
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
     2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
     pick fresh Y and apply typing_tabs.
-    + admit.
-    + admit.
+    + eapply wf_typ_in_subst_tb...
+    + specialize (H0 Y ltac:(notin_solve)).
+      rewrite subst_tt_open_tt_var...
+      rewrite_env (map (subst_tb Z P) ([(Y, bind_sub V)] ++ F) ++ E).
+      apply binding_uniq_from_wf_env in HwfNarrE as ?.
+      assert (Y `notin` (dom F `union` singleton Z `union` dom E)) by notin_solve.
+      eapply (wf_typ_set_strengthen Z Q) in H0.
+      2: {
+        apply binds_tail. apply binds_tail.
+        all: trivial...
+      }
+      simpl_env in H0.
+      apply wf_typ_subst_tb with (Q := Q).
+      * apply (wf_typ_come_on H0); clear Fr; fsetdec.
+      * apply sub_regular, proj2, proj1 in PsubQ.
+        eapply wf_typ_set_weakening.
+        -- apply PsubQ.
+        -- apply ok_from_wf_env, ok_tail, ok_tail in HwfNarrE.
+           assumption.
+        -- clear Fr; fsetdec.
+        -- clear Fr; fsetdec.
+      * apply sub_regular, proj2, proj1 in PsubQ.
+        eapply wf_typ_set_weakening.
+        -- apply PsubQ.
+        -- apply ok_from_wf_env, ok_tail, ok_tail in HwfNarrE.
+           assumption.
+        -- clear Fr; fsetdec.
+        -- clear Fr; fsetdec.
+      * pose proof (H1 Y ltac:(notin_solve))...
     + rewrite subst_te_open_te_var...
       rewrite subst_tt_open_tt_var...
       rewrite_env (map (subst_tb Z P) ([(Y, bind_sub V)] ++ F) ++ E).
       apply H2...
   - Case "typing_tapp".
     rewrite subst_tt_open_tt...
-Admitted.
+Qed.
 
 
 (* ********************************************************************** *)
