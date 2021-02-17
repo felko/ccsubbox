@@ -972,91 +972,92 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb, captures_through_subst
   subst.
   binds_cases H...
   - constructor...
-    (* Alex: requires wf_cset_through_subst_ct 
-       Jona: maybe we can use wf_cset_in_subst_cb?
-    *)
-    admit.
+    eapply wf_cset_in_subst_tb...
   - subst.
     constructor...
     (* Same as above... *)
-    + admit.
-    + admit.
+    + eapply wf_cset_in_subst_tb...
+    + eapply wf_cset_in_subst_tb...
     + unfold AtomSet.F.For_all in *. intros.
       specialize (H1 x H2)...
-Admitted.
+Qed.
 
 Lemma sub_through_subst_tt : forall Q E F Z S T P,
   sub (F ++ [(Z, bind_sub Q)] ++ E) S T ->
   sub E P Q ->
-  sub (map (subst_tb Z P) F ++ E) (subst_tt Z P S) (subst_tt Z P T).
+  sub (map (subst_tb Z P) F ++ E) (subst_tt Z P S) (subst_tt Z P T)
+with sub_pre_through_subst_tpt : forall Q E F Z S T P,
+  sub_pre (F ++ [(Z, bind_sub Q)] ++ E) S T ->
+  sub E P Q ->
+  sub_pre (map (subst_tb Z P) F ++ E) (subst_tpt Z P S) (subst_tpt Z P T).
 Proof with
       simpl_env;
       eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
-  intros Q E F Z S T P SsubT PsubQ.
-  remember (F ++ [(Z, bind_sub Q)] ++ E).
-  generalize dependent F.
-  induction SsubT; intros G EQ; subst; simpl subst_tt...
-
-  (* - Case "sub_top".
-    eapply sub_top...
-    apply cv_subst_empty with (Q := Q)...
-    admit.
-    admit.
-  - Case "sub_refl_tvar".
-    destruct (X == Z); subst.
-    SCase "X = Z".
+  (*
+    intros Q E F Z S T P SsubT PsubQ.
+    remember (F ++ [(Z, bind_sub Q)] ++ E).
+    generalize dependent F.
+    induction SsubT; intros G EQ; subst; simpl subst_tt...
+    - Case "sub_top".
+      eapply sub_top...
+      apply cv_subst_empty with (Q := Q)...
+      admit.
+      admit.
+    - Case "sub_refl_tvar".
+      destruct (X == Z); subst.
+      SCase "X = Z".
       apply sub_reflexivity...
-    SCase "X <> Z".
+      SCase "X <> Z".
       apply sub_reflexivity...
       inversion H0; subst.
       binds_cases H3...
       apply (wf_typ_var (subst_tt Z P U))...
-  - Case "sub_trans_tvar".
-    destruct (X == Z); subst.
-    SCase "X = Z".
+    - Case "sub_trans_tvar".
+      destruct (X == Z); subst.
+      SCase "X = Z".
       apply (sub_transitivity Q).
       SSCase "left branch".
-        rewrite_env (empty ++ map (subst_tb Z P) G ++ E).
-        apply sub_weakening...
+      rewrite_env (empty ++ map (subst_tb Z P) G ++ E).
+      apply sub_weakening...
       SSCase "right branch".
-        rewrite (subst_tt_fresh Z P Q).
-          binds_get H.
-            inversion H1; subst...
-          apply (notin_fv_wf E).
-          apply (proj2 (proj2 (sub_regular E P Q PsubQ))).
-          eapply fresh_mid_tail; apply ok_from_wf_env;
-            apply (proj1 (sub_regular (G ++ [(Z, bind_sub Q)] ++ E) U T SsubT)).
-    SCase "X <> Z".
+      rewrite (subst_tt_fresh Z P Q).
+      binds_get H.
+      inversion H1; subst...
+      apply (notin_fv_wf E).
+      apply (proj2 (proj2 (sub_regular E P Q PsubQ))).
+      eapply fresh_mid_tail; apply ok_from_wf_env;
+        apply (proj1 (sub_regular (G ++ [(Z, bind_sub Q)] ++ E) U T SsubT)).
+      SCase "X <> Z".
       apply (sub_trans_tvar (subst_tt Z P U))...
       rewrite (map_subst_tb_id E Z P);
         [ | auto | eapply fresh_mid_tail; eauto ].
       binds_cases H...
-  (* this case is not worked out in the P&P proof. *)
-  - Case "sub_arrow".
-    pick fresh X and apply sub_arrow...
-    repeat (rewrite <- subst_tt_open_ct)...
-    assert (X `notin` L) as XL. { fsetdec. }
-    (* assert ([(X, bind_typ T1)] ++ G ++ [(Z, bind_sub Q)] ++ E = G ++ [(Z, bind_sub Q)] ++ E) as Heq. {
+    (* this case is not worked out in the P&P proof. *)
+    - Case "sub_arrow".
+      pick fresh X and apply sub_arrow...
+      repeat (rewrite <- subst_tt_open_ct)...
+      assert (X `notin` L) as XL. { fsetdec. }
+                                  (* assert ([(X, bind_typ T1)] ++ G ++ [(Z, bind_sub Q)] ++ E = G ++ [(Z, bind_sub Q)] ++ E) as Heq. {
       (* JONATHAN: This is bogus! *)
       admit.
     }
     specialize (H0 X XL G Heq).  *)
-    rewrite_env (empty ++ [(X, bind_typ (subst_tt Z P T1))] ++ (map (subst_tb Z P) G ++ E)).
-    apply sub_weakening.
-    (* JONATHAN: We can't apply H0 here! *)
-    (* apply H0... *)
-    admit.
-    simpl_env.
-    admit.
-  - Case "sub_all".
-    pick fresh X and apply sub_all...
-    rewrite subst_tt_open_tt_var...
-    rewrite subst_tt_open_tt_var...
-    rewrite_env (map (subst_tb Z P) ([(X, bind_sub T1)] ++ G) ++ E).
-    apply H0...
-  - Case "sub_capt".
-    apply sub_capt...
-    apply subcapt_through_subst_tt with (Q := Q)... *)
+                                  rewrite_env (empty ++ [(X, bind_typ (subst_tt Z P T1))] ++ (map (subst_tb Z P) G ++ E)).
+      apply sub_weakening.
+      (* JONATHAN: We can't apply H0 here! *)
+      (* apply H0... *)
+      admit.
+      simpl_env.
+      admit.
+    - Case "sub_all".
+      pick fresh X and apply sub_all...
+      rewrite subst_tt_open_tt_var...
+      rewrite subst_tt_open_tt_var...
+      rewrite_env (map (subst_tb Z P) ([(X, bind_sub T1)] ++ G) ++ E).
+      apply H0...
+    - Case "sub_capt".
+      apply sub_capt...
+      apply subcapt_through_subst_tt with (Q := Q)... *)
 Admitted.
 
 
@@ -1180,10 +1181,53 @@ Proof.
   apply subst_tt_open_ct; auto.
 Qed.
 
-Lemma subst_ct_useless_repetition : forall x C D T,
-  subst_ct x C (subst_ct x D T) = (subst_ct x D T).
+Lemma subst_cset_useless_repetition : forall x C1 C2 D,
+  x `notin` cset_fvars C2 ->
+  subst_cset x C1 (subst_cset x C2 D) = (subst_cset x C2 D).
 Proof.
-Admitted.
+  intros.
+  destruct D.
+  {
+    unfold subst_cset, cset_references_fvar_dec.
+    reflexivity.
+  }
+  unfold subst_cset, cset_references_fvar_dec.
+  destruct (AtomSet.F.mem x t) eqn:EQ.
+  - unfold cset_remove_fvar at 1.
+    unfold cset_union at 1.
+    destruct C2.
+    + reflexivity.
+    + rewrite <- AtomSetFacts.mem_iff in EQ.
+      unfold cset_fvars in H.
+      replace (AtomSet.F.mem x (t1 `union` t `remove` x)) with false by fset_mem_dec.
+      reflexivity.
+  - rewrite EQ.
+    reflexivity.
+Qed.
+
+Lemma subst_ct_useless_repetition : forall x C D T,
+  x `notin` cset_fvars D ->
+  subst_ct x C (subst_ct x D T) = (subst_ct x D T)
+with subst_cpt_useless_repetition : forall x C D T,
+  x `notin` cset_fvars D ->
+  subst_cpt x C (subst_cpt x D T) = (subst_cpt x D T).
+Proof with auto.
+{ intros.
+  induction T; simpl; try reflexivity.
+  rewrite subst_cset_useless_repetition.
+  rewrite subst_cpt_useless_repetition.
+  all : trivial.
+}
+{ intros.
+  induction T; simpl; try reflexivity.
+  - rewrite subst_ct_useless_repetition.
+    rewrite subst_ct_useless_repetition.
+    all : trivial.
+  - rewrite subst_ct_useless_repetition.
+    rewrite subst_ct_useless_repetition.
+    all : trivial.
+}
+Qed.
 
 (* Alex: well all right, none of these are used now... *)
 (* Lemma fv_et_subset_dom_env : forall E T, *)
@@ -1336,12 +1380,12 @@ Qed.
 (* Substituting the same capture set preserves subcapturing *)
 Lemma subcapt_through_subst_cset : forall F x U E C1 C2 D,
   subcapt (F ++ [(x, bind_typ U)] ++ E) C1 C2 ->
-  ok (F ++ [(x, bind_typ U)] ++ E) ->
+  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
   cv E U D ->
   subcapt (map (subst_cb x D) F ++ E) (subst_cset x D C1) (subst_cset x D C2).
 Proof with eauto.
   intros *.
-  intros Hsc Hok Hcv.
+  intros Hsc WfE Hcv.
   destruct C1; destruct C2; subst; simpl subst_cset; try solve [inversion Hsc]...
   1: {
     cbv [subst_cset cset_references_fvar_dec].
@@ -1350,6 +1394,7 @@ Proof with eauto.
     destruct (AtomSet.F.mem x t) eqn:EQ...
     - apply wf_cset_union.
       + rewrite_nil_concat.
+        assert (ok (F ++ [(x, bind_typ U)] ++ E))...
         apply wf_cset_weakening with (A := dom E); simpl_env...
       + unfold cset_remove_fvar; simpl.
         pose proof (subcapt_regular _ _ _ Hsc) as [HA _].
@@ -1377,7 +1422,52 @@ Proof with eauto.
   pose proof (subcapt_regular _ _ _ Hsc) as [Wf1 Wf2].
   inversion Wf1; inversion Wf2; subst.
   unfold subst_cset.
-  (* TODO : branch on the variable inside forall... *)
+  Lemma ugh : forall x C,
+    cset_references_fvar_dec x C = false -> x `notin` fv_cset C.
+  Proof.
+    intros.
+    unfold cset_references_fvar_dec in H.
+    unfold fv_cset.
+    destruct C.
+    - fsetdec.
+    - rewrite AtomSetFacts.not_mem_iff.
+      assumption.
+  Qed.
+  destruct_if; destruct_if.
+  - unfold cset_remove_fvar, cset_union.
+    destruct D.
+    + apply subcapt_reflexivity with (A := dom (map (subst_cb x cset_universal) F ++ E))...
+      (* apply wf_env_subst_cb *)
+      admit.
+    + admit.                    (* union-over-subcapt + remove-from-subcapt ? *)
+  - destruct D.
+    simpl.
+    + admit.                    (* leads to contradiction, LHS must be universal *)
+    + simpl.
+      admit.
+  - destruct D.
+    + simpl.
+      constructor...
+      apply subcapt_regular in Hsc as [? _].
+      apply ugh in Heqb as ?.
+      replace (cset_set t {}N)
+        with (subst_cset x cset_universal (cset_set t {}N)).
+      2: {
+        rewrite <- subst_cset_fresh...
+      }
+      eapply wf_cset_in_subst_cb...
+      assert (ok (F ++ [(x, bind_typ U)] ++ E))...
+    + simpl.
+      admit.
+  - inversion Hsc; subst.
+    constructor...
+    + admit.
+    + admit.
+    + unfold AtomSet.F.For_all in *.
+      intros z ?.
+      specialize (H6 z ltac:(trivial)).
+      inversion H6; subst...
+      admit.
 Admitted.
 
 Lemma subst_cset_across_subcapt : forall E x C D C0 A,
@@ -1481,8 +1571,31 @@ Lemma cv_through_subst_ct : forall F x U E C T D,
     cv (F ++ [(x, bind_typ U)] ++ E) T C ->
     cv E U D ->
     cv (map (subst_cb x D) F ++ E) (subst_ct x D T) (subst_cset x D C).
-Proof.
-  admit.
+Proof with eauto using wf_env_subst_cb, wf_pretyp_in_subst_cb, wf_typ_in_subst_cb, wf_cset_in_subst_cb.
+  intros * HcvT HcvU.
+  dependent induction HcvT.
+  - simpl.
+    binds_cases H.
+    + apply wf_typ_from_binds_sub in H as WfT...
+      rewrite_nil_concat.
+      apply cv_weakening; simpl_env...
+      apply cv_unique_shrink in HcvT...
+      2: {
+        assert (wf_env (F ++ [(x, bind_typ U)] ++ E))...
+        rewrite_nil_concat.
+        eapply wf_typ_weakening; simpl_env.
+        - apply WfT.
+        - apply ok_from_wf_env, ok_tail in H1.
+          assumption.
+        - clear_frees. fsetdec.
+        - clear_frees. fsetdec.
+      }
+      apply cv_unique_shrink in HcvT...
+      admit.                    (* x `notin` fv_cset CT b/c of well-formedness *)
+    + assert (binds X (subst_cb x D (bind_sub T)) (map (subst_cb x D) F ++ E))...
+  - simpl.
+    constructor...
+    apply (wf_cset_in_subst_cb U)...
 Admitted.
 
 Lemma sub_through_subst_ct : forall E F x U C S T,
@@ -1769,7 +1882,7 @@ Proof.
       with (subst_ct y C_S (subst_ct y C1 (open_ct T y))).
     replace (subst_ct y C2 (open_ct T y))
       with (subst_ct y C_S (subst_ct y C2 (open_ct T y))).
-    2,3: solve [apply subst_ct_useless_repetition].
+    2,3: solve [apply subst_ct_useless_repetition; notin_solve].
     apply sub_through_subst_ct with (U := S); simpl_env; auto.
   }
   eapply true_meaning_of with (Ap := dom E `union` singleton y) (Am := dom E); eauto.
@@ -1839,17 +1952,31 @@ Proof with eauto.
   intro Fr.
   induction e.
   - simpl.
-    admit.
+    unfold subst_cset, cset_references_fvar_dec. simpl.
+    destruct_if.
+    + rewrite <- AtomSetFacts.mem_iff in Heqb. notin_solve.
+    + easy.
   - simpl in *.
-    admit.
+    assert (a <> x) by fsetdec.
+    destruct (a == x); try easy.
+    cbv.
+    destruct_if.
+    + rewrite <- AtomSetFacts.mem_iff in Heqb. exfalso. fsetdec.
+    + reflexivity.
   - apply IHe...
   - simpl in *.
+    pose proof (cv_free_never_universal e1).
+    pose proof (cv_free_never_universal e2).
+    destruct (free_for_cv e1); try easy.
+    destruct (free_for_cv e2); try easy.
+    unfold cset_union, cset_fvars in Fr.
     rewrite <- IHe1...
     rewrite <- IHe2...
-    all : admit.
+    rewrite subst_cset_distributive_across_union.
+    reflexivity.
   - apply IHe...
   - apply IHe...
-Admitted.
+Qed.
 
 Lemma free_for_cv_subst_ee_cset_irrelevancy: forall x u C D t,
   free_for_cv (subst_ee x u C t) =
@@ -2368,7 +2495,16 @@ Proof with simpl_env; eauto.
     pose proof (sub_through_subst_ct _ _ _ _ _ _ _ HE HcvU) as HP.
 
     simpl_env in HP.
-    repeat (rewrite subst_ct_useless_repetition in HP).
+    apply typing_regular in HtypT as [WfE _].
+    rewrite_env (empty ++ [(x, bind_typ U)] ++ E) in WfE.
+    apply binding_uniq_from_wf_env in WfE.
+    simpl_env in WfE.
+    assert (x `notin` (fv_ee u)) by admit.
+    assert (x `notin` (cset_fvars (free_for_cv u))) by admit.
+    assert (x `notin` (cset_fvars C)) by admit.
+    repeat (
+        rewrite subst_ct_useless_repetition in HP; [|notin_solve]
+      ).
     apply HP.
   }
   apply true_meaning_of with (Ap := Ap) (Am := Am)...
@@ -2377,7 +2513,7 @@ Proof with simpl_env; eauto.
     eapply typing_weakening...
   rewrite_env (empty ++ [(x, bind_typ U)] ++ E);
     eapply cv_weakening...
-Qed.
+Admitted.
 
 (************************************************************************ *)
 (** ** Type substitution preserves typing (11) *)
@@ -2783,14 +2919,14 @@ Proof.
   remember empty.
   remember (typ_arrow U1 U2).
   revert U1 U2 Heqp Heql.
-  induction Typ; intros U1 U2 EQT EQE; subst;
+  dependent induction Typ; intros U1 U2 EQT EQE; subst;
     try solve [ inversion Val | inversion EQT | eauto ].
   Case "typing_sub".
-  (*
-    inversion H; subst; eauto.
-    inversion H0. *)
-    admit.
-Admitted.
+  inversion H; subst; eauto.
+  - binds_cases H0.
+  - inversion H5; subst.
+    eapply IHTyp; eauto.
+Qed.
 
 Lemma canonical_form_tabs : forall e U1 U2 C,
   value e ->
@@ -2801,15 +2937,14 @@ Proof.
   remember empty.
   remember (typ_all U1 U2).
   revert U1 U2 Heqp Heql.
-  induction Typ; intros U1 U2 EQT EQE; subst;
+  dependent induction Typ; intros U1 U2 EQT EQE; subst;
     try solve [ inversion Val | inversion EQT | eauto ].
   Case "typing_sub".
-    (*inversion H; subst; eauto.
-    inversion H0.*)
-    admit.
-Admitted.
-
-
+  inversion H; subst; eauto.
+  - binds_cases H0.
+  - inversion H5; subst.
+    eapply IHTyp; eauto.
+Qed.
 
 (* ********************************************************************** *)
 (** ** Progress (16) *)
