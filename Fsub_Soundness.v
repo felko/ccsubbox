@@ -1571,8 +1571,31 @@ Lemma cv_through_subst_ct : forall F x U E C T D,
     cv (F ++ [(x, bind_typ U)] ++ E) T C ->
     cv E U D ->
     cv (map (subst_cb x D) F ++ E) (subst_ct x D T) (subst_cset x D C).
-Proof.
-  admit.
+Proof with eauto using wf_env_subst_cb, wf_pretyp_in_subst_cb, wf_typ_in_subst_cb, wf_cset_in_subst_cb.
+  intros * HcvT HcvU.
+  dependent induction HcvT.
+  - simpl.
+    binds_cases H.
+    + apply wf_typ_from_binds_sub in H as WfT...
+      rewrite_nil_concat.
+      apply cv_weakening; simpl_env...
+      apply cv_unique_shrink in HcvT...
+      2: {
+        assert (wf_env (F ++ [(x, bind_typ U)] ++ E))...
+        rewrite_nil_concat.
+        eapply wf_typ_weakening; simpl_env.
+        - apply WfT.
+        - apply ok_from_wf_env, ok_tail in H1.
+          assumption.
+        - clear_frees. fsetdec.
+        - clear_frees. fsetdec.
+      }
+      apply cv_unique_shrink in HcvT...
+      admit.                    (* x `notin` fv_cset CT b/c of well-formedness *)
+    + assert (binds X (subst_cb x D (bind_sub T)) (map (subst_cb x D) F ++ E))...
+  - simpl.
+    constructor...
+    apply (wf_cset_in_subst_cb U)...
 Admitted.
 
 Lemma sub_through_subst_ct : forall E F x U C S T,
