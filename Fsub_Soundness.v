@@ -28,6 +28,7 @@ Admitted.
 
 
 
+
 (* ********************************************************************** *)
 (** * #<a name="subtyping"></a># Properties of subtyping *)
 
@@ -2280,6 +2281,20 @@ Inductive syn_cat_agree : typ -> typ -> Prop :=
     syn_cat_agree (typ_capt C P) (typ_capt D U)
 .
 
+Lemma typing_narrowing_typ_type_variables : forall E F x X Y e T,
+  typing (F ++ [(x, bind_typ X)] ++ E) e T ->
+  sub E X Y ->
+  typing (F ++ [(x, bind_typ Y)] ++ E) e T.
+Proof.
+Admitted.
+
+Lemma typing_narrowing_typ' : forall Q E F X C P e T,
+  typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
+  sub E (typ_capt C P) Q ->
+  typing (F ++ [(X, bind_typ (typ_capt C P))] ++ E) e T.
+Proof.
+Admitted.
+
 Lemma typing_narrowing_typ : forall Q E F X P e T,
   typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
   sub E P Q ->
@@ -2370,9 +2385,7 @@ Proof with simpl_env; eauto.
     rewrite_env (map (subst_cb x (free_for_cv u)) empty ++ E).
     eapply (typing_through_subst_ee P)...
     rewrite_nil_concat.
-    eapply typing_narrowing_typ...
-    inversion HsubP; subst.
-    constructor.
+    eapply typing_narrowing_typ'...
   }
   eapply typing_sub.
   apply Hthrough.
@@ -2616,12 +2629,23 @@ Qed.
 (* ********************************************************************** *)
 (** ** Preservation (20) *)
 
-Lemma preservation : forall E e e' T,
-  typing E e T ->
+Lemma inversion_toplevel_type : forall T,
+  wf_typ_in empty T ->
+  exists C P, T = typ_capt C P.
+Proof with eauto.
+  intros * H.
+  inversion H; subst.
+  - exfalso. inversion H; subst. inversion H0.
+  - exists C. exists P...
+Qed.
+
+Lemma preservation : forall e e' T,
+  typing empty e T ->
   red e e' ->
-  typing E e' T.
+  typing empty e' T.
 Proof with simpl_env; eauto.
-  intros E e e' T Typ. generalize dependent e'.
+  intros e e' T Typ. generalize dependent e'.
+  remember empty.
   induction Typ; intros e' Red; try solve [ inversion Red; subst; eauto ].
   - Case "typing_app".
     inversion Red; subst...
@@ -2632,18 +2656,17 @@ Proof with simpl_env; eauto.
       destruct (P2 x ltac:(notin_solve)) as [? [? ?]]...
       rewrite (subst_ee_intro x)...
       rewrite (subst_ct_intro x)...
-      apply typing_through_subst_ee'
-        with (U := T1')
-             (Ap := dom ([(x, bind_typ T1')] ++ E))
-             (Am := dom E) ...
+      apply typing_through_subst_ee' with (U := T1') (Ap := singleton x) (Am := {}) ...
       * apply (typing_sub (open_ct S2 x))...
-        -- rewrite_nil_concat.
-           apply (typing_narrowing_typ T)...
+        -- destruct (inversion_toplevel_type T1') as [C [P Eq]]...
+           subst.
+           rewrite_nil_concat.
+           eapply (typing_narrowing_typ' T)...
            eauto using (sub_transitivity T1).
         -- rewrite_nil_concat.
            apply (sub_narrowing_typ) with (Q := T1)...
-      * replace (singleton x `union` dom E)
-          with (dom E `union` singleton x) by (clear Fr; fsetdec)...
+      * replace (dom empty `union` singleton x)
+          with (singleton x) in H2 by (clear Fr; fsetdec)...
         rewrite_nil_concat.
         apply wf_typ_narrowing_typ_base with (V := T)...
   - Case "typing_tapp".
