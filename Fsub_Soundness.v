@@ -688,16 +688,38 @@ Lemma cv_subst_empty : forall S G Z Q E P,
   wf_typ_in E P ->
   cv (G ++ [(Z, bind_sub Q)] ++ E) S {}C ->
   cv (map (subst_tb Z P) G ++ E) (subst_tt Z P S) {}C.
-Proof with eauto using wf_env_subst_tb, wf_pretyp_subst_tb, wf_cset_subst_tb.
+Proof with eauto using wf_env_subst_tb, wf_typ_subst_tb, wf_pretyp_subst_tb, wf_cset_subst_tb.
   intros * Wf CV.
   dependent induction CV.
   - simpl. destruct (X == Z).
     admit.
     admit.
-  - simpl. apply cv_typ_capt...
-    eapply wf_pretyp_subst_tb with (Q := Q)...
-    admit.
-    admit.
+  - simpl.
+    assert (Z `notin` dom G). { eapply fresh_mid_head... }
+    assert (Z `notin` dom E). { eapply fresh_mid_tail... }
+    apply cv_typ_capt...
+    + unfold wf_pretyp_in.
+      eapply wf_pretyp_subst_tb with (Q := Q)...
+      replace (dom (map (subst_tb Z P) G ++ E)) 
+        with ((dom G `union` dom [(Z, bind_sub Q)] `union` dom E) `remove` Z).
+        eapply wf_pretyp_set_strengthen with (S := Q)...
+      repeat rewrite <- dom_concat...
+      repeat rewrite dom_concat.
+      rewrite dom_map. simpl.
+      fsetdec.
+      (* probably needs new strengthening lemmas *)
+      admit.
+      admit.
+    + eapply wf_cset_subst_tb with (Q := Q) (Am := (dom (map (subst_tb Z P) G ++ E)))...
+      replace (dom (map (subst_tb Z P) G ++ E)) 
+        with ((dom G `union` dom [(Z, bind_sub Q)] `union` dom E) `remove` Z).
+      eapply wf_cset_set_strengthen with (S := Q)...
+      repeat rewrite <- dom_concat...
+      repeat rewrite dom_concat.
+      rewrite dom_map. simpl.
+      fsetdec.
+      (* probably needs new strengthening lemmas *)
+      admit.
 Admitted.
 
 Lemma captures_expansion : forall D2 E x D1,
