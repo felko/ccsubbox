@@ -1235,71 +1235,61 @@ Proof with auto.
   - apply notin_fv_ct_open_et with (C := C)...
 Qed.
 
-Lemma notin_fv_wf_typ : forall E (X : atom) T,
-  wf_typ_in E T ->
+Lemma notin_fv_wf_typ : forall E Ap Am (X : atom) T,
+  wf_typ E Ap Am T ->
   X `notin` dom E ->
   X `notin` (fv_tt T `union` fv_et T)
-with notin_fv_wf_pretyp : forall E (X : atom) T,
-  wf_pretyp_in E T ->
+with notin_fv_wf_pretyp : forall E Ap Am (X : atom) T,
+  wf_pretyp E Ap Am T ->
   X `notin` dom E ->
   X `notin` (fv_tpt T `union` fv_ept T).
 Proof with eauto.
-  all: admit.
-Admitted.
-(* Proof with eauto. *)
-(* ------ *)
-(*   intros E X T Wf_typ. *)
-(*   induction Wf_typ; intros FrE; simpl... *)
-(*   (* Var *) *)
-(*   - assert (X0 `in` dom E) by (eapply binds_In; eauto)... *)
-(*   (* typ_cset *) *)
-(*   - specialize (notin_fv_wf_pretyp _ _ _ H0 FrE) as Wf. *)
-(*     inversion H; *)
-(*     destruct C. *)
-(*     + fsetdec. *)
-(*     + repeat apply notin_union; try fsetdec. *)
-(*     + contradict H2; discriminate. *)
-(*     + repeat apply notin_union; try fsetdec. *)
-(*       unfold fv_cset in *. *)
-(*       unfold allbound_typ in *. *)
-(*       unfold cset_fvar. *)
-(*       intro. *)
-(*       specialize (H1 X H4). *)
-(*       inversion H3; subst. *)
-(*       destruct H1. *)
-(*       assert (X `in` dom E). { eapply binds_In... } *)
-(*       contradiction. *)
-(* ------ *)
-(*   intros E X T Wf_typ. *)
-(*   induction Wf_typ; intros FrE; simpl... *)
-(*   (* typ_arrow *) *)
-(*   - pick fresh Y. *)
-(*     assert (Y `notin` L) by fsetdec. *)
-(*     assert (X `notin` dom ([(Y, bind_typ T1)] ++ E)). { *)
-(*       simpl_env. fsetdec. *)
-(*     } *)
-(*     specialize (H0 Y H1). *)
-(*     specialize (notin_fv_wf_typ _ _ _ H FrE) as Wf1. *)
-(*     specialize (notin_fv_wf_typ _ _ _ H0 H2) as Wf2. *)
-(*     notin_simpl. *)
-(*     repeat apply notin_union... *)
-(*     + apply notin_fv_ct_open_tt with (C := Y)... *)
-(*     + apply notin_fv_ct_open_et with (C := Y). *)
-(*       discriminate. intuition. *)
-(*   (* typ_all *) *)
-(*   - pick fresh Y. *)
-(*     assert (Y `notin` L) by fsetdec. *)
-(*     assert (X `notin` dom ([(Y, bind_typ T1)] ++ E)). { *)
-(*       simpl_env. fsetdec. *)
-(*     } *)
-(*     specialize (H0 Y H1). *)
-(*     specialize (notin_fv_wf_typ _ _ _ H FrE) as Wf1. *)
-(*     specialize (notin_fv_wf_typ _ _ _ H0 H2) as Wf2. *)
-(*     notin_simpl. *)
-(*     repeat apply notin_union... *)
-(*     + apply notin_fv_tt_open_tt with (Y := Y)... *)
-(*     + apply notin_fv_tt_open_et with (Y := Y)... *)
-(* Qed. *)
+-------
+  intros * Wf_typ.
+  induction Wf_typ; intros FrE; simpl...
+  - assert (X0 `in` dom E) by (eapply binds_In; eauto)...
+  - specialize (notin_fv_wf_pretyp _ _ _ _ _ H0 FrE) as Wf.
+    inversion H; destruct C; subst; simpl in *; try notin_solve.
+    assert (X `notin` fvars). {
+      unfold allbound_typ in *; unfold cset_fvars in *.
+      intro Hin; specialize (H1 X Hin) as [T Hbinds].
+      apply binds_In in Hbinds. intuition.
+    }
+    notin_solve.
+-------
+  intros * Wf_pretyp.
+  induction Wf_pretyp; intros FrE; simpl...
+  - pick fresh Y.
+    specialize (notin_fv_wf_typ _ _ _ X _ H ltac:(assumption)) as HT1.
+    specialize (H0 Y ltac:(notin_solve)) as WfT2.
+    specialize (notin_fv_wf_typ _ _ _ X _ WfT2) as HT2.
+    simpl in *.
+    specialize (HT2 ltac:(notin_solve)).
+    assert (X `notin` fv_tt T2). {
+      apply notin_fv_ct_open_tt with (C := Y).
+      notin_solve.
+    }
+    assert (X `notin` fv_et T2). {
+      apply notin_fv_ct_open_et with (C := Y); try discriminate.
+      notin_solve.
+    }
+    notin_solve.
+  - pick fresh Y.
+    specialize (notin_fv_wf_typ _ _ _ X _ H ltac:(assumption)) as HT1.
+    specialize (H0 Y ltac:(notin_solve)) as WfT2.
+    specialize (notin_fv_wf_typ _ _ _ X _ WfT2) as HT2.
+    simpl in *.
+    specialize (HT2 ltac:(notin_solve)).
+    assert (X `notin` fv_tt T2). {
+      apply notin_fv_tt_open_tt with (Y := Y).
+      notin_solve.
+    }
+    assert (X `notin` fv_et T2). {
+      apply notin_fv_tt_open_et with (Y := Y); try discriminate.
+      notin_solve.
+    }
+    notin_solve.
+Qed.
 
 Lemma notin_fv_wf : forall E (X : atom) T,
   wf_typ_in E T ->
