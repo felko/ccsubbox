@@ -992,6 +992,7 @@ Proof with eauto 6 using wf_typ_narrowing_typ_base, wf_cset_narrowing_typ_base.
 Qed.
 
 
+(* Duplicate, there's one like it at the end of the file *)
 Lemma wf_typ_subst_tb' : forall F Q E Z P T,
   wf_typ_in (F ++ [(Z, bind_sub Q)] ++ E) T ->
   wf_typ_in E P ->
@@ -1903,6 +1904,123 @@ Proof with eauto.
     + simpl_env; fsetdec.
     + simpl_env; fsetdec.
 }
+Qed.
+
+(* *********************************************************************** *)
+(** * Auxilliary lemmas for Soundness *)
+
+Lemma cset_eq_injectivity : forall a1 a2 n1 n2,
+    a1 = a2 ->
+    n1 = n2 ->
+    cset_set a1 n1 = cset_set a2 n2.
+Proof.
+  intros *. intros EqA EqN.
+  rewrite EqA.
+  rewrite EqN.
+  trivial.
+Qed.
+
+
+Ltac fnset_mem_dec :=
+  match goal with
+  | |- true = _ => symmetry
+  | |- false = _ => symmetry
+  | |- _ => idtac
+  end;
+  match goal with
+  | |- NatSet.F.mem _ _ = true => rewrite <- NatSetFacts.mem_iff; fnsetdec
+  | |- NatSet.F.mem _ _ = false => rewrite <- NatSetFacts.not_mem_iff; fnsetdec
+  end.
+
+Ltac fset_mem_dec :=
+  match goal with
+  | |- true = _ => symmetry
+  | |- false = _ => symmetry
+  | |- _ => idtac
+  end;
+  match goal with
+  | |- AtomSet.F.mem _ _ = true => rewrite <- AtomSetFacts.mem_iff; fsetdec
+  | |- AtomSet.F.mem _ _ = false => rewrite <- AtomSetFacts.not_mem_iff; fsetdec
+  end.
+
+Ltac cset_eq_dec :=
+  apply cset_eq_injectivity; [try fsetdec | try fnsetdec].
+
+Ltac destruct_if :=
+  match goal with
+  | |- context[if ?t then _ else _] =>
+    destruct t eqn:?
+  end.
+
+Ltac destruct_match :=
+  match goal with
+  | |- context[match ?t with _ => _ end] =>
+    destruct t eqn:?
+  end.
+
+Lemma subst_cset_distributive_across_union : forall z C D1 D2,
+  subst_cset z C (cset_union D1 D2) =
+  cset_union (subst_cset z C D1) (subst_cset z C D2).
+Proof with eauto.
+  intros.
+  destruct D1; destruct D2.
+  all :
+    try solve [
+          unfold cset_union, subst_cset, cset_references_fvar_dec;
+          (try destruct_match);
+          reflexivity].
+
+  unfold cset_union, subst_cset, cset_references_fvar_dec.
+  destruct (AtomSet.F.mem z t) eqn:EQ1.
+  - rewrite <- AtomSetFacts.mem_iff in EQ1.
+    assert (AtomSet.F.mem z (t `union` t1) = true) as HA by fset_mem_dec.
+    rewrite HA.
+    destruct C.
+    + unfold cset_union.
+      all : repeat destruct_match.
+      all : easy.
+    + unfold cset_union, cset_remove_fvar.
+      destruct (AtomSet.F.mem z t1) eqn:EQ2.
+      * rewrite <- AtomSetFacts.mem_iff in EQ2.
+        cset_eq_dec.
+      * rewrite <- AtomSetFacts.not_mem_iff in EQ2.
+        cset_eq_dec.
+  - rewrite <- AtomSetFacts.not_mem_iff in EQ1.
+    destruct (AtomSet.F.mem z t1) eqn:EQ2.
+    + rewrite <- AtomSetFacts.mem_iff in EQ2.
+      assert (AtomSet.F.mem z (t `union` t1) = true) as HA by fset_mem_dec.
+      rewrite HA.
+      destruct C.
+      * unfold cset_union.
+        all : repeat destruct_match.
+        all : easy.
+      * unfold cset_remove_fvar, cset_union.
+        cset_eq_dec.
+    + rewrite <- AtomSetFacts.not_mem_iff in EQ2.
+      assert (AtomSet.F.mem z (t `union` t1) = false) as HA by fset_mem_dec.
+      rewrite HA.
+      reflexivity.
+Qed.
+
+Lemma subst_cset_fresh_for_cv : forall z t C,
+  z `notin` fv_ee t ->
+  (subst_cset z C (free_for_cv t)) = (free_for_cv t).
+Proof.
+  intros.
+  induction t; simpl in H |- *.
+  - cbv.
+    replace (AtomSet.F.mem z {}) with false by fset_mem_dec.
+    cset_eq_dec.
+  - cbv.
+    replace (AtomSet.F.mem z (singleton a)) with false by fset_mem_dec.
+    cset_eq_dec.
+  - apply IHt. fsetdec.
+  - rewrite subst_cset_distributive_across_union.
+    rewrite IHt1 by notin_solve.
+    rewrite IHt2 by notin_solve.
+    reflexivity.
+  - apply IHt. fsetdec.
+  - apply IHt. fsetdec.
 Qed.
 
 (* *********************************************************************** *)
