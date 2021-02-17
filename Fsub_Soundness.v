@@ -2588,23 +2588,32 @@ Qed.
 (* ********************************************************************** *)
 (** ** Preservation (20) *)
 
-Lemma inversion_toplevel_type : forall T,
-  wf_typ_in empty T ->
+
+(* ********************************************************************** *)
+(** * #<a name="progress"></a># Progress *)
+
+Definition no_type_bindings (E : env) : Prop :=
+  forall X U, ~ binds X (bind_sub U) E.
+
+
+Lemma inversion_toplevel_type : forall E T,
+  no_type_bindings E ->
+  wf_typ_in E T ->
   exists C P, T = typ_capt C P.
 Proof with eauto.
-  intros * H.
+  intros * NoTyp H.
   inversion H; subst.
-  - exfalso. inversion H; subst. inversion H0.
+  - inversion H; subst. specialize (NoTyp X U). contradiction.
   - exists C. exists P...
 Qed.
 
-Lemma preservation : forall e e' T,
-  typing empty e T ->
+Lemma preservation : forall E e e' T,
+  no_type_bindings E ->
+  typing E e T ->
   red e e' ->
-  typing empty e' T.
+  typing E e' T.
 Proof with simpl_env; eauto.
-  intros e e' T Typ. generalize dependent e'.
-  remember empty.
+  intros * NoTyp Typ. generalize dependent e'.
   induction Typ; intros e' Red; try solve [ inversion Red; subst; eauto ].
   - Case "typing_app".
     inversion Red; subst...
@@ -2615,17 +2624,20 @@ Proof with simpl_env; eauto.
       destruct (P2 x ltac:(notin_solve)) as [? [? ?]]...
       rewrite (subst_ee_intro x)...
       rewrite (subst_ct_intro x)...
-      apply typing_through_subst_ee' with (U := T1') (Ap := singleton x) (Am := {}) ...
+      apply typing_through_subst_ee'
+        with (U := T1')
+            (Ap := dom ([(x, bind_typ T1')] ++ E))
+            (Am := dom E) ...
       * apply (typing_sub (open_ct S2 x))...
-        -- destruct (inversion_toplevel_type T1') as [C [P Eq]]...
-           subst.
+        -- rewrite_nil_concat.
+           destruct (inversion_toplevel_type E T1') as [C [P Eq]]; subst...
            rewrite_nil_concat.
            eapply (typing_narrowing_typ' T)...
            eauto using (sub_transitivity T1).
         -- rewrite_nil_concat.
-           apply (sub_narrowing_typ) with (Q := T1)...
-      * replace (dom empty `union` singleton x)
-          with (singleton x) in H2 by (clear Fr; fsetdec)...
+          apply (sub_narrowing_typ) with (Q := T1)...
+      * replace (singleton x `union` dom E)
+          with (dom E `union` singleton x) by (clear Fr; fsetdec)...
         rewrite_nil_concat.
         apply wf_typ_narrowing_typ_base with (V := T)...
   - Case "typing_tapp".
@@ -2642,10 +2654,6 @@ Proof with simpl_env; eauto.
     (* rewrite_env (map (subst_tb X T) empty ++ E). *)
     (* apply (typing_through_subst_te T1)... *)
 Admitted.
-
-(* ********************************************************************** *)
-(** * #<a name="progress"></a># Progress *)
-
 
 (* ********************************************************************** *)
 (** ** Canonical forms (14) *)
