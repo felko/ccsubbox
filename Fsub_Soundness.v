@@ -330,63 +330,18 @@ Qed.
 
 
 Lemma captures_narrowing_typ : forall F X P Q E xs x,
-  ok (F ++ [(X, bind_typ Q)] ++ E) ->
+  wf_env (F ++ [(X, bind_typ Q)] ++ E) ->
   sub E P Q ->
   captures (F ++ [(X, bind_typ Q)] ++ E) xs x ->
   captures (F ++ [(X, bind_typ P)] ++ E) xs x.
 Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, cv_narrowing_typ.
-  intros F X P Q E xs x Ok Sub H.
-  remember (F ++ [(X, bind_typ Q)] ++ E). generalize dependent F.
-  induction H; intros; subst.
-  - apply captures_in...
-  - assert (cv (F ++ [(X, bind_typ P)] ++ E) T (cset_set ys {}N))...
-    { destruct (x == X).
-      + (* x == X *)
-        binds_cases H.
-        * eapply captures_var with (T := T).
-          apply binds_tail.
-          apply binds_tail...
-          trivial.
-          apply H3.
-          unfold AtomSet.F.For_all in *. intros.
-          apply H2...
-        * inversion H4; subst.
-          (* here we could choose our own captureset ys, as long as
-             ys <= x
-           *)
-          eapply captures_var with (ys := ys)...
-          2: {
-            unfold AtomSet.F.For_all in *. intros.
-            apply H2...
-          }
-          (* then use sub_implies_subcapt *)
-          destruct (cv_exists_in E P) as [C CV]...
-          { destruct C...
-            **
-
-            (* universal *)
-                exfalso. admit.
-            ** admit.
-          }
-        * eapply captures_var with (T := T).
-          apply binds_head...
-          apply H3.
-          unfold AtomSet.F.For_all in *. intros.
-          apply H2...
-      + (* x <> X *)
-        eapply captures_var with (T := T).
-        { binds_cases H.
-          * apply binds_tail.
-            apply binds_tail...
-            trivial.
-          * apply binds_head...
-        }
-        apply H3.
-        unfold AtomSet.F.For_all in *. intros.
-        apply H2...
-    }
-Admitted.
-
+  intros F Z P Q E xs x Ok Sub H.
+  eapply captures_narrowing_typ_forall with (Q := Q) (ys := singleton x)...
+  - unfold AtomSet.F.For_all; intros.
+    assert (x = x0) by fsetdec; subst.
+    trivial.
+  - fsetdec.
+Qed.
 
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
   sub E P Q ->
@@ -404,7 +359,7 @@ Qed.
 
 Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
   sub E P Q ->
-  ok (F ++ [(x, bind_typ P)] ++ E) ->
+  wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
   subcapt (F ++ [(x, bind_typ Q)] ++ E) C1 C2 ->
   subcapt (F ++ [(x, bind_typ P)] ++ E) C1 C2.
 Proof with eauto using wf_cset_narrowing_typ, captures_narrowing_typ.
