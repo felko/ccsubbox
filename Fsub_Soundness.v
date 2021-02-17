@@ -2246,12 +2246,22 @@ Proof.
   * exists X0; trivial.
 Qed.
 
+Inductive syn_cat_agree : typ -> typ -> Prop :=
+| syn_cat_agree_tvar : forall (X Y : atom),
+    syn_cat_agree X Y
+| syn_cat_agree_concrete : forall C P D U,
+    syn_cat_agree (typ_capt C P) (typ_capt D U)
+.
+
 Lemma typing_narrowing_typ : forall Q E F X P e T,
   typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
   sub E P Q ->
+  syn_cat_agree P Q ->
   typing (F ++ [(X, bind_typ P)] ++ E) e T.
-Proof with simpl_env; eauto using wf_env_narrowing_typ, sub_weakening, type_from_wf_typ.
-  intros *. intros HT HSub.
+Proof with simpl_env; eauto using
+    wf_env_narrowing_typ, wf_typ_narrowing_typ, cv_narrowing_typ, sub_narrowing_typ,
+    sub_weakening, type_from_wf_typ.
+  intros *. intros HT HSub HAg.
   assert (type P) as Htype by eauto*.
   dependent induction HT...
   (* typing_var_tvar *)
@@ -2279,11 +2289,39 @@ Proof with simpl_env; eauto using wf_env_narrowing_typ, sub_weakening, type_from
            ++ apply sub_pre_weakening...
               inversion HSub...
       * binds_get H0; inversion H2; subst...
-        eapply typing_sub.
-        admit.
-        admit.
+        inversion HAg.
     + eapply typing_var...
-Admitted.
+  - assert (wf_env (F ++ [(X, bind_typ P)] ++ E)). {
+      pick fresh z for L.
+      pose proof (H1 z Fr)...
+      enough (wf_env
+                ([(z, bind_typ V)] ++ F ++ [(X, bind_typ Q)] ++ E)) as HwfHugeE...
+      inversion HwfHugeE...
+    }
+    pick fresh y and apply typing_abs...
+    + simpl_env in *.
+      rewrite_parenthesise_binding.
+      eapply wf_typ_narrowing_typ_base...
+    + rewrite_parenthesise_binding.
+      eapply H2...
+  - eapply typing_app.
+    1: eapply IHHT1...
+    1: eapply IHHT2...
+    all: trivial...
+  - assert (wf_env (F ++ [(X, bind_typ P)] ++ E)). {
+      pick fresh z for L.
+      pose proof (H1 z Fr)...
+      enough (wf_env
+                ([(z, bind_sub V)] ++ F ++ [(X, bind_typ Q)] ++ E)) as HwfHugeE...
+      inversion HwfHugeE...
+    }
+    pick fresh y and apply typing_tabs...
+    + simpl_env in *.
+      rewrite_parenthesise_binding.
+      eapply wf_typ_narrowing_typ_base...
+    + rewrite_parenthesise_binding.
+      eapply H2...
+Qed.
 
 Lemma typing_through_subst_ee' : forall U E Ap Am x T C e u,
   typing ([(x, bind_typ U)] ++ E) e T ->
@@ -2306,6 +2344,8 @@ Proof with simpl_env; eauto.
     eapply (typing_through_subst_ee P)...
     rewrite_nil_concat.
     eapply typing_narrowing_typ...
+    inversion HsubP; subst.
+    constructor.
   }
   eapply typing_sub.
   apply Hthrough.
