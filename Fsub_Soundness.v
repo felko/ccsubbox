@@ -139,13 +139,7 @@ Lemma captures_transitivity : forall E xs ys x,
   captures E xs x.
 Proof with auto.
   intros E xs ys x Hc Hall.
-  remember ys.
-  generalize dependent ys.
-  remember xs.
-  generalize dependent xs.
-  remember x.
-  generalize dependent x.
-  induction Hc ; intros ; subst...
+  dependent induction Hc ; intros ; subst...
   eapply captures_var.
   apply H.
   apply H0.
