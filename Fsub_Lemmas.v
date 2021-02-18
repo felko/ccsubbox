@@ -1869,14 +1869,18 @@ Lemma red_regular : forall e e',
   expr e /\ expr e'.
 Proof with auto*.
   intros e e' H.
-  admit.
-(*   induction H; assert(J := value_regular); split... *)
-(*   - Case "red_abs". *)
-(*     inversion H. pick fresh y. rewrite (subst_ee_intro y)... *)
-(*   - Case "red_tabs". *)
-(*     inversion H. pick fresh Y. rewrite (subst_te_intro Y)... *)
-(* Qed. *)
-Admitted.
+  induction H; assert (J := value_regular); split...
+  - Case "red_abs".
+    inversion H. pick fresh y.
+    rewrite (subst_ee_intro y)...
+    eapply subst_ee_expr...
+    pose proof (cv_free_is_bvar_free v2).
+    unfold empty_cset_bvars in H5. unfold cset_all_bvars in H5.
+    destruct (free_for_cv v2); subst...
+    assert (t0 = {}N) by fnsetdec; subst...
+  - Case "red_tabs".
+    inversion H. pick fresh Y. rewrite (subst_te_intro Y)...
+Qed.
 
 Lemma cv_regular : forall E T C,
   cv E T C ->
