@@ -26,6 +26,123 @@ Admitted.
 Local Lemma cheat_with : forall A B, A -> B.
 Admitted.
 
+Lemma subst_ct_open_ct_var : forall (x y:atom) c t,
+  y <> x ->
+  capt c ->
+  (open_ct (subst_ct x c t) (cset_fvar y)) = (subst_ct x c (open_ct t (cset_fvar y))).
+Proof with auto*.
+  intros *; intros Neq Wu.
+  unfold open_ct.
+  symmetry.
+  apply subst_ct_open_ct_rec...
+  - constructor.
+  - cbv [cset_references_fvar cset_all_fvars cset_fvar]. (* like unfold but a bit different *)
+    fsetdec.
+Qed.
+
+(* Alex: looking at the subst_tt_open_tt_* chain, there should be a better way to do this... *)
+Lemma subst_ct_open_ct : forall x c1 T c2,
+  (* not (cset_references_fvar x c2) -> *)
+  (* capt c1 -> *)
+  subst_ct x c1 (open_ct T c2) = (open_ct (subst_ct x c1 T) (subst_cset x c1 c2)).
+Proof with auto*.
+  intros *.
+  (* intros Hnotin Hc1. *)
+  induction T.
+  - cbn [open_ct open_ct_rec].
+    replace (subst_cset x c1 (open_cset 0 c2 c))
+      with (open_cset 0 (subst_cset x c1 c2) (subst_cset x c1 c)).
+    2: {
+      unfold open_cset.
+      destruct (cset_references_bvar_dec 0 c) eqn:EQ.
+      admit.
+      admit.
+    }
+    admit.
+  - admit.
+  - admit.
+Admitted.
+
+Lemma subst_ct_open_tt : forall x c t1 t2,
+  capt c ->
+  subst_ct x c (open_tt t1 t2) = (open_tt (subst_ct x c t1) (subst_ct x c t2)).
+Proof with auto*.
+  intros.
+  admit.
+Admitted.
+
+Lemma subst_tt_open_ct : forall x C S T,
+    type S ->
+    open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
+Proof.
+Admitted.
+
+Lemma subst_tt_open_ct_var : forall (X y:atom) P T,
+  y <> X ->
+  type P ->
+  (open_ct (subst_tt X P T) (cset_fvar y)) = (subst_tt X P (open_ct T (cset_fvar y))).
+Proof with auto*.
+  intros *; intros Neq Wu.
+  unfold open_ct.
+  symmetry.
+  apply subst_tt_open_ct_rec...
+Qed.
+
+Lemma subst_cset_useless_repetition : forall x C1 C2 D,
+  x `notin` cset_fvars C2 ->
+  subst_cset x C1 (subst_cset x C2 D) = (subst_cset x C2 D).
+Proof.
+  intros.
+  destruct D.
+  {
+    unfold subst_cset, cset_references_fvar_dec.
+    reflexivity.
+  }
+  unfold subst_cset, cset_references_fvar_dec.
+  destruct (AtomSet.F.mem x t) eqn:EQ.
+  - unfold cset_remove_fvar at 1.
+    unfold cset_union at 1.
+    destruct C2.
+    + reflexivity.
+    + rewrite <- AtomSetFacts.mem_iff in EQ.
+      unfold cset_fvars in H.
+      replace (AtomSet.F.mem x (t1 `union` t `remove` x)) with false by fset_mem_dec.
+      reflexivity.
+  - rewrite EQ.
+    reflexivity.
+Qed.
+
+Lemma subst_ct_useless_repetition : forall x C D T,
+  x `notin` cset_fvars D ->
+  subst_ct x C (subst_ct x D T) = (subst_ct x D T)
+with subst_cpt_useless_repetition : forall x C D T,
+  x `notin` cset_fvars D ->
+  subst_cpt x C (subst_cpt x D T) = (subst_cpt x D T).
+Proof with auto.
+{ intros.
+  induction T; simpl; try reflexivity.
+  rewrite subst_cset_useless_repetition.
+  rewrite subst_cpt_useless_repetition.
+  all : trivial.
+}
+{ intros.
+  induction T; simpl; try reflexivity.
+  - rewrite subst_ct_useless_repetition.
+    rewrite subst_ct_useless_repetition.
+    all : trivial.
+  - rewrite subst_ct_useless_repetition.
+    rewrite subst_ct_useless_repetition.
+    all : trivial.
+}
+Qed.
+
+
+Ltac rewrite_parenthesise_binding_in H :=
+  match type of H with
+  | context[[(?x, ?b)] ++ ?F ++ ?E] =>
+    rewrite_env (([(x, b)] ++ F) ++ E) in H
+  end.
+
 (* ********************************************************************** *)
 (** * #<a name="subtyping"></a># Properties of subtyping *)
 
@@ -982,23 +1099,6 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb, captures_through_subst
       specialize (H1 x H2)...
 Qed.
 
-Lemma subst_tt_open_ct_var : forall (X y:atom) P T,
-  y <> X ->
-  type P ->
-  (open_ct (subst_tt X P T) (cset_fvar y)) = (subst_tt X P (open_ct T (cset_fvar y))).
-Proof with auto*.
-  intros *; intros Neq Wu.
-  unfold open_ct.
-  symmetry.
-  apply subst_tt_open_ct_rec...
-Qed.
-
-Ltac rewrite_parenthesise_binding_in H :=
-  match type of H with
-  | context[[(?x, ?b)] ++ ?F ++ ?E] =>
-    rewrite_env (([(x, b)] ++ F) ++ E) in H
-  end.
-
 Lemma sub_through_subst_tt : forall Q E F Z S T P,
   sub (F ++ [(Z, bind_sub Q)] ++ E) S T ->
   sub E P Q ->
@@ -1243,113 +1343,6 @@ Qed.
 
 (************************************************************************ *)
 (** ** Narrowing for typing (7) *)
-
-Lemma subst_ct_open_ct_var : forall (x y:atom) c t,
-  y <> x ->
-  capt c ->
-  (open_ct (subst_ct x c t) (cset_fvar y)) = (subst_ct x c (open_ct t (cset_fvar y))).
-Proof with auto*.
-  intros *; intros Neq Wu.
-  unfold open_ct.
-  symmetry.
-  apply subst_ct_open_ct_rec...
-  - constructor.
-  - cbv [cset_references_fvar cset_all_fvars cset_fvar]. (* like unfold but a bit different *)
-    fsetdec.
-Qed.
-
-(* Alex: looking at the subst_tt_open_tt_* chain, there should be a better way to do this... *)
-Lemma subst_ct_open_ct : forall x c1 T c2,
-  (* not (cset_references_fvar x c2) -> *)
-  (* capt c1 -> *)
-  subst_ct x c1 (open_ct T c2) = (open_ct (subst_ct x c1 T) (subst_cset x c1 c2)).
-Proof with auto*.
-  intros *.
-  (* intros Hnotin Hc1. *)
-  induction T.
-  - cbn [open_ct open_ct_rec].
-    replace (subst_cset x c1 (open_cset 0 c2 c))
-      with (open_cset 0 (subst_cset x c1 c2) (subst_cset x c1 c)).
-    2: {
-      unfold open_cset.
-      destruct (cset_references_bvar_dec 0 c) eqn:EQ.
-      admit.
-      admit.
-    }
-    admit.
-  - admit.
-  - admit.
-Admitted.
-
-Lemma subst_ct_open_tt : forall x c t1 t2,
-  capt c ->
-  subst_ct x c (open_tt t1 t2) = (open_tt (subst_ct x c t1) (subst_ct x c t2)).
-Proof with auto*.
-  intros.
-  admit.
-Admitted.
-
-Lemma subst_tt_open_ct : forall x C S T,
-    type S ->
-    open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
-Proof.
-Admitted.
-
-Lemma subst_tt_open_ct_var : forall x y S T,
-    type S ->
-    open_ct (subst_tt x S T) (cset_fvar y) = subst_tt x S (open_ct T (cset_fvar y)).
-Proof.
-  intros.
-  apply subst_tt_open_ct; auto.
-Qed.
-
-Lemma subst_cset_useless_repetition : forall x C1 C2 D,
-  x `notin` cset_fvars C2 ->
-  subst_cset x C1 (subst_cset x C2 D) = (subst_cset x C2 D).
-Proof.
-  intros.
-  destruct D.
-  {
-    unfold subst_cset, cset_references_fvar_dec.
-    reflexivity.
-  }
-  unfold subst_cset, cset_references_fvar_dec.
-  destruct (AtomSet.F.mem x t) eqn:EQ.
-  - unfold cset_remove_fvar at 1.
-    unfold cset_union at 1.
-    destruct C2.
-    + reflexivity.
-    + rewrite <- AtomSetFacts.mem_iff in EQ.
-      unfold cset_fvars in H.
-      replace (AtomSet.F.mem x (t1 `union` t `remove` x)) with false by fset_mem_dec.
-      reflexivity.
-  - rewrite EQ.
-    reflexivity.
-Qed.
-
-Lemma subst_ct_useless_repetition : forall x C D T,
-  x `notin` cset_fvars D ->
-  subst_ct x C (subst_ct x D T) = (subst_ct x D T)
-with subst_cpt_useless_repetition : forall x C D T,
-  x `notin` cset_fvars D ->
-  subst_cpt x C (subst_cpt x D T) = (subst_cpt x D T).
-Proof with auto.
-{ intros.
-  induction T; simpl; try reflexivity.
-  rewrite subst_cset_useless_repetition.
-  rewrite subst_cpt_useless_repetition.
-  all : trivial.
-}
-{ intros.
-  induction T; simpl; try reflexivity.
-  - rewrite subst_ct_useless_repetition.
-    rewrite subst_ct_useless_repetition.
-    all : trivial.
-  - rewrite subst_ct_useless_repetition.
-    rewrite subst_ct_useless_repetition.
-    all : trivial.
-}
-Qed.
 
 (* Alex: well all right, none of these are used now... *)
 (* Lemma fv_et_subset_dom_env : forall E T, *)
