@@ -45,51 +45,6 @@ Admitted.
 Local Lemma cheat_with : forall A B, A -> B.
 Admitted.
 
-Lemma subst_ct_open_ct_var : forall (x y:atom) c t,
-  y <> x ->
-  capt c ->
-  (open_ct (subst_ct x c t) (cset_fvar y)) = (subst_ct x c (open_ct t (cset_fvar y))).
-Proof with auto*.
-  intros *; intros Neq Wu.
-  unfold open_ct.
-  symmetry.
-  apply subst_ct_open_ct_rec...
-  - constructor.
-  - cbv [cset_references_fvar cset_all_fvars cset_fvar]. (* like unfold but a bit different *)
-    fsetdec.
-Qed.
-
-(* Alex: looking at the subst_tt_open_tt_* chain, there should be a better way to do this... *)
-Lemma subst_ct_open_ct : forall x c1 T c2,
-  (* not (cset_references_fvar x c2) -> *)
-  (* capt c1 -> *)
-  subst_ct x c1 (open_ct T c2) = (open_ct (subst_ct x c1 T) (subst_cset x c1 c2)).
-Proof with auto*.
-  intros *.
-  (* intros Hnotin Hc1. *)
-  induction T.
-  - cbn [open_ct open_ct_rec].
-    replace (subst_cset x c1 (open_cset 0 c2 c))
-      with (open_cset 0 (subst_cset x c1 c2) (subst_cset x c1 c)).
-    2: {
-      unfold open_cset.
-      destruct (cset_references_bvar_dec 0 c) eqn:EQ.
-      admit.
-      admit.
-    }
-    admit.
-  - admit.
-  - admit.
-Admitted.
-
-Lemma subst_ct_open_tt : forall x c t1 t2,
-  capt c ->
-  subst_ct x c (open_tt t1 t2) = (open_tt (subst_ct x c t1) (subst_ct x c t2)).
-Proof with auto*.
-  intros.
-  admit.
-Admitted.
-
 Lemma subst_tt_open_ct : forall x C S T,
     type S ->
     open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
