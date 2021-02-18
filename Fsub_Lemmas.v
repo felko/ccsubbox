@@ -1808,55 +1808,6 @@ Qed.
 (* *********************************************************************** *)
 (** * Auxilliary lemmas for Soundness *)
 
-Lemma cset_eq_injectivity : forall a1 a2 n1 n2,
-    a1 = a2 ->
-    n1 = n2 ->
-    cset_set a1 n1 = cset_set a2 n2.
-Proof.
-  intros *. intros EqA EqN.
-  rewrite EqA.
-  rewrite EqN.
-  trivial.
-Qed.
-
-
-Ltac fnset_mem_dec :=
-  match goal with
-  | |- true = _ => symmetry
-  | |- false = _ => symmetry
-  | |- _ => idtac
-  end;
-  match goal with
-  | |- NatSet.F.mem _ _ = true => rewrite <- NatSetFacts.mem_iff; fnsetdec
-  | |- NatSet.F.mem _ _ = false => rewrite <- NatSetFacts.not_mem_iff; fnsetdec
-  end.
-
-Ltac fset_mem_dec :=
-  match goal with
-  | |- true = _ => symmetry
-  | |- false = _ => symmetry
-  | |- _ => idtac
-  end;
-  match goal with
-  | |- AtomSet.F.mem _ _ = true => rewrite <- AtomSetFacts.mem_iff; fsetdec
-  | |- AtomSet.F.mem _ _ = false => rewrite <- AtomSetFacts.not_mem_iff; fsetdec
-  end.
-
-Ltac cset_eq_dec :=
-  apply cset_eq_injectivity; [try fsetdec | try fnsetdec].
-
-Ltac destruct_if :=
-  match goal with
-  | |- context[if ?t then _ else _] =>
-    destruct t eqn:?
-  end.
-
-Ltac destruct_match :=
-  match goal with
-  | |- context[match ?t with _ => _ end] =>
-    destruct t eqn:?
-  end.
-
 Lemma subst_cset_distributive_across_union : forall z C D1 D2,
   subst_cset z C (cset_union D1 D2) =
   cset_union (subst_cset z C D1) (subst_cset z C D2).

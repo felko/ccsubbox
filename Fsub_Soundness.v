@@ -45,70 +45,6 @@ Admitted.
 Local Lemma cheat_with : forall A B, A -> B.
 Admitted.
 
-Lemma subst_tt_open_ct : forall x C S T,
-    type S ->
-    open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
-Proof.
-Admitted.
-
-Lemma subst_tt_open_ct_var : forall (X y:atom) P T,
-  y <> X ->
-  type P ->
-  (open_ct (subst_tt X P T) (cset_fvar y)) = (subst_tt X P (open_ct T (cset_fvar y))).
-Proof with auto*.
-  intros *; intros Neq Wu.
-  unfold open_ct.
-  symmetry.
-  apply subst_tt_open_ct_rec...
-Qed.
-
-Lemma subst_cset_useless_repetition : forall x C1 C2 D,
-  x `notin` cset_fvars C2 ->
-  subst_cset x C1 (subst_cset x C2 D) = (subst_cset x C2 D).
-Proof.
-  intros.
-  destruct D.
-  {
-    unfold subst_cset, cset_references_fvar_dec.
-    reflexivity.
-  }
-  unfold subst_cset, cset_references_fvar_dec.
-  destruct (AtomSet.F.mem x t) eqn:EQ.
-  - unfold cset_remove_fvar at 1.
-    unfold cset_union at 1.
-    destruct C2.
-    + reflexivity.
-    + rewrite <- AtomSetFacts.mem_iff in EQ.
-      unfold cset_fvars in H.
-      replace (AtomSet.F.mem x (t1 `union` t `remove` x)) with false by fset_mem_dec.
-      reflexivity.
-  - rewrite EQ.
-    reflexivity.
-Qed.
-
-Lemma subst_ct_useless_repetition : forall x C D T,
-  x `notin` cset_fvars D ->
-  subst_ct x C (subst_ct x D T) = (subst_ct x D T)
-with subst_cpt_useless_repetition : forall x C D T,
-  x `notin` cset_fvars D ->
-  subst_cpt x C (subst_cpt x D T) = (subst_cpt x D T).
-Proof with auto.
-{ intros.
-  induction T; simpl; try reflexivity.
-  rewrite subst_cset_useless_repetition.
-  rewrite subst_cpt_useless_repetition.
-  all : trivial.
-}
-{ intros.
-  induction T; simpl; try reflexivity.
-  - rewrite subst_ct_useless_repetition.
-    rewrite subst_ct_useless_repetition.
-    all : trivial.
-  - rewrite subst_ct_useless_repetition.
-    rewrite subst_ct_useless_repetition.
-    all : trivial.
-}
-Qed.
 
 Local Lemma foo : forall x C e,
     AtomSet.F.In x (cset_fvars (free_for_cv e)) ->
@@ -3198,7 +3134,7 @@ Proof with simpl_env;
                       (typ_capt Cf (typ_arrow (subst_tt Z P T1) (subst_tt Z P T2))))...
     unshelve epose proof (cv_exists_in (map (subst_tb Z P) F ++ E) (subst_tt Z P T1) _ _) as [? ?]...
     + apply (wf_typ_in_subst_tb Q)...
-    + rewrite <- subst_tt_open_ct...
+    + rewrite <- open_tt_subst_ct...
       apply (typing_sub (open_ct (subst_tt Z P T2) D))...
 
       eapply applied_meaning_of.

@@ -22,6 +22,55 @@
 
 Require Export Fsub_Definitions.
 
+(** Automation *)
+Lemma cset_eq_injectivity : forall a1 a2 n1 n2,
+    a1 = a2 ->
+    n1 = n2 ->
+    cset_set a1 n1 = cset_set a2 n2.
+Proof.
+  intros *. intros EqA EqN.
+  rewrite EqA.
+  rewrite EqN.
+  trivial.
+Qed.
+
+Ltac fnset_mem_dec :=
+  match goal with
+  | |- true = _ => symmetry
+  | |- false = _ => symmetry
+  | |- _ => idtac
+  end;
+  match goal with
+  | |- NatSet.F.mem _ _ = true => rewrite <- NatSetFacts.mem_iff; fnsetdec
+  | |- NatSet.F.mem _ _ = false => rewrite <- NatSetFacts.not_mem_iff; fnsetdec
+  end.
+
+Ltac fset_mem_dec :=
+  match goal with
+  | |- true = _ => symmetry
+  | |- false = _ => symmetry
+  | |- _ => idtac
+  end;
+  match goal with
+  | |- AtomSet.F.mem _ _ = true => rewrite <- AtomSetFacts.mem_iff; fsetdec
+  | |- AtomSet.F.mem _ _ = false => rewrite <- AtomSetFacts.not_mem_iff; fsetdec
+  end.
+
+Ltac cset_eq_dec :=
+  apply cset_eq_injectivity; [try fsetdec | try fnsetdec].
+
+Ltac destruct_if :=
+  match goal with
+  | |- context[if ?t then _ else _] =>
+    destruct t eqn:?
+  end.
+
+Ltac destruct_match :=
+  match goal with
+  | |- context[match ?t with _ => _ end] =>
+    destruct t eqn:?
+  end.
+
 
 (* ********************************************************************** *)
 (** * #<a name="fv"></a># Free variables *)
@@ -1485,7 +1534,7 @@ Ltac closed_type :=
 Lemma subst_ct_open_tt_rec : forall c z P t k,
   capt c ->
   subst_ct z c (open_tt_rec k P t) = open_tt_rec k (subst_ct z c P) (subst_ct z c t)
-with subst_cpt_open_tpt_rec2 : forall c z P t k,
+with subst_cpt_open_tpt_rec : forall c z P t k,
   capt c ->
   subst_cpt z c (open_tpt_rec k P t) = open_tpt_rec k (subst_ct z c P) (subst_cpt z c t).
 Proof with eauto.
@@ -1517,4 +1566,75 @@ Proof with auto using open_cset_capt, open_cpt_rec_type, subst_ct_open_rec.
   induction T... eapply subst_ct_open_rec...
 Qed.
 
+Lemma open_ct_subst_tt : forall x C S T,
+  type S ->
+  open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
+Proof with auto using open_cset_capt, open_cpt_rec_type, subst_ct_open_rec,
+  subst_ct_open_tt_var, open_ct_subst_ct_var.
+  intros * HS.
+  cbv [open_ct]...
+  pick fresh y for (fv_et (subst_tt x S T)).
+  erewrite open_ct_subst_ct_var. 
+  erewrite subst_tt_open_ct_rec.
+  erewrite <-subst_ct_intro_rec.
+  all: eauto.
+Qed.
 
+Lemma subst_tt_open_ct_var : forall (X y:atom) P T,
+  y <> X ->
+  type P ->
+  (open_ct (subst_tt X P T) (cset_fvar y)) = (subst_tt X P (open_ct T (cset_fvar y))).
+Proof with auto*.
+  intros *; intros Neq Wu.
+  unfold open_ct.
+  symmetry.
+  apply subst_tt_open_ct_rec...
+Qed.
+
+Lemma subst_cset_useless_repetition : forall x C1 C2 D,
+  x `notin` cset_fvars C2 ->
+  subst_cset x C1 (subst_cset x C2 D) = (subst_cset x C2 D).
+Proof.
+  intros.
+  destruct D.
+  {
+    unfold subst_cset, cset_references_fvar_dec.
+    reflexivity.
+  }
+  unfold subst_cset, cset_references_fvar_dec.
+  destruct (AtomSet.F.mem x t) eqn:EQ.
+  - unfold cset_remove_fvar at 1.
+    unfold cset_union at 1.
+    destruct C2.
+    + reflexivity.
+    + rewrite <- AtomSetFacts.mem_iff in EQ.
+      unfold cset_fvars in H.
+      replace (AtomSet.F.mem x (t1 `union` t `remove` x)) with false by fset_mem_dec.
+      reflexivity.
+  - rewrite EQ.
+    reflexivity.
+Qed.
+
+Lemma subst_ct_useless_repetition : forall x C D T,
+  x `notin` cset_fvars D ->
+  subst_ct x C (subst_ct x D T) = (subst_ct x D T)
+with subst_cpt_useless_repetition : forall x C D T,
+  x `notin` cset_fvars D ->
+  subst_cpt x C (subst_cpt x D T) = (subst_cpt x D T).
+Proof with auto.
+{ intros.
+  induction T; simpl; try reflexivity.
+  rewrite subst_cset_useless_repetition.
+  rewrite subst_cpt_useless_repetition.
+  all : trivial.
+}
+{ intros.
+  induction T; simpl; try reflexivity.
+  - rewrite subst_ct_useless_repetition.
+    rewrite subst_ct_useless_repetition.
+    all : trivial.
+  - rewrite subst_ct_useless_repetition.
+    rewrite subst_ct_useless_repetition.
+    all : trivial.
+}
+Qed.
