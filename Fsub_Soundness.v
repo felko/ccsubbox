@@ -1799,11 +1799,21 @@ Proof with eauto.
         fsetdec.
       * simpl in InAp. unfold subst_cset. unfold cset_references_fvar_dec. rewrite InAp.
         inversion Wf; subst.
-        simpl. rewrite elim_empty_nat_set.
-        constructor...
-        -- admit. 
-        -- admit.
-        -- admit.
+        match goal with
+        | |- subcapt _ ?C _ =>
+          assert (wf_cset_in E C) as WfC
+        end. {
+          eauto using wf_cset_union, wf_cset_remove_fvar.
+        }
+        match goal with
+        | |- subcapt _ _ ?D =>
+          assert (wf_cset_in E D) as WfD
+        end. {
+          eauto using wf_cset_union, wf_cset_remove_fvar.
+        }
+        simpl in WfC, WfD |- *. rewrite elim_empty_nat_set in WfC, WfD |- *.
+        constructor...          (* well OK, what do we do here? induction? *)
+        admit.
     + rewrite <- AtomSetFacts.not_mem_iff in InAp.
       replace (subst_cset x C c) with c.
       replace (subst_cset x D c) with c.
@@ -1957,15 +1967,114 @@ Proof with eauto.
 Qed.
 
 Lemma wf_typ_preserved_by_subst_wf_cset : forall x C E Ap Am T,
-  wf_cset E Ap C ->
+  wf_env E ->
+  Ap `subset` dom E ->
+  Am `subset` dom E ->
   wf_typ E Ap Am T ->
-  wf_typ E Ap Am (subst_ct x C T)
+  (x `notin` Am -> wf_cset E Ap C -> wf_typ E Ap Am (subst_ct x C T)) /\
+  (x `notin` Ap -> wf_cset E Am C -> wf_typ E Ap Am (subst_ct x C T))
 with wf_pretyp_preserved_by_subst_wf_cset : forall x C E Ap Am T,
-  wf_cset E Ap C ->
+  wf_env E ->
+  Ap `subset` dom E ->
+  Am `subset` dom E ->
   wf_pretyp E Ap Am T ->
-  wf_pretyp E Ap Am (subst_cpt x C T).
-Proof.
-Admitted.
+  (x `notin` Am -> wf_cset E Ap C -> wf_pretyp E Ap Am (subst_cpt x C T)) /\
+  (x `notin` Ap -> wf_cset E Am C -> wf_pretyp E Ap Am (subst_cpt x C T)).
+Proof with eauto.
+{ intros * ? ? ? WfT.
+  generalize dependent Ap.
+  generalize dependent Am.
+  induction T; intros ? ? ? ? WfT.
+  - simpl.
+    split; intros ? WfC.
+    + constructor.
+      * unfold subst_cset.
+        inversion WfT.
+        destruct_if; eauto using wf_cset_union, wf_cset_remove_fvar.
+      * inversion WfT; subst.
+        unshelve epose proof (wf_pretyp_preserved_by_subst_wf_cset x C E Ap Am p _ _ _ _) as IH...
+        apply (proj1 IH)...
+    + constructor.
+      * unfold subst_cset.
+        inversion WfT; subst.
+        destruct_if...
+        inversion H8; subst.
+        {
+          simpl; unfold cset_union; destruct_match; constructor...
+        }
+        unfold cset_references_fvar_dec in Heqb.
+        set_facts_come_on_in Heqb.
+        exfalso.
+        fsetdec.
+      * inversion WfT; subst.
+        unshelve epose proof (wf_pretyp_preserved_by_subst_wf_cset x C E Ap Am p _ _ _ _) as IH...
+        apply (proj2 IH)...
+  - inversion WfT.
+  - simpl...
+}
+{ intros * ? ? ? WfT.
+  generalize dependent Ap.
+  generalize dependent Am.
+  induction T; intros ? ? ? ? WfT.
+  - constructor...
+  - wf_typ_inversion WfT.
+    split; intros ? WfC.
+    + pick fresh y and apply wf_typ_arrow; fold subst_ct...
+      1: {
+        unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Am Ap t _ _ _ _) as IH...
+        apply (proj2 IH)...
+      }
+      specialize (H8 y ltac:(notin_solve)).
+      apply (wf_typ_preserved_by_subst_wf_cset x C) in H8...
+      rewrite subst_ct_open_ct_var ; [| notin_solve | eapply capt_from_wf_cset]...
+      rewrite_nil_concat.
+      eapply wf_typ_ignores_typ_bindings; simpl...
+      apply (proj1 H8)...
+      rewrite_nil_concat.
+      eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+    + pick fresh y and apply wf_typ_arrow; fold subst_ct...
+      1: {
+        unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Am Ap t _ _ _ _) as IH...
+        apply (proj1 IH)...
+      }
+      specialize (H8 y ltac:(notin_solve)).
+      apply (wf_typ_preserved_by_subst_wf_cset x C) in H8...
+      rewrite subst_ct_open_ct_var ; [| notin_solve | eapply capt_from_wf_cset]...
+      rewrite_nil_concat.
+      eapply wf_typ_ignores_typ_bindings; simpl...
+      apply (proj2 H8)...
+      rewrite_nil_concat.
+      eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+  - wf_typ_inversion WfT.
+    split; intros ? WfC.
+    + pick fresh y and apply wf_typ_all; fold subst_ct...
+      1: {
+        unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Am Ap t _ _ _ _) as IH...
+        apply (proj2 IH)...
+      }
+      specialize (H8 y ltac:(notin_solve)).
+      apply (wf_typ_preserved_by_subst_wf_cset x C) in H8...
+      rewrite subst_ct_open_tt_var ; [| notin_solve | eapply capt_from_wf_cset]...
+      rewrite_nil_concat.
+      eapply wf_typ_ignores_sub_bindings; simpl...
+      apply (proj1 H8)...
+      rewrite_nil_concat.
+      eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+    + pick fresh y and apply wf_typ_all; fold subst_ct...
+      1: {
+        unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Am Ap t _ _ _ _) as IH...
+        apply (proj1 IH)...
+      }
+      specialize (H8 y ltac:(notin_solve)).
+      apply (wf_typ_preserved_by_subst_wf_cset x C) in H8...
+      rewrite subst_ct_open_tt_var ; [| notin_solve | eapply capt_from_wf_cset]...
+      rewrite_nil_concat.
+      eapply wf_typ_ignores_sub_bindings; simpl...
+      apply (proj2 H8)...
+      rewrite_nil_concat.
+      eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+}
+Qed.
 
 Lemma meaning_of : forall E Ap Am x C D T,
   wf_env E ->
@@ -1974,8 +2083,8 @@ Lemma meaning_of : forall E Ap Am x C D T,
   Am `subset` dom E ->
   wf_typ E Ap Am T ->
   subcapt E C D ->
-  ((x `notin` Am -> sub E (subst_ct x C T) (subst_ct x D T)) /\
-   (x `notin` Ap -> sub E (subst_ct x D T) (subst_ct x C T)))
+  ((x `notin` Am -> wf_cset E Ap C -> wf_cset E Ap D -> sub E (subst_ct x C T) (subst_ct x D T)) /\
+   (x `notin` Ap -> wf_cset E Am C -> wf_cset E Am D -> sub E (subst_ct x D T) (subst_ct x C T)))
 with pre_meaning_of : forall E Ap Am x C D T,
   wf_env E ->
   pretype T ->
@@ -1983,8 +2092,8 @@ with pre_meaning_of : forall E Ap Am x C D T,
   Am `subset` dom E ->
   wf_pretyp E Ap Am T ->
   subcapt E C D ->
-  ((x `notin` Am -> sub_pre E (subst_cpt x C T) (subst_cpt x D T)) /\
-  (x `notin` Ap -> sub_pre E (subst_cpt x D T) (subst_cpt x C T))).
+  ((x `notin` Am -> wf_cset E Ap C -> wf_cset E Ap D -> sub_pre E (subst_cpt x C T) (subst_cpt x D T)) /\
+  (x `notin` Ap -> wf_cset E Am C -> wf_cset E Am D -> sub_pre E (subst_cpt x D T) (subst_cpt x C T))).
 Proof with simpl_env; eauto; fold subst_cpt.
 ------
   intros *.
@@ -2008,18 +2117,35 @@ Proof with simpl_env; eauto; fold subst_cpt.
   - simpl. constructor...
   - (* specializing the hypothesis to the argument type of arrow *)
     destruct (meaning_of E Am Ap x C D T1 HwfE H SubAm SubAp H6 Hsc).
-    split; intros.
-    + specialize (H2 H3).
+    split; intros ? WfC WfD.
+    + specialize (H2 H3 WfC WfD).
       pick fresh y and apply sub_arrow; fold subst_ct...
-      rewrite subst_ct_open_ct_var...
-      specialize (H7 y).
-      (*
-       1) we need to know that `Ap subset dom E`
-       2) we need to show that subst_ct preserves wellformedness (wf_typ).
-       3) then we can apply wf_typ_ignores_typ_bindings
-      *)
-      apply cheat.
-      apply cheat.
+      {
+        rewrite subst_ct_open_ct_var...
+        specialize (H7 y ltac:(notin_solve)).
+        rewrite_nil_concat.
+        eapply wf_typ_ignores_typ_bindings.
+        eapply wf_typ_set_weakening.
+        eapply wf_typ_preserved_by_subst_wf_cset in H7.
+        simpl_env.
+        apply (proj1 H7).
+        all : trivial...
+        rewrite_nil_concat.
+        eapply wf_cset_weakening; [ apply WfD | simpl_env; auto .. ].
+      }
+      {
+        rewrite subst_ct_open_ct_var...
+        specialize (H7 y ltac:(notin_solve)).
+        rewrite_nil_concat.
+        eapply wf_typ_ignores_typ_bindings.
+        eapply wf_typ_set_weakening.
+        eapply wf_typ_preserved_by_subst_wf_cset in H7.
+        simpl_env.
+        apply (proj1 H7).
+        all : trivial...
+        rewrite_nil_concat.
+        eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+      }
       rewrite subst_ct_open_ct_var...
       rewrite subst_ct_open_ct_var...
       (* we cannot call meaning_of on anything that is larger than wf_typ.... *)
@@ -2036,20 +2162,43 @@ Proof with simpl_env; eauto; fold subst_cpt.
       * rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
         eapply wf_typ_ignores_typ_bindings...
       * destruct H4.
-        rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
-        apply subcapt_weakening...
-        apply H4...
-    + specialize (H1 H3).
+        -- rewrite_env (empty ++ [(y, bind_typ (subst_ct x D T1))] ++ E).
+           apply subcapt_weakening...
+        -- apply H4...
+           ++ rewrite_nil_concat.
+              eapply wf_cset_ignores_typ_bindings.
+              eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
+           ++ rewrite_nil_concat.
+              eapply wf_cset_ignores_typ_bindings.
+              eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
+    + specialize (H1 H3 WfC WfD).
       pick fresh y and apply sub_arrow; fold subst_ct...
-      rewrite subst_ct_open_ct_var...
-      specialize (H7 y).
-      (*
-        1) we need to know that `Ap subset dom E`
-        2) we need to show that subst_ct preserves wellformedness (wf_typ).
-        3) then we can apply wf_typ_ignores_typ_bindings
-      *)
-      apply cheat.
-      apply cheat.
+      {
+        rewrite subst_ct_open_ct_var...
+        specialize (H7 y ltac:(notin_solve)).
+        rewrite_nil_concat.
+        eapply wf_typ_ignores_typ_bindings.
+        eapply wf_typ_set_weakening.
+        eapply wf_typ_preserved_by_subst_wf_cset in H7.
+        simpl_env.
+        apply (proj2 H7).
+        all : trivial...
+        rewrite_nil_concat.
+        eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+      }
+      {
+        rewrite subst_ct_open_ct_var...
+        specialize (H7 y ltac:(notin_solve)).
+        rewrite_nil_concat.
+        eapply wf_typ_ignores_typ_bindings.
+        eapply wf_typ_set_weakening.
+        eapply wf_typ_preserved_by_subst_wf_cset in H7.
+        simpl_env.
+        apply (proj2 H7).
+        all : trivial...
+        rewrite_nil_concat.
+        eapply wf_cset_weakening; [ apply WfD | simpl_env; auto .. ].
+      }
       rewrite subst_ct_open_ct_var...
       rewrite subst_ct_open_ct_var...
       (* we cannot call meaning_of on anything that is larger than wf_typ.... *)
@@ -2066,23 +2215,44 @@ Proof with simpl_env; eauto; fold subst_cpt.
       * rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
         eapply wf_typ_ignores_typ_bindings...
       * destruct H4.
-        rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
-        apply subcapt_weakening...
-        apply H5...
+        -- rewrite_env (empty ++ [(y, bind_typ (subst_ct x C T1))] ++ E).
+           apply subcapt_weakening...
+        -- apply H5...
+           ++ rewrite_nil_concat.
+              eapply wf_cset_ignores_typ_bindings.
+              eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
+           ++ rewrite_nil_concat.
+              eapply wf_cset_ignores_typ_bindings.
+              eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
   - (* specializing the hypothesis to the argument type of arrow *)
     destruct (meaning_of E Am Ap x C D T1 HwfE H SubAm SubAp H6 Hsc).
-    split; intros.
-    + specialize (H2 H3).
+    split; intros ? WfC WfD.
+    + specialize (H2 H3 WfC WfD).
       pick fresh y and apply sub_all; fold subst_ct...
-      rewrite subst_ct_open_tt_var...
-      specialize (H7 y).
-      (*
-       1) we need to know that `Ap subset dom E`
-       2) we need to show that subst_ct preserves wellformedness (wf_typ).
-       3) then we can apply wf_typ_ignores_typ_bindings
-      *)
-      apply cheat.
-      apply cheat.
+      { rewrite subst_ct_open_tt_var...
+        specialize (H7 y ltac:(notin_solve)).
+        rewrite_nil_concat.
+        apply wf_typ_ignores_sub_bindings with (T1 := T1)...
+        eapply wf_typ_set_weakening.
+        eapply wf_typ_preserved_by_subst_wf_cset in H7.
+        simpl_env.
+        apply (proj1 H7).
+        all : trivial...
+        rewrite_nil_concat.
+        eapply wf_cset_weakening; [ apply WfD | simpl_env; auto .. ].
+      }
+      { rewrite subst_ct_open_tt_var...
+        specialize (H7 y ltac:(notin_solve)).
+        rewrite_nil_concat.
+        apply wf_typ_ignores_sub_bindings with (T1 := T1)...
+        eapply wf_typ_set_weakening.
+        eapply wf_typ_preserved_by_subst_wf_cset in H7.
+        simpl_env.
+        apply (proj1 H7).
+        all : trivial...
+        rewrite_nil_concat.
+        eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+      }
       rewrite subst_ct_open_tt_var...
       rewrite subst_ct_open_tt_var...
       (* we cannot call meaning_of on anything that is larger than wf_typ.... *)
@@ -2099,63 +2269,79 @@ Proof with simpl_env; eauto; fold subst_cpt.
       * rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
         eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
       * destruct H4.
-        rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
-        apply subcapt_weakening...
-        apply H4...
-    + specialize (H1 H3).
-      pick fresh y and apply sub_all; fold subst_ct...
-      * rewrite subst_ct_open_tt_var...
-        specialize (H7 y ltac:(notin_solve)).
-        (*
-          1) we need to know that `Ap subset dom E`
-          2) we need to show that subst_ct preserves wellformedness (wf_typ).
-          3) then we can apply wf_typ_ignores_typ_bindings
-        *)
-        (* apply wf_typ_subst_cb. *)
-        (* rewrite (empty) *)
-        (* Ltac rewrite_nil_concat_in := *)
-        (*   match goal with *)
-        (*   | |- _ ?E0 _ => *)
-        (*     rewrite <- nil_concat with (E := E0) *)
-        (*   | |- _ ?E0 _ _ => *)
-        (*     rewrite <- nil_concat with (E := E0) *)
-        (*   | |- _ ?E0 _ _ _ => *)
-        (*     rewrite <- nil_concat with (E := E0) *)
-        (*   end. *)
-
-        (* rewrite_nil_concat *)
-        apply cheat.
-      * apply cheat.
-      * rewrite subst_ct_open_tt_var...
-        rewrite subst_ct_open_tt_var...
-        (* we cannot call meaning_of on anything that is larger than wf_typ.... *)
-        assert (y `notin` L) as NotIn by notin_solve.
-        specialize (H0 y NotIn).
-        unshelve epose proof (meaning_of
-                                ([(y, bind_sub (subst_ct x C T1))] ++ E)
-                                Ap
-                                Am x C D (open_tt T2 y) _ H0 _ _ _).
-        -- econstructor...
-        (* we need to help fsetdec here a little *)
-        -- clear Fr. simpl. fsetdec.
-        -- clear Fr. simpl. fsetdec.
-        -- rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
-           eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
-        -- destruct H4.
-           rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
+        -- rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
            apply subcapt_weakening...
-           apply H5...
+        -- apply H4...
+           ++ rewrite_nil_concat.
+              eapply wf_cset_ignores_sub_bindings.
+              eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
+           ++ rewrite_nil_concat.
+              eapply wf_cset_ignores_sub_bindings.
+              eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
+    + specialize (H1 H3 WfC WfD).
+      pick fresh y and apply sub_all; fold subst_ct...
+      { rewrite subst_ct_open_tt_var...
+        specialize (H7 y ltac:(notin_solve)).
+        rewrite_nil_concat.
+        apply wf_typ_ignores_sub_bindings with (T1 := T1)...
+        eapply wf_typ_set_weakening.
+        eapply wf_typ_preserved_by_subst_wf_cset in H7.
+        simpl_env.
+        apply (proj2 H7).
+        all : trivial...
+        rewrite_nil_concat.
+        eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+      }
+      { rewrite subst_ct_open_tt_var...
+        specialize (H7 y ltac:(notin_solve)).
+        rewrite_nil_concat.
+        apply wf_typ_ignores_sub_bindings with (T1 := T1)...
+        eapply wf_typ_set_weakening.
+        eapply wf_typ_preserved_by_subst_wf_cset in H7.
+        simpl_env.
+        apply (proj2 H7).
+        all : trivial...
+        rewrite_nil_concat.
+        eapply wf_cset_weakening; [ apply WfD | simpl_env; auto .. ].
+      }
+      rewrite subst_ct_open_tt_var...
+      rewrite subst_ct_open_tt_var...
+      (* we cannot call meaning_of on anything that is larger than wf_typ.... *)
+      assert (y `notin` L) as NotIn by notin_solve.
+      specialize (H0 y NotIn).
+      unshelve epose proof (meaning_of
+                              ([(y, bind_sub (subst_ct x C T1))] ++ E)
+                              Ap
+                              Am x C D (open_tt T2 y) _ H0 _ _ _).
+      * econstructor...
+      (* we need to help fsetdec here a little *)
+      * clear Fr. simpl. fsetdec.
+      * clear Fr. simpl. fsetdec.
+      * rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
+        eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
+      * destruct H4.
+        -- rewrite_env (empty ++ [(y, bind_sub (subst_ct x C T1))] ++ E).
+           apply subcapt_weakening...
+        -- apply H5...
+           ++ rewrite_nil_concat.
+              eapply wf_cset_ignores_sub_bindings.
+              eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
+           ++ rewrite_nil_concat.
+              eapply wf_cset_ignores_sub_bindings.
+              eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
 Qed.
 
 Lemma true_meaning_of : forall E Ap Am x C D T,
-    wf_env E ->
-    type T ->
-    Ap `subset` dom E ->
-    Am `subset` dom E ->
-    wf_typ E Ap Am T ->
-    subcapt E C D ->
-    x `notin` Am ->
-    sub E (subst_ct x C T) (subst_ct x D T).
+  wf_env E ->
+  type T ->
+  Ap `subset` dom E ->
+  Am `subset` dom E ->
+  wf_typ E Ap Am T ->
+  subcapt E C D ->
+  x `notin` Am ->
+  wf_cset E Ap C ->
+  wf_cset E Ap D ->
+  sub E (subst_ct x C T) (subst_ct x D T).
 Proof with eauto.
   intros.
   eapply (proj1 (meaning_of _ Ap Am _ _ _ _ H H0 H1 H2 H3 H4))...
@@ -2214,8 +2400,14 @@ Proof.
     apply sub_through_subst_ct with (U := S); simpl_env; auto.
   }
   eapply true_meaning_of with (Ap := dom E `union` singleton y) (Am := dom E); eauto.
-  rewrite_nil_concat.
-  apply subcapt_weakening; simpl_env; eauto.
+  - rewrite_nil_concat.
+    apply subcapt_weakening; simpl_env; eauto.
+  - apply subcapt_regular in Hsc as [WfC1 _].
+    rewrite_nil_concat.
+    eapply wf_cset_weakening ; [ apply WfC1 | simpl_env; auto .. ].
+  - apply subcapt_regular in Hsc as [_ WfC2].
+    rewrite_nil_concat.
+    eapply wf_cset_weakening ; [ apply WfC2 | simpl_env; auto .. ].
 Qed.
 
 Lemma typing_narrowing : forall Q E F X P e T,
@@ -2790,10 +2982,12 @@ Lemma typing_through_subst_ee' : forall U E Ap Am x T C e u,
   value u ->
   typing E u U ->
   cv E U C ->
+  wf_cset E Ap (free_for_cv u) ->
+  wf_cset E Ap C ->
   typing E (subst_ee x u (free_for_cv u) e) (subst_ct x C T).
 Proof with simpl_env; eauto.
   intros *.
-  intros HtypT HwfT Hnotin HApRsnbl HAmRsnbl HvalU HtypU HcvU.
+  intros HtypT HwfT Hnotin HApRsnbl HAmRsnbl HvalU HtypU HcvU WfFvU WfC.
   assert (typing E (subst_ee x u (free_for_cv u) e) (subst_ct x (free_for_cv u) T))
     as Hthrough. {
     apply values_have_precise_captures in HtypU...
@@ -2826,8 +3020,8 @@ Proof with simpl_env; eauto.
       fsetdec.
     }
     assert (x `notin` (cset_fvars C)). {
-      apply cv_regular in HcvU as [_ [_ WfC]].
-      inversion WfC; subst.
+      apply cv_regular in HcvU as [_ [_ WfC']].
+      inversion WfC'; subst.
       - unfold cset_fvars; fsetdec.
       - unfold cset_fvars. notin_solve.
     }
@@ -2837,11 +3031,15 @@ Proof with simpl_env; eauto.
     apply HP.
   }
   apply true_meaning_of with (Ap := Ap) (Am := Am)...
-  apply value_therefore_fv_subcapt_cv with (T := U)...
-  rewrite_env (empty ++ [(x, bind_typ U)] ++ E);
-    eapply typing_weakening...
-  rewrite_env (empty ++ [(x, bind_typ U)] ++ E);
-    eapply cv_weakening...
+  - apply value_therefore_fv_subcapt_cv with (T := U)...
+    rewrite_env (empty ++ [(x, bind_typ U)] ++ E);
+      eapply typing_weakening...
+    rewrite_env (empty ++ [(x, bind_typ U)] ++ E);
+      eapply cv_weakening...
+  - rewrite_nil_concat.
+    eapply wf_cset_weakening ; [ apply WfFvU | simpl_env; auto .. ].
+  - rewrite_nil_concat.
+    eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
 Qed.
 
 (************************************************************************ *)
@@ -3221,6 +3419,9 @@ Proof with simpl_env; eauto.
           with (dom E `union` singleton x) by (clear Fr; fsetdec)...
         rewrite_nil_concat.
         apply wf_typ_narrowing_typ_base with (V := T)...
+      * eapply wf_cset_set_weakening; [eapply typing_cv | fsetdec]...
+      * apply cv_regular in H0 as [_ [_ ?]].
+        eapply wf_cset_set_weakening; [ apply H0 | fsetdec ].
   - Case "typing_tapp".
     inversion Red; subst...
     SCase "red_tabs".
