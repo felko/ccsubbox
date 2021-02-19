@@ -987,40 +987,57 @@ Proof with eauto.
   assumption.
 Qed.
 
-(* Type substitution preserves subcapturing *)
-Lemma captures_through_subst_tt : forall Q E F Z P C x,
-  captures (F ++ [(Z, bind_sub Q)] ++ E) C x ->
+
+Lemma captures_through_subst_tt_forall : forall Q F Z P E C ys,
   wf_typ_in E P ->
-  captures (map (subst_tb Z P) F ++ E) C x.
+  wf_env (F ++ [(Z, bind_sub Q)] ++ E) ->
+  sub E P Q ->
+  AtomSet.F.For_all (captures (F ++ [(Z, bind_sub Q)] ++ E) C) ys ->
+  AtomSet.F.For_all (captures (map (subst_tb Z P) F ++ E) C) ys.
 Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb.
-  intros *.
-  intros H Tp.
-  remember  (F ++ [(Z, bind_sub Q)] ++ E).
-  generalize dependent F.
-  induction H; intros; subst.
-  - constructor...
-  (* that's the same as in captures_narrowing -> TODO refactor *)
+  intros * WfTyp WfEnv Sub H.
+  unfold AtomSet.F.For_all in *; intros.
+  specialize (H x H0).
+  generalize dependent ys.
+  dependent induction H; intros ys' In...
   - assert (x <> Z). {
       unfold not. intros.
       binds_cases H.
       * subst. unfold dom in Fr0. fsetdec.
       * subst. exfalso. admit.
-    }
-    apply captures_var with (T := T) (ys := ys)...
-    admit.
-  (* - assert (exists (C3 : captureset),
-      cv (subst_tt X P T) (map (subst_tb X P) G ++ E) C3 /\
-      subcapt (map (subst_tb X P) G ++ E) C3 C2
-           ) as [C3 [C3sub C3eq]]. {
-      apply cv_through_subst_tt with (Q := Q)...
-      assert (binds X0 (bind_typ T) (G ++ [(X, bind_sub Q)] ++ E)); auto.
-      eapply wf_typ_from_binds_typ; auto.
-      apply H.
-    }
-    apply subcapt_var with (C2 := C3) (T := subst_tt X P T)...
-    apply subcapt_transitivity with (C2 := C2)...
-    apply wf_env_subst_tb with (Q := Q)... *)
+    }  
+    destruct (cv_through_subst_tt_exists _ _ P _ _ _ _ ltac:(eauto) ltac:(eauto) H0 Sub) as [C2 [CvC2 SubcaptC2]].
+    inversion SubcaptC2; subst.  
+    eapply captures_var with (T := subst_tt Z P T) (ys := xs0).
+    * binds_cases H.
+      ** apply binds_tail. admit. admit.
+      ** apply binds_head.
+         replace (bind_typ (subst_tt Z P T)) with ((subst_tb Z P) (bind_typ T)).
+         apply binds_map...
+         simpl...
+    * trivial.
+    * eapply captures_transitivity_forall with (ys := ys)...
+      unfold AtomSet.F.For_all; intros.
+      destruct (x == x0); subst...
 Admitted.
+
+
+(* Type substitution preserves subcapturing *)
+Lemma captures_through_subst_tt : forall Q E F Z P C x,
+  captures (F ++ [(Z, bind_sub Q)] ++ E) C x ->
+  sub E P Q ->
+  wf_typ_in E P ->  
+  wf_env (F ++ [(Z, bind_sub Q)] ++ E) ->
+  captures (map (subst_tb Z P) F ++ E) C x.
+Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb.
+  intros *.
+  intros H Sub Tp WfEnv.
+  eapply captures_through_subst_tt_forall with (Q := Q) (ys := singleton x)...
+  - unfold AtomSet.F.For_all; intros.
+    assert (x = x0) by fsetdec; subst.
+    trivial.
+  - fsetdec.
+Qed.
 
 Lemma subcapt_through_subst_tt : forall E P Q G X C D,
   wf_env (G ++ [(X, bind_sub Q)] ++ E) ->
