@@ -411,6 +411,7 @@ admit.
 (* induction F; intros Wf_env WP; simpl_env; *)
 (*   inversion Wf_env; simpl_env in *; simpl subst_tb... *)
 Admitted.
+
 Lemma cset_subst_self : forall C x,
   subst_cset x C (cset_fvar x) = C.
 Proof.
@@ -582,6 +583,26 @@ Proof with eauto*.
   inversion Hwf...
 Qed.
 
+Lemma tail_not_in_head : forall (E F : env) x,
+  ok (F ++ E) ->
+  x `in` dom E ->
+  x `notin` dom F.
+Proof. 
+  intros * Hok Hx.
+  induction F.
+  + notin_solve.
+  + assert (x `notin` dom F). {
+      apply IHF; inversion Hok; assumption.
+    }
+    destruct a; simpl_env in *...
+    assert (x <> a). {
+      inversion Hok; subst.
+      simpl_env in *.
+      fsetdec.
+    }
+    fsetdec.
+Qed.
+
 Lemma captures_subenv : forall E F xs y,
   wf_env (F ++ E) ->
   captures (F ++ E) xs y ->
@@ -590,18 +611,22 @@ Lemma captures_subenv : forall E F xs y,
 Proof with eauto*.
   intros * Hwf HC HyE.
   dependent induction HC...
-  assert (x `notin` dom F) by admit.
+  assert (x `notin` dom F). {
+    eapply tail_not_in_head...
+  }
   binds_cases H...
-  * eapply captures_var with (T := T)...
-    eapply cv_unique_shrink...
-    eapply wf_typ_from_binds_typ...
-    eapply wf_env_weaken_head...
+  * assert (cv E T (cset_set ys {}N)) as HcvTE. {
+      eapply cv_unique_shrink...
+      eapply wf_typ_from_binds_typ...
+      eapply wf_env_weaken_head...
+    }
+    eapply captures_var with (T := T)...
     intros y HyIn.
     eapply H2...
-    (** of course y is in dom E **)
-    admit.
+    pose proof (cv_regular _ _ _ HcvTE) as [_ [_ HysE]]...
+    inversion HysE...
   * apply binds_In in H5. notin_solve.
-Admitted.
+Qed.
 
 Lemma captures_through_env_subst_set : forall F x U E ys zs C,
   wf_env (F ++ [(x, bind_typ U)] ++ E) ->
