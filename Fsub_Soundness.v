@@ -45,7 +45,6 @@ Admitted.
 Local Lemma cheat_with : forall A B, A -> B.
 Admitted.
 
-
 Local Lemma foo : forall x C e,
     AtomSet.F.In x (cset_fvars (free_for_cv e)) ->
     subst_cset x C (free_for_cv e) = cset_union C (cset_remove_fvar x (free_for_cv e)).
@@ -59,15 +58,19 @@ Proof.
     + pose proof (cv_free_never_universal e).
       easy.
     + set_facts_come_on_in Heqb.
-      exfalso.
+      unfold cset_fvars in H.
       fsetdec.
 Qed.
 
+
+(* x in (fv e) ->
+  (fv u) union (fv e remove x) = fv (e[x !-> u][x !-> fv u])
+*)
 Local Lemma bar : forall x e u,
   AtomSet.F.In x (cset_fvars (free_for_cv e)) ->
   (cset_union (free_for_cv u) (cset_remove_fvar x (free_for_cv e))) =
         (free_for_cv (subst_ee x u (free_for_cv u) e)).
-Proof with auto.
+Proof with eauto using cv_free_never_universal.
   intros * Hin.
   induction e; simpl in *...
   - csetdec.
@@ -79,13 +82,58 @@ Proof with auto.
       * fsetdec.
       * fnsetdec.
     + exfalso. apply n. fsetdec.
-  - simpl in Hin.
+  - destruct (free_for_cv e1); destruct (free_for_cv e2); destruct (free_for_cv u); 
+      unfold cset_fvars in *; simpl in *; try fsetdec.
+    + rewrite (AtomSetFacts.union_iff t t1 x) in Hin.
+      destruct Hin.
+      * specialize (IHe1 H).
+        epose proof (cv_free_never_universal (subst_ee x u cset_universal e1)).
+        symmetry in IHe1.
+        contradiction.
+      * specialize (IHe2 H).
+        epose proof (cv_free_never_universal (subst_ee x u cset_universal e2)).
+        symmetry in IHe2.
+        contradiction.
+      (* we only want to consider the case where all u, e1 and e2 have a concrete cv...  *)
+    + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
+      rewrite (AtomSetFacts.union_iff t t1 x) in Hin.
+      destruct Hin.
+      * specialize (IHe1 H).
+        rewrite <- IHe1.
+        unfold cset_fvars in *; simpl.
 Admitted.
 
 Lemma notin_dom_is_notin_fv_ee : forall x E e T,
   x `notin` dom E ->
   typing E e T ->
   x `notin` fv_ee e.
+Proof with eauto.
+  intros * NotIn Typ.
+  assert (wf_typ_in E T) as WfTyp by eauto.
+
+  induction Typ.
+  - assert (x <> x0). { admit. }
+    unfold fv_ee. notin_solve.
+  - assert (x <> x0). { admit. }
+    unfold fv_ee. notin_solve.
+  - admit.
+  - unfold fv_ee. fold fv_ee.
+    rewrite (AtomSetFacts.union_iff (fv_ee e1) (fv_ee e2) x).
+    unfold not in *. intros. destruct H1...
+  - unfold fv_ee. fold fv_ee.
+    rewrite (AtomSetFacts.union_iff (fv_et V) (fv_ee e1) x).
+    unfold not in *. intros. destruct H3...
+    + admit. (* notin_fv_wf_typ *)
+    + pick fresh X.
+      specialize (H2 X ltac:(fsetdec)).
+      apply H2...
+      admit.
+      admit.
+      admit.
+  - unfold fv_ee. fold fv_ee.
+    rewrite (AtomSetFacts.union_iff (fv_et T) (fv_ee e1) x).
+    unfold not in *. intros. destruct H0...
+    admit. (* notin_fv_wf_typ *)
 Admitted.
 
 (* ********************************************************************** *)
