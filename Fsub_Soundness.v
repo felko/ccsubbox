@@ -63,11 +63,23 @@ Proof.
       fsetdec.
 Qed.
 
-Local Lemma bar : forall x C e u,
+Local Lemma bar : forall x e u,
   AtomSet.F.In x (cset_fvars (free_for_cv e)) ->
-  (cset_union C (cset_remove_fvar x (free_for_cv e))) =
-        (free_for_cv (subst_ee x u C e)).
-Proof.
+  (cset_union (free_for_cv u) (cset_remove_fvar x (free_for_cv e))) =
+        (free_for_cv (subst_ee x u (free_for_cv u) e)).
+Proof with auto.
+  intros * Hin.
+  induction e; simpl in *...
+  - csetdec.
+  - destruct (a == x) eqn:HX.
+    + subst.
+      csetdec.
+      destruct (free_for_cv u)...
+      f_equal...
+      * fsetdec.
+      * fnsetdec.
+    + exfalso. apply n. fsetdec.
+  - simpl in Hin.
 Admitted.
 
 Lemma notin_dom_is_notin_fv_ee : forall x E e T,
