@@ -3356,18 +3356,17 @@ Proof with simpl_env; eauto.
         eapply wf_cset_set_weakening; [ apply H0 | fsetdec ].
   - Case "typing_tapp".
     inversion Red; subst...
-    SCase "red_tabs".
-    admit.
-    (* destruct (typing_inv_tabs _ _ _ _ Typ T1 T2 C) as [P1 [L P2]]. { *)
-    (*   eapply sub_reflexivity... *)
-    (* } *)
-    (* pick fresh X. *)
-    (* destruct (P2 X ltac:(notin_solve)) as [S2 ?]... *)
-    (* rewrite (subst_te_intro X)... *)
-    (* rewrite (subst_tt_intro X)... *)
-    (* rewrite_env (map (subst_tb X T) empty ++ E). *)
-    (* apply (typing_through_subst_te T1)... *)
-Admitted.
+    SCase "red_tabs". 
+    destruct (typing_inv_tabs _ _ _ _ Typ T1 T2 C) as [Sub [P1 [L P2]]]. {
+      eapply sub_reflexivity...
+    }
+    pick fresh X.
+    destruct (P2 X ltac:(notin_solve)) as [S2 ?]...
+    rewrite (subst_te_intro X)...
+    rewrite (subst_tt_intro X)...
+    rewrite_env (map (subst_tb X T) empty ++ E).
+    apply (typing_through_subst_te T1)...
+Qed.
 
 (* ********************************************************************** *)
 (** ** Canonical forms (14) *)
