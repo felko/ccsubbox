@@ -1015,7 +1015,14 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb.
     inversion SubcaptC2; subst.  
     eapply captures_var with (T := subst_tt Z P T) (ys := xs0).
     * binds_cases H.
-      ** apply binds_tail. admit. admit.
+      ** apply binds_tail.
+         assert (wf_typ_in E T). {
+           eapply wf_typ_from_binds_typ...
+         }
+         destruct (wf_env_inv _ _ _ _ WfEnv) as [WfE ZNotInE].
+         assert (Z `notin` fv_tt T). { eapply notin_fv_wf... }
+         rewrite <- (subst_tt_fresh Z P T)...
+         rewrite dom_map...
       ** apply binds_head.
          replace (bind_typ (subst_tt Z P T)) with ((subst_tb Z P) (bind_typ T)).
          apply binds_map...
@@ -1024,7 +1031,7 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb.
     * eapply captures_transitivity_forall with (ys := ys)...
       unfold AtomSet.F.For_all; intros.
       destruct (x == x0); subst...
-Admitted.
+Qed.
 
 
 (* Type substitution preserves subcapturing *)
