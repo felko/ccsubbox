@@ -571,3 +571,171 @@ Proof with eauto using wf_env_subst_cb, wf_pretyp_in_subst_cb_cv, wf_typ_in_subs
     constructor...
     apply (wf_cset_in_subst_cb U)...
 Qed.
+
+
+Lemma wf_env_weaken_head : forall E F,
+  wf_env (F ++ E) ->
+  wf_env E.
+Proof with eauto*.
+  intros E F Hwf.
+  induction F...
+  inversion Hwf...
+Qed.
+
+Lemma captures_subenv : forall E F xs y,
+  wf_env (F ++ E) ->
+  captures (F ++ E) xs y ->
+  y `in` dom E ->
+  captures E xs y.
+Proof with eauto*.
+  intros * Hwf HC HyE.
+  dependent induction HC...
+  assert (x `notin` dom F) by admit.
+  binds_cases H...
+  * eapply captures_var with (T := T)...
+    eapply cv_unique_shrink...
+    eapply wf_typ_from_binds_typ...
+    eapply wf_env_weaken_head...
+    intros y HyIn.
+    eapply H2...
+    (** of course y is in dom E **)
+    admit.
+  * apply binds_In in H5. notin_solve.
+Admitted.
+
+Lemma captures_through_env_subst_set : forall F x U E ys zs C,
+  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
+  AtomSet.F.For_all (captures (F ++ [(x, bind_typ U)] ++ E) ys) zs ->
+  x `notin` zs ->
+  x `notin` ys ->
+  cv E U C ->
+  AtomSet.F.For_all (captures (map (subst_cb x C) F ++ E) ys) zs.
+Proof with eauto.
+  intros * Hwf HC HfreshZ HfreshY HCv.
+  intros z Hin.
+  specialize (HC z Hin).
+  generalize dependent zs.
+  dependent induction HC; intros zs HfreshZ Hin...
+  binds_cases H...
+
+  - assert (wf_typ_in E T). {
+      eapply wf_typ_from_binds_typ...
+    }
+    assert (cv E T (cset_set ys {}N)) as HcvT. {
+      apply cv_unique_shrink in H0...
+      2: {
+        rewrite_nil_concat.
+        eapply wf_typ_weakening...
+        apply ok_from_wf_env in Hwf.
+        apply ok_tail in Hwf...
+      }
+      apply cv_unique_shrink in H0...
+    }
+
+    eapply captures_var...
+    + rewrite_nil_concat.
+      apply cv_weakening; simpl_env.
+      2: eauto using wf_env_subst_cb.
+      apply HcvT.
+    + apply cv_regular in HcvT as [_ [_ WfCvT]].
+      inversion WfCvT; subst.
+      apply binding_uniq_from_wf_env in Hwf as ?.
+      assert (x `notin` ys) by notin_solve.
+      intros y ?.
+      assert (y <> x) by notin_solve.
+      destruct (AtomSet.F.mem y xs) eqn:EQ; set_facts_come_on_in EQ.
+      * constructor...
+      * eapply H2 with (x0 := y) (zs := ys); trivial.
+        eauto.
+  - Case "z = x".
+    exfalso; notin_solve.
+    (* assert (binds x0 (bind_typ (subst_ct x C T)) (map (subst_cb x C) F ++ E)) by auto. *)
+  - assert (binds z (bind_typ (subst_ct x C T)) (map (subst_cb x C) F ++ E)) by auto.
+    apply cv_through_subst_ct with (D := C) in H0 as H0'...
+    unfold subst_cset, cset_references_fvar_dec in H0'.
+    destruct (AtomSet.F.mem x ys) eqn:EQ; set_facts_come_on_in EQ.
+    + SCase "x in ys".
+      destruct C; simpl in H0'.
+      * specialize (H1 x EQ).
+        inversion H1; subst.
+        -- exfalso; notin_solve.
+        -- binds_get H3.
+          inversion H8; subst.
+          assert (cv (empty ++ (F ++ [(x, bind_typ U)]) ++ E) U cset_universal) as HA. {
+            apply cv_weakening; simpl_env...
+          }
+          simpl_env in HA.
+          unshelve epose proof (cv_unique _ _ _ _ _ _ H5 HA)...
+          easy.
+      * pose proof (cv_regular _ _ _ HCv) as [_ [_ Reg]].
+        inversion Reg; subst.
+        rewrite elim_empty_nat_set in H0'.
+        eapply captures_var...
+
+        intros y HyIn.
+        rewrite AtomSetFacts.union_iff in HyIn.
+        destruct HyIn...
+        -- (** y is in t, if y isn't in ys, then x was in ys,
+               and we've substituted away x --> t
+               
+               Now, as x wasn't in xs, 
+               *)
+            assert (captures (F ++ [(x, bind_typ U)] ++ E) xs x).
+            {
+              specialize (H1 x EQ). assumption.
+            }
+
+            (**
+              we have that t <: xs
+            *)
+            inversion H5; subst; try notin_solve.
+            binds_get H6; subst...
+            inversion H12; subst...
+            assert (ys0 = t). {
+              assert (cv (empty ++ (F ++ [(x, bind_typ U)]) ++ E) U (cset_set t {}N)) as HA. {
+                apply cv_weakening; simpl_env...
+              }
+              simpl_env in HA.
+              unshelve epose proof (cv_unique _ _ _ _ _ _ HA H7) as HA'...
+              inversion HA'...
+            }
+            subst...
+
+            (** and in particular, E |- t <: xs, as t is bound in E *)
+            assert (AtomSet.F.For_all (captures E xs) t). {
+              intros s sInT.
+              pose proof (cv_regular _ _ _ H0) as [HwfFx [? Hreg]].
+              rewrite_env ((F ++ [(x, bind_typ U)]) ++ E) in HwfFx.
+              eapply captures_subenv.
+              apply HwfFx.
+              simpl_env. apply H10. assumption.
+              fsetdec.
+            }
+            rewrite_nil_concat.
+            eapply captures_weakening...
+            simpl_env...
+        -- eapply H2 with (x0 := y) (zs := ys `remove` x)...
+           fsetdec.
+    + eapply captures_var...
+      intros y ?.
+      assert (y <> x) by notin_solve.
+      destruct (AtomSet.F.mem y xs) eqn:EQ'; set_facts_come_on_in EQ'.
+      * constructor...
+      * eapply H2 with (x0 := y) (zs := ys); trivial.
+        eauto*.
+Qed.
+
+Lemma captures_through_env_subst_cb : forall F x U E ys z C,
+  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
+  captures (F ++ [(x, bind_typ U)] ++ E) ys z ->
+  z <> x ->
+  x `notin` ys ->
+  cv E U C ->
+  captures (map (subst_cb x C) F ++ E) ys z.
+Proof with eauto*.
+  intros * Hwf HC HfreshZ HfreshYs Hcv.
+  eapply captures_through_env_subst_set with (zs := singleton z)...
+  + intros zz Hzzisz.
+    assert (zz = z) by fsetdec; subst...
+  + fsetdec.
+Qed.
