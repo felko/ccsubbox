@@ -3275,26 +3275,27 @@ Lemma typing_inv_tabs : forall E S1 e1 T,
      typing ([(X, bind_sub U1)] ++ E) (open_te e1 X) (open_tt S2 X)
      /\ sub ([(X, bind_sub U1)] ++ E) (open_tt S2 X) (open_tt U2 X).
 Proof with simpl_env; auto.
-  Admitted.
-(*
-  intros E S1 e1 T Typ.
-  remember (exp_tabs S1 e1).
-  generalize dependent e1.
-  generalize dependent S1.
-  induction Typ; intros S1 e0 EQ U1 U2 Sub; inversion EQ; subst.
-  Case "typing_tabs".
-    inversion Sub; subst.
+Proof with auto.
+  intros *.
+  intro Htyp.
+  dependent induction Htyp; intros U1 U2 C Hsub.
+  - Case "typing_abs".
+    inversion Hsub; subst.
+    match goal with H : sub_pre _ _ _ |- _ =>
+      inversion H; subst
+    end.
     split...
     exists T1.
-    exists (L0 `union` L).
-    intros Y Fr.
-    split...
-    rewrite_env (empty ++ [(Y, bind_sub U1)] ++ E).
-    apply (typing_narrowing S1)...
-  Case "typing_sub".
-    auto using (sub_transitivity T).
+    exists (L `union` L0).
+    intros y ?.
+    repeat split...
+    rewrite_env (empty ++ [(y, bind_sub U1)] ++ E).
+    eapply typing_narrowing with (Q := S1)...
+    simpl_env...
+  - Case "typing_sub".
+    eauto using (sub_transitivity T).
 Qed.
-*)
+
 
 
 (* ********************************************************************** *)
