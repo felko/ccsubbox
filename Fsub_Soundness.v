@@ -1004,7 +1004,12 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb.
       unfold not. intros.
       binds_cases H.
       * subst. unfold dom in Fr0. fsetdec.
-      * subst. exfalso. admit.
+      * subst. exfalso. 
+        unshelve epose proof (binds_mid _ Z (bind_sub Q) E F _)...
+        binds_cases H.
+        ** exfalso. unshelve epose proof (binds_In _ _ _ _ H5). fsetdec.
+        ** exfalso. unshelve epose proof (binds_In _ _ _ _ H5). fsetdec.
+        ** inversion H5; inversion H4. rewrite H3 in H6. inversion H6.
     }  
     destruct (cv_through_subst_tt_exists _ _ P _ _ _ _ ltac:(eauto) ltac:(eauto) H0 Sub) as [C2 [CvC2 SubcaptC2]].
     inversion SubcaptC2; subst.  
