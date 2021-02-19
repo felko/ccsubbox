@@ -96,11 +96,9 @@ Proof with eauto using cv_free_never_universal.
         contradiction.
       (* we only want to consider the case where all u, e1 and e2 have a concrete cv...  *)
     + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
-      rewrite (AtomSetFacts.union_iff t t1 x) in Hin.
-      destruct Hin.
-      * specialize (IHe1 H).
-        rewrite <- IHe1.
-        unfold cset_fvars in *; simpl.
+      rewrite (AtomSetFacts.mem_iff) in Hin.
+      rewrite (AtomSetFacts.union_b) in Hin.
+      destruct (AtomSet.F.mem x t) eqn:InT; destruct (AtomSet.F.mem x t1) eqn:InT1; inversion Hin; subst...
 Admitted.
 
 Lemma notin_dom_is_notin_fv_ee : forall x E e T,
