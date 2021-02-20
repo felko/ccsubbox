@@ -1413,72 +1413,217 @@ Ltac cv_really_no_locals_come_on H :=
   let H' := fresh "H" in
   pose proof (cv_no_locals_come_on _ _ _ _ H) as H'; rewrite H' in *; clear H'.
 
-Lemma captures_through_subst_atoms_forall : forall F E x U xs ys t,
+Lemma captures_through_subst_atoms_forall : forall x U ds F E ys zs,
   wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  cv E U (cset_set t {}N) ->
-  AtomSet.F.For_all (captures (F ++ [(x, bind_typ U)] ++ E) xs) ys ->
-  AtomSet.F.For_all (captures (map (subst_cb x (cset_set t {}N)) F ++ E) (subst_atoms x t xs)) (subst_atoms x t ys).
+  cv E U (cset_set ds {}N) ->
+  AtomSet.F.For_all (captures (F ++ [(x, bind_typ U)] ++ E) ys) zs ->
+  AtomSet.F.For_all (captures (map (subst_cb x (cset_set ds {}N)) F ++ E) (subst_atoms x ds ys)) (subst_atoms x ds zs).
 Proof with eauto.
   intros * Wf Cv H.
   unfold AtomSet.F.For_all in *.
   unfold subst_atoms at 1.
   destruct_if.
-  - Case "x `in` ys".
+  - Case "x `in` zs".
     unfold subst_atoms at 1.
     destruct_if.
-    + SCase "x `in` xs".
-      intros y0 ?.
+    + SCase "x `in` ys".
+      intros z' ?.
       rewrite AtomSetFacts.union_iff in H0.
       destruct H0.
       * apply captures_in.
         fsetdec.
-      * specialize (H y0 ltac:(fsetdec)).
-        dependent induction H.
-        -- apply captures_in.
+      * specialize (H z' ltac:(fsetdec)).
+        clear Heqb.
+        clear Heqb0.
+        generalize dependent zs.
+        dependent induction H; intros zs ?.
+        1: {
+           apply captures_in.
            fsetdec.
-        -- admit.
+        }
+        binds_cases H.
+        2: exfalso; fsetdec.
+        1: {
+          assert (wf_typ_in E T). {
+            eapply wf_typ_from_binds_typ...
+          }
+          assert (cv E T (cset_set ys {}N)) as HcvT. {
+            apply cv_unique_shrink in H0...
+            2: {
+              rewrite_nil_concat.
+              eapply wf_typ_weakening...
+              apply ok_from_wf_env in Wf.
+              apply ok_tail in Wf...
+            }
+            apply cv_unique_shrink in H0...
+          }
+          eapply captures_var...
+          ** rewrite_nil_concat.
+             apply cv_weakening; simpl_env.
+             2: eauto using wf_env_subst_cb.
+             apply HcvT.
+          ** apply cv_regular in HcvT as [_ [_ WfCvT]].
+             inversion WfCvT; subst.
+             apply binding_uniq_from_wf_env in Wf as ?.
+             assert (x `notin` ys) by notin_solve.
+             intros y ?.
+             assert (y <> x) by notin_solve.
+             destruct (AtomSet.F.mem y xs) eqn:EQ; set_facts_come_on_in EQ.
+             1: {
+               constructor; fsetdec.
+             }
+             1: {
+               eapply H2 with (x0 := y) (zs := ys); (eauto || fsetdec).
+             }
+        }
+        assert (binds z' (bind_typ (subst_ct x (cset_set ds {}N) T))
+                      (map (subst_cb x (cset_set ds {}N)) F ++ E)) as HA by auto.
+        apply cv_through_subst_ct with (D := (cset_set ds {}N)) in H0 as H0'...
+        unfold subst_cset, cset_references_fvar_dec in H0'.
+        destruct (AtomSet.F.mem x ys) eqn:EQ; set_facts_come_on_in EQ.
+        2: {
+          eapply captures_var...
+          intros y ?.
+          assert (y <> x) by notin_solve.
+          destruct (AtomSet.F.mem y xs) eqn:EQ'; set_facts_come_on_in EQ'.
+          - constructor; fsetdec.
+          - eapply H2 with (x0 := y) (zs := ys); (eauto || fsetdec).
+        }
+        simpl in H0'.
+        rewrite elim_empty_nat_set in H0'.
+
+        eapply captures_var...
+
+        intros y HyIn.
+        rewrite AtomSetFacts.union_iff in HyIn.
+        destruct HyIn...
+        2: {
+           eapply H2 with (x0 := y) (zs := ys `remove` x)...
+           all : fsetdec.
+        }
+        apply captures_in.
+        fsetdec.
     + SCase "x `notin` xs".
-      admit.
-          (* apply H3... *)
-    (* admit. *)
+      intros z' z'InSet.
+      rewrite AtomSetFacts.union_iff in z'InSet.
+      set_facts_come_on_in Heqb.
+      set_facts_come_on_in Heqb0.
+      destruct z'InSet.
+      {
+        specialize (H x Heqb).
+        inversion H; subst; try solve [exfalso; eauto].
+        binds_get H1.
+        inversion H5; subst.
+        assert (ys0 = ds). {
+          assert (cv (empty ++ (F ++ [(x, bind_typ U)]) ++ E) U (cset_set ds {}N)) as HA. {
+            apply cv_weakening; simpl_env...
+          }
+          simpl_env in HA.
+          unshelve epose proof (cv_unique _ _ _ _ _ _ HA H2) as HA'...
+          inversion HA'...
+        }
+        subst.
+        assert (AtomSet.F.For_all (captures E ys) ds). {
+          intros s sInT.
+          pose proof (cv_regular _ _ _ H2) as [HwfFx [? Hreg]].
+          rewrite_env ((F ++ [(x, bind_typ U)]) ++ E) in HwfFx.
+          eapply captures_subenv.
+          - apply HwfFx.
+          - simpl_env. apply H3. assumption.
+          - apply cv_regular in Cv as RegDs.
+            pose proof (proj2 (proj2 RegDs)) as HPP; inversion HPP; subst.
+            fsetdec.
+        }
+        rewrite_nil_concat.
+        eapply captures_weakening...
+        simpl_env...
+        apply (wf_env_subst_cb U)...
+      }
+      eapply captures_through_env_subst_cb...
+      * apply H. fsetdec.
+      * fsetdec.
   - Case "x `notin` ys".
     unfold subst_atoms at 1.
     destruct_if.
     + SCase "x `in` xs".
-      admit.
+      set_facts_come_on_in Heqb.
+      set_facts_come_on_in Heqb0.
+      intros z' z'InSet.
+      specialize (H z' z'InSet).
+      (* clear Heqb. *)
+      clear Heqb0.
+      generalize dependent zs.
+      dependent induction H; intros zs ? z'InSet.
+      1: {
+        apply captures_in. fsetdec.
+      }
+      (* destruct (AtomSet.F.mem z' ys) eqn:EQ; set_facts_come_on_in EQ. *)
+      (* 1: solve [ eapply H2; (eauto || fsetdec)]. *)
+      binds_cases H.
+      2: exfalso; fsetdec.
+      1: {
+        assert (wf_typ_in E T). {
+          eapply wf_typ_from_binds_typ...
+        }
+        assert (cv E T (cset_set ys {}N)) as HcvT. {
+          apply cv_unique_shrink in H0...
+          2: {
+            rewrite_nil_concat.
+            eapply wf_typ_weakening...
+            apply ok_from_wf_env in Wf.
+            apply ok_tail in Wf...
+          }
+          apply cv_unique_shrink in H0...
+        }
+        eapply captures_var...
+        - rewrite_nil_concat.
+          apply cv_weakening; simpl_env.
+          2: eauto using wf_env_subst_cb.
+          apply HcvT.
+        - apply cv_regular in HcvT as [_ [_ WfCvT]].
+          inversion WfCvT; subst.
+          apply binding_uniq_from_wf_env in Wf as ?.
+          assert (x `notin` ys) by notin_solve.
+          intros y ?.
+          assert (y <> x) by notin_solve.
+          destruct (AtomSet.F.mem y xs) eqn:EQ; set_facts_come_on_in EQ.
+          + constructor; fsetdec.
+          + eapply H2 with (x0 := y) (zs := ys); (eauto || fsetdec).
+      }
+      assert (binds z' (bind_typ (subst_ct x (cset_set ds {}N) T))
+                    (map (subst_cb x (cset_set ds {}N)) F ++ E)) as HA by auto.
+      apply cv_through_subst_ct with (D := (cset_set ds {}N)) in H0 as H0'...
+      unfold subst_cset, cset_references_fvar_dec in H0'.
+      destruct (AtomSet.F.mem x ys) eqn:EQ; set_facts_come_on_in EQ.
+      2: {
+        eapply captures_var...
+        intros y ?.
+        assert (y <> x) by notin_solve.
+        destruct (AtomSet.F.mem y xs) eqn:EQ'; set_facts_come_on_in EQ'.
+        - constructor; fsetdec.
+        - eapply H2 with (x0 := y) (zs := ys); (eauto || fsetdec).
+      }
+      simpl in H0'.
+      rewrite elim_empty_nat_set in H0'.
+
+      eapply captures_var...
+
+      intros y HyIn.
+      rewrite AtomSetFacts.union_iff in HyIn.
+      destruct HyIn...
+      2: {
+        eapply H2 with (x0 := y) (zs := ys `remove` x)...
+        all : fsetdec.
+      }
+      apply captures_in.
+      fsetdec.
     + SCase "x `notin` xs".
       intros y yInYs.
       specialize (H y yInYs).
       set_facts_come_on_in Heqb.
       set_facts_come_on_in Heqb0.
       apply captures_through_env_subst_cb with (U := U)...
-      (* (* generalize dependent ys. *) *)
-      (* dependent induction H. *)
-      (* * intros. *)
-      (*   apply captures_in. *)
-      (*   fsetdec. *)
-      (* * assert (cv (map (subst_cb x (cset_set t {}N)) F ++ E) *)
-      (*              (subst_ct x (cset_set t {}N )T) *)
-      (*              (cset_set (subst_atoms x t ys0) {}N)). { *)
-      (*     rewrite subst_atoms_rel_subst_subst_cset. *)
-      (*     apply (cv_through_subst_ct) with (U := U); trivial. *)
-      (*   } *)
-      (*   set_facts_come_on_in Heqb. *)
-      (*   assert (y <> x) by notin_solve. *)
-      (*   binds_cases H. *)
-      (*   -- assert (wf_typ_in E T). { *)
-      (*        eapply wf_typ_from_binds_typ; eauto. *)
-      (*      } *)
-      (*      rewrite_nil_concat. *)
-      (*      apply captures_weakening; simpl_env... *)
-      (*      eapply captures_var. *)
-      (*      ++ apply H. *)
-      (*      ++ apply cv_unique_shrink in H0... *)
-      (*         2: admit. *)
-      (*         admit. *)
-      (*      ++ admit. *)
-      (*   -- admit. *)
-Admitted.
+Qed.
 
 (* Substituting the same capture set preserves subcapturing *)
 Lemma subcapt_through_subst_cset : forall F x U E C1 C2 D,
@@ -1567,101 +1712,56 @@ Proof with eauto.
         }
         apply (wf_cset_in_subst_cb U)...
         apply (wf_env_subst_cb _ cset_universal) in WfE...
-      * apply subcapt_set.
-        -- admit.
-        -- admit.
-        -- unfold cset_references_fvar_dec in Heqb, Heqb0.
-           set_facts_come_on_in Heqb.
-           set_facts_come_on_in Heqb0.
-           intros y ?.
+      * unfold cset_references_fvar_dec in Heqb, Heqb0.
+        set_facts_come_on_in Heqb.
+        set_facts_come_on_in Heqb0.
+        apply subcapt_set.
+        -- rewrite (subst_cset_fresh x (cset_set _ _) cset_universal).
+           2: {
+             unfold fv_cset; fsetdec.
+           }
+           eapply wf_cset_in_subst_cb; eauto using wf_env_subst_cb.
+        -- rewrite (subst_cset_fresh x (cset_set _ _) cset_universal).
+           2: {
+             unfold fv_cset; fsetdec.
+           }
+           eapply wf_cset_in_subst_cb; eauto using wf_env_subst_cb.
+        -- intros y ?.
            inversion Hsc; subst.
            eapply captures_through_env_subst_cb...
   - cv_really_no_locals_come_on Hcv.
     repeat rewrite <- subst_atoms_rel_subst_subst_cset.
     apply subcapt_set.
-    + admit.
-    + admit.
+    + rewrite subst_atoms_rel_subst_subst_cset.
+      eapply wf_cset_in_subst_cb; eauto using wf_env_subst_cb.
+    + rewrite subst_atoms_rel_subst_subst_cset.
+      eapply wf_cset_in_subst_cb; eauto using wf_env_subst_cb.
     + inversion Hsc; subst.
       apply captures_through_subst_atoms_forall with (U := U)...
-  (* assert (wf_env (map (subst_cb x D) F ++ E)) by (apply (wf_env_subst_cb U); auto). *)
-  (* match goal with *)
-  (* | |- subcapt ?E ?C _ => *)
-  (*   assert (wf_cset_in E C) as WfCS1 *)
-  (* end. { *)
-  (*   apply (wf_cset_in_subst_cb U)... *)
-  (* } *)
-  (* match goal with *)
-  (* | |- subcapt ?E _ ?C => *)
-  (*   assert (wf_cset_in E C) as WfCS2 *)
-  (* end. { *)
-  (*   apply (wf_cset_in_subst_cb U)... *)
-  (* } *)
-  (* unfold subst_cset in *. *)
-  (* destruct_if; destruct_if. *)
-  (* - destruct D. *)
-  (*   + unfold cset_remove_fvar, cset_union. *)
-  (*     apply subcapt_reflexivity with (A := dom (map (subst_cb x cset_universal) F ++ E))... *)
-  (*   + apply union_under_subcapturing. *)
-  (*     * apply subcapt_reflexivity *)
-  (*         with (A := dom (map (subst_cb x (cset_set t0 t2)) F ++ E)); *)
-  (*         eauto using (wf_env_subst_cb U). *)
-  (*       rewrite_nil_concat. *)
-  (*       apply wf_cset_weakening with (A := dom E); simpl_env; *)
-  (*         eauto using (wf_env_subst_cb U). *)
-  (*     * inversion Hsc; subst. *)
-  (*       apply subcapt_set... *)
-  (*       { *)
-  (*         inversion WfCS1; subst. *)
-  (*         constructor... *)
-  (*         intros x0 ?... *)
-  (*         apply H12. *)
-  (*         fsetdec. *)
-  (*       } *)
-  (*       { *)
-  (*         inversion WfCS2; subst. *)
-  (*         constructor... *)
-  (*         intros x0 ?... *)
-  (*         apply H12. *)
-  (*         fsetdec. *)
-  (*       } *)
-  (*       admit. *)
-  (* - assert (wf_cset_in E D) as WfD by auto. *)
-  (*   destruct D. *)
-  (*   simpl. *)
-  (*   + unfold cset_references_fvar_dec in Heqb, Heqb0. *)
-  (*     set_facts_come_on_in Heqb. *)
-  (*     set_facts_come_on_in Heqb0. *)
-  (*     exfalso; intuition. *)
-  (*   + inversion WfD; subst. *)
-  (*     simpl. *)
-  (*     admit. *)
-  (* - assert (wf_cset_in E D) as WfD by auto. *)
-  (*   destruct D. *)
-  (*   + simpl. *)
-  (*     constructor... *)
-  (*     (* apply subcapt_regular in Hsc as [? _]. *) *)
-  (*     (* apply not_in_fv_cset_iff in Heqb as ?. *) *)
-  (*     (* replace (cset_set t {}N) *) *)
-  (*     (*   with (subst_cset x cset_universal (cset_set t {}N)). *) *)
-  (*     (* 2: { *) *)
-  (*     (*   rewrite <- subst_cset_fresh... *) *)
-  (*     (* } *) *)
-  (*     (* eapply wf_cset_in_subst_cb... *) *)
-  (*     (* assert (ok (F ++ [(x, bind_typ U)] ++ E))... *) *)
-  (*   + inversion WfD; subst. *)
-  (*     simpl. *)
-  (*     admit. *)
-  (* - inversion Hsc; subst. *)
-  (*   constructor... *)
-  (*   + admit. *)
-  (*   + admit. *)
-  (*   + unfold AtomSet.F.For_all in *. *)
-  (*     intros z ?. *)
-  (*     specialize (H7 z ltac:(trivial)). *)
-  (*     inversion H7; subst... *)
-  (*     admit. *)
+Qed.
 
-Admitted.
+Lemma subst_atoms_across_captures : forall x ds E ys zs,
+  wf_env E ->
+  wf_cset_in E (cset_set ds {}N) ->
+  AtomSet.F.For_all (captures E ys) zs ->
+  AtomSet.F.For_all (captures E (subst_atoms x ys ds)) (subst_atoms x zs ds).
+Proof with eauto.
+  intros* WfE WfDs H.
+  unfold subst_atoms.
+  destruct_if.
+  2: {
+    intros  d ?.
+    constructor...
+  }
+  intros d' d'InSet.
+  rewrite AtomSetFacts.union_iff in d'InSet.
+  destruct d'InSet as [d'InSet|d'InSet].
+  2: {
+    apply captures_in. fsetdec.
+  }
+  specialize (H d' d'InSet).
+  apply captures_expansion...
+Qed.
 
 Lemma subst_cset_across_subcapt : forall E x C D C0 A,
   wf_env E ->
@@ -1684,42 +1784,79 @@ Proof with eauto.
       apply subcapt_reflexivity with (A := A)...
       apply subst_cset_fresh. inversion Wf; subst...
       apply subst_cset_fresh. inversion Wf; subst...
-  - destruct (AtomSet.F.mem x (cset_fvars c)) eqn:InAp.
+  - destruct C eqn:EQ__C.
     + inversion Sub; subst.
-      * simpl in InAp. unfold subst_cset. unfold cset_references_fvar_dec. rewrite InAp. constructor.
-        destruct C...
-        simpl. inversion Wf. inversion H. rewrite elim_empty_nat_set. subst.
-        constructor...
-        unfold allbound_typ in *.
-        intros.
-        rewrite AtomSetFacts.union_iff in H0.
-        destruct H0...
-        apply H4.
-        fsetdec.
-      * simpl in InAp. unfold subst_cset. unfold cset_references_fvar_dec. rewrite InAp.
-        inversion Wf; subst.
-        match goal with
-        | |- subcapt _ ?C _ =>
-          assert (wf_cset_in E C) as WfC
-        end. {
-          eauto using wf_cset_union, wf_cset_remove_fvar.
-        }
-        match goal with
-        | |- subcapt _ _ ?D =>
-          assert (wf_cset_in E D) as WfD
-        end. {
-          eauto using wf_cset_union, wf_cset_remove_fvar.
-        }
-        simpl in WfC, WfD |- *. rewrite elim_empty_nat_set in WfC, WfD |- *.
-        constructor...          (* well OK, what do we do here? induction? *)
-        admit.
-    + rewrite <- AtomSetFacts.not_mem_iff in InAp.
-      replace (subst_cset x C c) with c.
-      replace (subst_cset x D c) with c.
-      apply subcapt_reflexivity with (A := A)...
-      apply subst_cset_fresh. unfold fv_cset; subst...
-      apply subst_cset_fresh. unfold fv_cset; subst...
-Admitted.
+      unfold subst_cset.
+      destruct_if; simpl; eapply subcapt_reflexivity...
+    + assert (wf_cset_in E (cset_set t1 t2)) as WfT1 by auto.
+      inversion WfT1; subst.
+      destruct D.
+      * unfold subst_cset.
+        destruct_if; simpl.
+        -- constructor...
+           inversion Wf; subst.
+           change (cset_set (t1 `union` t `remove` x) (NatSet.F.union {}N {}N))
+             with (cset_union (cset_set t1 {}N) (cset_set (t `remove` x) {}N)).
+           apply wf_cset_union...
+           change (cset_set (t `remove` x) {}N)
+             with (cset_remove_fvar x (cset_set t {}N)).
+           apply wf_cset_remove_fvar...
+        -- eapply subcapt_reflexivity...
+      * inversion Wf; subst.
+        assert (wf_cset_in E (cset_set t2 t3)) as WfT2 by auto.
+        inversion WfT2; subst.
+        inversion Sub; subst.
+        subst.
+        repeat rewrite <- subst_atoms_rel_subst_subst_cset.
+        constructor.
+        -- unfold subst_atoms.
+           destruct_if; constructor...
+           intros y yInSet.
+           apply AtomSetFacts.union_iff in yInSet.
+           destruct yInSet; [apply H3 | apply H5]; fsetdec.
+        -- unfold subst_atoms.
+           destruct_if; constructor...
+           intros y yInSet.
+           apply AtomSetFacts.union_iff in yInSet.
+           destruct yInSet; [apply H7 | apply H5]; fsetdec.
+        -- apply subst_atoms_across_captures...
+
+  (* - destruct (AtomSet.F.mem x (cset_fvars c)) eqn:InAp. *)
+  (*   + inversion Sub; subst. *)
+  (*     * simpl in InAp. unfold subst_cset. unfold cset_references_fvar_dec. rewrite InAp. constructor. *)
+  (*       destruct C... *)
+  (*       simpl. inversion Wf. inversion H. rewrite elim_empty_nat_set. subst. *)
+  (*       constructor... *)
+  (*       unfold allbound_typ in *. *)
+  (*       intros. *)
+  (*       rewrite AtomSetFacts.union_iff in H0. *)
+  (*       destruct H0... *)
+  (*       apply H4. *)
+  (*       fsetdec. *)
+  (*     * simpl in InAp. unfold subst_cset, cset_references_fvar_dec. rewrite InAp. *)
+  (*       inversion Wf; subst. *)
+  (*       match goal with *)
+  (*       | |- subcapt _ ?C _ => *)
+  (*         assert (wf_cset_in E C) as WfC *)
+  (*       end. { *)
+  (*         eauto using wf_cset_union, wf_cset_remove_fvar. *)
+  (*       } *)
+  (*       match goal with *)
+  (*       | |- subcapt _ _ ?D => *)
+  (*         assert (wf_cset_in E D) as WfD *)
+  (*       end. { *)
+  (*         eauto using wf_cset_union, wf_cset_remove_fvar. *)
+  (*       } *)
+  (*       simpl in WfC, WfD |- *. rewrite elim_empty_nat_set in WfC, WfD |- *. *)
+  (*       constructor... *)
+  (*   + rewrite <- AtomSetFacts.not_mem_iff in InAp. *)
+  (*     replace (subst_cset x C c) with c. *)
+  (*     replace (subst_cset x D c) with c. *)
+  (*     apply subcapt_reflexivity with (A := A)... *)
+  (*     apply subst_cset_fresh. unfold fv_cset; subst... *)
+  (*     apply subst_cset_fresh. unfold fv_cset; subst... *)
+
+Qed.
 
 Lemma sub_through_subst_ct : forall E F x U C S T,
   sub (F ++ [(x, bind_typ U)] ++ E) S T ->
