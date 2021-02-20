@@ -804,35 +804,38 @@ Proof with eauto*.
   eapply wf_env_subst_cb...
 Qed.
 
-
-Lemma wf_typ_subst_cb_cv : forall U F E x C T Ap Am,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  wf_typ (F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
+Lemma wf_typ_subst_cb_cv : forall U G F E x C T Ap Am,
+  wf_env (G ++ F ++ [(x, bind_typ U)] ++ E) ->
+  wf_typ (G ++ F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
   cv E U C ->
   (dom E `union` dom F) `subset` Ap ->
   (dom E `union` dom F) `subset` Am ->
-  wf_typ (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_ct x C T).
+  wf_typ (map (subst_cb x C) (G ++ F) ++ E) (Ap `remove` x) (Am `remove` x) (subst_ct x C T).
 Proof with eauto*.
   intros * Hwf HwfT Hcv Hp Hm.
   pose proof (cv_regular _ _ _ Hcv) as [_ [_ ?]].
-  eapply wf_typ_subst_cb...
+  eapply wf_typ_subst_cb; simpl_env...
   1, 2: simpl_env in *; apply wf_cset_extra...
+  rewrite_env (map (subst_cb x C) (G ++ F) ++ E)...
   apply ok_from_wf_env...
   eapply wf_env_subst_cb...
+  simpl_env in *...
 Qed.
 
-Lemma wf_pretyp_subst_cb_cv : forall U F E x C T Ap Am,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  wf_pretyp (F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
+Lemma wf_pretyp_subst_cb_cv : forall U G F E x C T Ap Am,
+  wf_env (G ++ F ++ [(x, bind_typ U)] ++ E) ->
+  wf_pretyp (G ++ F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
   cv E U C ->
   (dom E `union` dom F) `subset` Ap ->
   (dom E `union` dom F) `subset` Am ->
-  wf_pretyp (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_cpt x C T).
+  wf_pretyp (map (subst_cb x C) (G ++ F) ++ E) (Ap `remove` x) (Am `remove` x) (subst_cpt x C T).
 Proof with eauto*.
   intros * Hwf HwfT Hcv Hp Hm.
   pose proof (cv_regular _ _ _ Hcv) as [_ [_ _]].
-  eapply wf_pretyp_subst_cb...
+  eapply wf_pretyp_subst_cb; simpl_env...
   1, 2: simpl_env in *; apply wf_cset_extra...
+  rewrite_env (map (subst_cb x C) (G ++ F) ++ E)...
   apply ok_from_wf_env...
   eapply wf_env_subst_cb...
+  simpl_env in *...
 Qed.
