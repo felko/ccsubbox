@@ -373,44 +373,50 @@ Proof with eauto.
   auto*.
 Qed.
 
-Lemma wf_typ_subst_cb_cv : forall U Ap Am F x C E T,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  cv E U C ->
-  wf_typ (F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
-  wf_typ (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_ct x C T)
-with wf_pretyp_typ_subst_cb_cv : forall U Ap Am F x C E P,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  cv E U C ->
-  wf_pretyp (F ++ [(x, bind_typ U)] ++ E) Ap Am P ->
-  wf_pretyp (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_cpt x C P).
-Proof.
-Admitted.
-
-Lemma wf_typ_in_subst_cb_cv : forall F x U C E T,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  cv E U C ->
-  wf_typ_in (F ++ [(x, bind_typ U)] ++ E) T ->
-  wf_typ_in (map (subst_cb x C) F ++ E) (subst_ct x C T)
-with wf_pretyp_in_subst_cb_cv : forall F x U C E P,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  cv E U C ->
-  wf_pretyp_in (F ++ [(x, bind_typ U)] ++ E) P ->
-  wf_pretyp_in (map (subst_cb x C) F ++ E) (subst_cpt x C P).
-Proof.
-(* Use above. *)
-Admitted.
+Lemma wf_cset_extra : forall S1 S2 E C,
+  wf_cset_in E C ->
+  dom E `subset` S2 ->
+  wf_cset E (S1 `union` S2) C.
+Proof with eauto*.
+  intros * HwfC.
+  induction HwfC...
+Qed.
 
 Lemma wf_env_subst_cb : forall Q C x E F,
 wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
 wf_cset_in E C ->
 wf_env (map (subst_cb x C) F ++ E).
-Proof.
-(* with eauto 6 using wf_typ_subst_tb *)
-
-admit.
-(* induction F; intros Wf_env WP; simpl_env; *)
-(*   inversion Wf_env; simpl_env in *; simpl subst_tb... *)
-Admitted.
+Proof with eauto using wf_typ_subst_cb, wf_cset_extra.
+  intros *.
+  induction F; intros Hwf HwfC; simpl_env in *;
+    inversion Hwf; simpl_env in *; simpl subst_tb...
+  + constructor...
+    assert (dom (map (subst_cb x C) F ++ E) = dom (F ++ [(x, bind_typ Q)] ++ E) `remove` x ). {
+      simpl_env in *.
+      assert (x `notin` (dom F `union` dom E)). {
+        pose proof (binding_uniq_from_ok _ F E x _ ltac:(eauto)).
+        fsetdec.
+      }
+      fsetdec.
+    }
+    unfold wf_typ_in.
+    rewrite H4...
+    eapply wf_typ_subst_cb...
+    all : simpl_env in *; apply wf_cset_extra...
+  + constructor...
+     assert (dom (map (subst_cb x C) F ++ E) = dom (F ++ [(x, bind_typ Q)] ++ E) `remove` x ). {
+      simpl_env in *.
+      assert (x `notin` (dom F `union` dom E)). {
+        pose proof (binding_uniq_from_ok _ F E x _ ltac:(eauto)).
+        fsetdec.
+      }
+      fsetdec.
+    }
+    unfold wf_typ_in.
+    rewrite H4...
+    eapply wf_typ_subst_cb...
+    all : simpl_env in *; apply wf_cset_extra...
+Qed.
 
 Lemma cset_subst_self : forall C x,
   subst_cset x C (cset_fvar x) = C.
