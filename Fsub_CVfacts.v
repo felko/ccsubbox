@@ -373,10 +373,10 @@ Proof with eauto.
   auto*.
 Qed.
 
-Lemma wf_cset_extra : forall S1 S2 E C,
+Lemma wf_cset_extra : forall S2 E C,
   wf_cset_in E C ->
   dom E `subset` S2 ->
-  wf_cset E (S1 `union` S2) C.
+  wf_cset E S2 C.
 Proof with eauto*.
   intros * HwfC.
   induction HwfC...
@@ -798,6 +798,39 @@ Proof with eauto*.
   pose proof (cv_regular _ _ _ Hcv) as [_ [_ _]].
   unfold wf_pretyp_in.
   erewrite dom_x_subst_away...
+  eapply wf_pretyp_subst_cb...
+  1, 2: simpl_env in *; apply wf_cset_extra...
+  apply ok_from_wf_env...
+  eapply wf_env_subst_cb...
+Qed.
+
+
+Lemma wf_typ_subst_cb_cv : forall U F E x C T Ap Am,
+  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
+  wf_typ (F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
+  cv E U C ->
+  (dom E `union` dom F) `subset` Ap ->
+  (dom E `union` dom F) `subset` Am ->
+  wf_typ (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_ct x C T).
+Proof with eauto*.
+  intros * Hwf HwfT Hcv Hp Hm.
+  pose proof (cv_regular _ _ _ Hcv) as [_ [_ ?]].
+  eapply wf_typ_subst_cb...
+  1, 2: simpl_env in *; apply wf_cset_extra...
+  apply ok_from_wf_env...
+  eapply wf_env_subst_cb...
+Qed.
+
+Lemma wf_pretyp_subst_cb_cv : forall U F E x C T Ap Am,
+  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
+  wf_pretyp (F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
+  cv E U C ->
+  (dom E `union` dom F) `subset` Ap ->
+  (dom E `union` dom F) `subset` Am ->
+  wf_pretyp (map (subst_cb x C) F ++ E) (Ap `remove` x) (Am `remove` x) (subst_cpt x C T).
+Proof with eauto*.
+  intros * Hwf HwfT Hcv Hp Hm.
+  pose proof (cv_regular _ _ _ Hcv) as [_ [_ _]].
   eapply wf_pretyp_subst_cb...
   1, 2: simpl_env in *; apply wf_cset_extra...
   apply ok_from_wf_env...
