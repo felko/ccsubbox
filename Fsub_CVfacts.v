@@ -382,6 +382,20 @@ Proof with eauto*.
   induction HwfC...
 Qed.
 
+Lemma dom_x_subst_away : forall F E f x b,
+  wf_env (F ++ [(x, b)] ++ E) ->
+  dom (map f F ++ E) = dom (F ++ [(x, b)] ++ E) `remove` x. 
+Proof with eauto*.
+  intros * Hwf.
+  simpl_env in *.
+  assert (x `notin` (dom F `union` dom E)). {
+    pose proof (binding_uniq_from_ok _ F E x _ ltac:(eauto)).
+    fsetdec.
+  }
+  fsetdec.
+Qed.
+
+
 Lemma wf_env_subst_cb : forall Q C x E F,
 wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
 wf_cset_in E C ->
@@ -391,29 +405,13 @@ Proof with eauto using wf_typ_subst_cb, wf_cset_extra.
   induction F; intros Hwf HwfC; simpl_env in *;
     inversion Hwf; simpl_env in *; simpl subst_tb...
   + constructor...
-    assert (dom (map (subst_cb x C) F ++ E) = dom (F ++ [(x, bind_typ Q)] ++ E) `remove` x ). {
-      simpl_env in *.
-      assert (x `notin` (dom F `union` dom E)). {
-        pose proof (binding_uniq_from_ok _ F E x _ ltac:(eauto)).
-        fsetdec.
-      }
-      fsetdec.
-    }
     unfold wf_typ_in.
-    rewrite H4...
+    erewrite dom_x_subst_away...
     eapply wf_typ_subst_cb...
     all : simpl_env in *; apply wf_cset_extra...
   + constructor...
-     assert (dom (map (subst_cb x C) F ++ E) = dom (F ++ [(x, bind_typ Q)] ++ E) `remove` x ). {
-      simpl_env in *.
-      assert (x `notin` (dom F `union` dom E)). {
-        pose proof (binding_uniq_from_ok _ F E x _ ltac:(eauto)).
-        fsetdec.
-      }
-      fsetdec.
-    }
     unfold wf_typ_in.
-    rewrite H4...
+    erewrite dom_x_subst_away...
     eapply wf_typ_subst_cb...
     all : simpl_env in *; apply wf_cset_extra...
 Qed.
@@ -542,7 +540,7 @@ Lemma cv_through_subst_ct : forall F x U E C T D,
     cv (F ++ [(x, bind_typ U)] ++ E) T C ->
     cv E U D ->
     cv (map (subst_cb x D) F ++ E) (subst_ct x D T) (subst_cset x D C).
-Proof with eauto using wf_env_subst_cb, wf_pretyp_in_subst_cb_cv, wf_typ_in_subst_cb_cv, wf_cset_in_subst_cb.
+Proof with eauto using wf_env_subst_cb, wf_pretyp_subst_cb, wf_typ_subst_cb, wf_cset_in_subst_cb, wf_cset_extra.
   intros * HcvT HcvU.
   dependent induction HcvT.
   - simpl.
@@ -576,9 +574,12 @@ Proof with eauto using wf_env_subst_cb, wf_pretyp_in_subst_cb_cv, wf_typ_in_subs
     + assert (binds X (subst_cb x D (bind_sub T)) (map (subst_cb x D) F ++ E))...
   - simpl.
     constructor...
+    unfold wf_pretyp_in.
+    erewrite dom_x_subst_away...
+    eapply wf_pretyp_subst_cb...
+    1, 2: simpl_env in *; apply wf_cset_extra...
     apply (wf_cset_in_subst_cb U)...
 Qed.
-
 
 Lemma wf_env_weaken_head : forall E F,
   wf_env (F ++ E) ->
