@@ -20,13 +20,11 @@ Set Nested Proofs Allowed.
 
 Local Ltac hint := idtac.
 
+(* Local Lemma cheat : forall A, A. *)
+(* Admitted. *)
 
-
-Local Lemma cheat : forall A, A.
-Admitted.
-
-Local Lemma cheat_with : forall A B, A -> B.
-Admitted.
+(* Local Lemma cheat_with : forall A B, A -> B. *)
+(* Admitted. *)
 
 Local Lemma foo : forall x C e,
     AtomSet.F.In x (cset_fvars (free_for_cv e)) ->
@@ -45,6 +43,31 @@ Proof.
       fsetdec.
 Qed.
 
+Lemma forbar : forall x C D,
+  C <> cset_universal ->
+  D <> cset_universal ->
+  x `notin` cset_fvars (cset_union C D) ->
+  x `notin` cset_fvars C /\
+  x `notin` cset_fvars D.
+Proof.
+  intros.
+  destruct C eqn:EQ__C;
+    destruct D eqn:EQ__D;
+    unfold cset_fvars, cset_union in *; split.
+  all : (easy || fsetdec).
+Qed.
+
+Local Lemma contrabar : forall u x C e,
+  x `notin` (cset_fvars (free_for_cv e)) ->
+  (free_for_cv e) = (free_for_cv (subst_ee x u C e)).
+Proof with eauto using cv_free_never_universal.
+  intros * Hin.
+  induction e; simpl in *...
+  - destruct_if; fsetdec.
+  - apply forbar in Hin as (? & ?)...
+    rewrite <- IHe1...
+    rewrite <- IHe2...
+Qed.
 
 (* x in (fv e) ->
   (fv u) union (fv e remove x) = fv (e[x !-> u][x !-> fv u])
@@ -65,7 +88,7 @@ Proof with eauto using cv_free_never_universal.
       * fsetdec.
       * fnsetdec.
     + exfalso. apply n. fsetdec.
-  - destruct (free_for_cv e1); destruct (free_for_cv e2); destruct (free_for_cv u); 
+  - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
       unfold cset_fvars in *; simpl in *; try fsetdec.
     + rewrite (AtomSetFacts.union_iff t t1 x) in Hin.
       destruct Hin.
@@ -81,8 +104,28 @@ Proof with eauto using cv_free_never_universal.
     + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
       rewrite (AtomSetFacts.mem_iff) in Hin.
       rewrite (AtomSetFacts.union_b) in Hin.
-      destruct (AtomSet.F.mem x t) eqn:InT; destruct (AtomSet.F.mem x t1) eqn:InT1; inversion Hin; subst...
-Admitted.
+      destruct (AtomSet.F.mem x t) eqn:InT;
+        destruct (AtomSet.F.mem x t1) eqn:InT1;
+        set_facts_come_on_in InT;
+        set_facts_come_on_in InT1;
+        inversion Hin; subst...
+      * rewrite <- IHe1...
+        rewrite <- IHe2...
+        cbn [cset_union].
+        cset_eq_dec.
+      * rewrite <- IHe1...
+        rewrite <- (contrabar u x _ e2)...
+        2: rewrite Heqc0; unfold cset_fvars; assumption.
+        cbn [cset_union].
+        rewrite Heqc0.
+        cset_eq_dec.
+      * rewrite <- IHe2...
+        rewrite <- (contrabar u x _ e1)...
+        2: rewrite Heqc; unfold cset_fvars; assumption.
+        rewrite Heqc.
+        cbn [cset_union].
+        cset_eq_dec.
+Qed.
 
 Lemma notin_dom_is_notin_fv_ee : forall x E e T,
   x `notin` dom E ->
@@ -90,32 +133,47 @@ Lemma notin_dom_is_notin_fv_ee : forall x E e T,
   x `notin` fv_ee e.
 Proof with eauto.
   intros * NotIn Typ.
-  assert (wf_typ_in E T) as WfTyp by eauto.
-
+  assert (wf_typ_in E T) as WfTyp by auto.
   induction Typ.
-  - assert (x <> x0). { admit. }
+  - assert (x <> x0) by (apply binds_In in H0; fsetdec).
     unfold fv_ee. notin_solve.
-  - assert (x <> x0). { admit. }
+  - assert (x <> x0) by (apply binds_In in H0; fsetdec).
     unfold fv_ee. notin_solve.
-  - admit.
-  - unfold fv_ee. fold fv_ee.
-    rewrite (AtomSetFacts.union_iff (fv_ee e1) (fv_ee e2) x).
-    unfold not in *. intros. destruct H1...
-  - unfold fv_ee. fold fv_ee.
-    rewrite (AtomSetFacts.union_iff (fv_et V) (fv_ee e1) x).
-    unfold not in *. intros. destruct H3...
-    + admit. (* notin_fv_wf_typ *)
-    + pick fresh X.
-      specialize (H2 X ltac:(fsetdec)).
-      apply H2...
-      admit.
-      admit.
-      admit.
-  - unfold fv_ee. fold fv_ee.
-    rewrite (AtomSetFacts.union_iff (fv_et T) (fv_ee e1) x).
-    unfold not in *. intros. destruct H0...
-    admit. (* notin_fv_wf_typ *)
-Admitted.
+  - simpl.
+    apply notin_fv_wf_typ with (X := x) in H as ?.
+    2: fsetdec.
+    pick fresh y.
+    unshelve epose proof (H2 y _ _ _) as SpH2.
+    + notin_solve.
+    + simpl_env; notin_solve.
+    + specialize (H0 y ltac:(fsetdec)).
+      specialize (H1 y ltac:(fsetdec)).
+      do 2 rewrite_nil_concat.
+      eapply wf_typ_weakening...
+    + apply notin_fv_ee_open_ee in SpH2.
+      notin_solve.
+      notin_solve.
+  - cbn [fv_ee].
+    apply notin_union...
+  - cbn [fv_ee].
+    apply notin_union.
+    + apply notin_fv_wf_typ with (X := x) in H as ?.
+      all: fsetdec.
+    + pick fresh y.
+      unshelve epose proof (H2 y _ _ _) as SpH2.
+      * notin_solve.
+      * simpl_env; notin_solve.
+      * specialize (H0 y ltac:(fsetdec)).
+        specialize (H1 y ltac:(fsetdec)).
+        do 2 rewrite_nil_concat.
+        eapply wf_typ_weakening...
+      * apply notin_fv_ee_open_te in SpH2...
+  - cbn [fv_ee].
+    apply notin_union...
+    assert (wf_typ_in E T) as HA...
+    apply notin_fv_wf_typ with (X := x) in HA as ?...
+  - eauto.
+Qed.
 
 (* ********************************************************************** *)
 (** * #<a name="subtyping"></a># Properties of subtyping *)
@@ -737,7 +795,7 @@ Proof with simpl_env; auto.
       apply (sub_narrowing_aux T1)...
       unfold transitivity_on.
       auto using (sub_transitivity T1).
-Admitted.
+Qed.
 
 Lemma sub_narrowing : forall Q E F Z P S T,
   sub E P Q ->
@@ -1451,7 +1509,8 @@ Proof with eauto.
             apply cv_unique_shrink in H0...
             2: {
               rewrite_nil_concat.
-              eapply wf_typ_weakening...
+              eapply wf_typ_weakening.
+              1,3,4 : trivial...
               apply ok_from_wf_env in Wf.
               apply ok_tail in Wf...
             }
@@ -1569,7 +1628,8 @@ Proof with eauto.
           apply cv_unique_shrink in H0...
           2: {
             rewrite_nil_concat.
-            eapply wf_typ_weakening...
+            eapply wf_typ_weakening.
+            1,3,4 : trivial...
             apply ok_from_wf_env in Wf.
             apply ok_tail in Wf...
           }

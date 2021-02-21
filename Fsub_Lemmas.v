@@ -1355,6 +1355,83 @@ Proof with eauto.
   fsetdec.
 Qed.
 
+Local Lemma notin_fv_ee_open_ee_rec : forall k u (y x : atom) t,
+  x `notin` fv_ee (open_ee_rec k u y t) ->
+  x <> y ->
+  x `notin` fv_ee t.
+Proof with eauto.
+  intros. generalize dependent k.
+  induction t; simpl in *; intros k H; try (trivial || notin_solve).
+  - apply notin_union...
+    + apply notin_fv_ct_open_ct_rec with (Y := y) (k := k)...
+    + apply (IHt (S k)). notin_solve.
+  - apply notin_union...
+    + apply (IHt1 k). notin_solve.
+    + apply (IHt2 k). notin_solve.
+  - apply notin_union.
+    + apply notin_fv_ct_open_ct_rec with (Y := y) (k := k)...
+    + apply (IHt k). notin_solve.
+  - apply notin_union.
+    + apply notin_fv_ct_open_ct_rec with (Y := y) (k := k)...
+    + apply (IHt k). notin_solve.
+Qed.
+
+Lemma notin_fv_ee_open_ee : forall u (y x : atom) t,
+  x `notin` fv_ee (open_ee t u y) ->
+  x <> y ->
+  x `notin` fv_ee t.
+Proof with eauto.
+  intros. unfold open_ee in *.
+  apply (notin_fv_ee_open_ee_rec 0 u y)...
+Qed.
+
+Local Lemma notin_fv_et_open_tt_rec : forall k (Y X : atom) T,
+  X `notin` fv_et (open_tt_rec k Y T) ->
+  X `notin` fv_et T
+with notin_fv_ept_open_tpt_rec : forall k (Y X : atom) T,
+  X `notin` fv_ept (open_tpt_rec k Y T) ->
+  X `notin` fv_ept T.
+Proof.
+------
+  intros k Y X T. unfold open_tt.
+  generalize k.
+  induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto.
+------
+  intros k Y X T. unfold open_tt.
+  generalize k.
+  induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto.
+Qed.
+
+Local Lemma notin_fv_ee_open_te_rec : forall k (y x : atom) t,
+  x `notin` fv_ee (open_te_rec k y t) ->
+  x <> y ->
+  x `notin` fv_ee t.
+Proof with eauto.
+  intros. generalize dependent k.
+  induction t; simpl in *; intros k H; try (trivial || notin_solve).
+  - apply notin_union...
+    + apply (notin_fv_et_open_tt_rec k y)...
+    + apply (IHt k). notin_solve.
+  - apply notin_union...
+    + apply (IHt1 k). notin_solve.
+    + apply (IHt2 k). notin_solve.
+  - apply notin_union.
+    + apply (notin_fv_et_open_tt_rec k y)...
+    + apply (IHt (S k)). notin_solve.
+  - apply notin_union.
+    + apply (notin_fv_et_open_tt_rec k y)...
+    + apply (IHt k). notin_solve.
+Qed.
+
+Lemma notin_fv_ee_open_te : forall (y x : atom) t,
+  x `notin` fv_ee (open_te t y) ->
+  x <> y ->
+  x `notin` fv_ee t.
+Proof with eauto.
+  intros. unfold open_ee in *.
+  apply (notin_fv_ee_open_te_rec 0 y)...
+Qed.
+
 Lemma map_subst_tb_id : forall G Z P,
   wf_env G ->
   Z `notin` dom G ->
