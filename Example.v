@@ -292,6 +292,61 @@ Definition CC_empty (c : captureset) (t : typ) :=
                  (typ_arrow 0 0))))
         (exp_abs 0 0))).
 
+Definition CC_cons :=
+  (** forall T <: {*} Top,*)
+  (exp_tabs
+     (typ_capt cset_universal typ_top)
+     (exp_abs
+        (** lst : {*} List [T] *)
+        (CC_List cset_universal (typ_bvar 0)) (** is this the right type?? *)
+        (exp_abs
+          (* e : T *)
+          (typ_bvar 0)
+          (** body of List *)
+          (exp_tabs
+            (** forall A*)
+            (typ_capt cset_universal typ_top)
+            (exp_abs
+              (* f : T, A -> A *)
+              (typ_capt
+                  {}C
+                  (typ_arrow
+                    t
+                    (typ_capt
+                        {}C
+                        (typ_arrow (typ_bvar 0) 
+                                   (typ_bvar 0)))))
+              (exp_abs 
+                (* start : A*)
+                (typ_bvar 0)
+                (* (f e (lst f start)) *)
+                (exp_app
+                  (* (f e) *)
+                  (exp_app (exp_bvar 1) (exp_bvar 2))
+                  (exp_app 
+                    (* (lst f) *)
+                    (exp_app (exp_bvar 3) (exp_bvar 1))
+                    (exp_bvar 0)))))))))
+
+Definition CC_map :=
+  (exp_tabs
+    (typ_capt cset_universal typ_top (** forall T <: {*} Top*)
+    (exp_tabs
+      (typ_capt cset_universal typ_top) (** forall A <: {*} Top, *)
+      (exp_abs
+        (CC_List cset_universal t) (** lst : {*} List [T] *)
+        (exp_abs
+          (typ_capt {}C (typ_abs (typ_bvar 1) (typ_bvar 0))) (** f : {}C T -> A *)
+          (exp_app
+            (exp_app (exp_bvar 1)
+              (** \e \a -> (cons (f elem) accum) *)
+              (exp_abs t
+                (exp_abs (typ_bvar 0)
+                  (exp_app 
+                    (exp_app (exp_tapp CC_cons t) (exp_app (exp_bvar 2) (exp_bvar 1)))
+                    (exp_bvar 0)))))
+            (CC_empty {}C t)))))))
+
 Lemma fast_and_furious : forall c t,
   wf_typ_in empty t ->
   wf_cset_in empty c ->
