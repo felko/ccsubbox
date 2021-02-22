@@ -437,8 +437,16 @@ Proof with eauto.
       repeat first [ reflexivity | destruct_if; try congruence].
 
   Hint Resolve allbound_typ_if.
+  Ltac promise_wf_typ H T1 :=
+    match goal with
+    | |- typing ?E _ _ =>
+      enough (wf_typ_in E T1) as H; [unfold T1 in H|unfold T1]
+    | |- sub ?E _ _ =>
+      enough (wf_typ_in E T1) as H; [unfold T1 in H|unfold T1]
+    end.
 
   epose (T1 := (typ_capt ?[T1__C] (typ_all ?[T1__A] ?[T1__R]))).
+  promise_wf_typ Wf__T1 T1.
   assert_typing_with T1. {
     (* pick fresh X. *)
     (* lazymatch goal with *)
@@ -452,45 +460,34 @@ Proof with eauto.
     (*     unify L L'; clear dependent X; intros X Fr' *)
     (*   end. *)
     (* eapply typing_tabs; try instantiate_var X; simpl_env... *)
+    wf_typ_inversion Wf__T1.
     pick fresh X and apply typing_tabs; simpl_env...
-    2: {
+    {
       assert_wf_env. {
         constructor...
       }
 
-      cbn [open_te open_te_rec open_tt_rec open_tpt_rec].
+      cbn'.
       destruct_if; try easy.
       rewrite TClsTt.
 
       epose (T2 := (typ_capt ?[T2__C] (typ_arrow ?[T2__A] ?[T2__R]))).
+      promise_wf_typ Wf__T2 T2.
       assert_typing_with T2. {
-        pick fresh y and apply typing_abs.
-        3: {
-          assert_wf_env. {
+        wf_typ_inversion Wf__T2.
+        pick fresh y and apply typing_abs...
+        { assert_wf_env. {
             constructor...
-            constructor...
-            - constructor...
-            - pick fresh y' and apply wf_typ_arrow...
-              + rewrite_env (empty ++ [(X, bind_sub (typ_capt cset_universal typ_top))] ++ empty).
-                eapply wf_typ_weakening...
-              + assert (y' <> X) by notin_solve.
-                cbn'.
-                rewrite EmptyCls.
-                constructor.
-                * constructor...
-                * pick fresh y'' and apply wf_typ_arrow.
-                  -- econstructor. binds_dec.
-                  -- extract_binding_uniqueness.
-                     econstructor. binds_dec.
           }
           cbn'.
           destruct_if; [congruence|].
 
           epose (T3 := (typ_capt ?[T3__C] (typ_arrow ?[T3__A] ?[T3__R]))).
+          promise_wf_typ Wf__T3 T3.
           assert_typing_with T3. {
-            pick fresh z and apply typing_abs.
-            3: {
-              assert_wf_env. {
+            wf_typ_inversion Wf__T3.
+            pick fresh z and apply typing_abs...
+            { assert_wf_env. {
                 constructor...
               }
               cbn'.
@@ -506,86 +503,92 @@ Proof with eauto.
               [T3__R] : exact X.
               cbn'. easy.
             }
-            - extract_binding_uniqueness.
-              econstructor; binds_dec.
-            - cbn'.
-              extract_binding_uniqueness.
-              assert (y <> X) by notin_solve.
-              econstructor; binds_dec.
           }
-          replace_type_with T3. easy.
-          cbn [free_for_cv].
-          [T2__R] : exact (typ_capt {}C (typ_arrow X X)).
-          cbn'. rewrite EmptyCls. easy.
+          {
+            replace_type_with T3. easy.
+            cbn [free_for_cv].
+            [T2__R] : exact (typ_capt {}C (typ_arrow X X)).
+            cbn'. rewrite EmptyCls. easy.
+          }
+          {
+            constructor.
+            - constructor; simpl_env...
+            - assert (y <> X) by notin_solve.
+              pick fresh y' and apply wf_typ_arrow...
+              + extract_binding_uniqueness.
+                cbn'.
+                econstructor; binds_dec.
+          }
         }
-        - constructor; simpl_env...
-          1 : constructor; simpl_env...
-          pick fresh y' and apply wf_typ_arrow.
-          match goal with
-          | |- wf_typ ?E _ _ T =>
-            change E with (empty ++ E ++ empty)
-          end.
-          eapply wf_typ_weakening; [apply H|eauto ..].
+      }
+      { cbn [free_for_cv] in T2.
+        [T1__R] : exact (
+                    typ_capt {}C
+                             (typ_arrow (typ_capt {}C (typ_arrow T (typ_capt {}C (typ_arrow 0 0))))
+                                        (typ_capt {}C (typ_arrow 0 0)))
+                  ).
+        replace_type_with T2. easy.
+        cbn'. rewrite TClsTt.
+        destruct_if; [|congruence].
+        reflexivity.
+      }
+      { cbv [free_for_cv] in *.
+        apply HCaptWf.
+        pick fresh y' and apply wf_typ_arrow; [|extract_binding_uniqueness].
+        + apply HCaptWf.
+          pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
+          {
+            match goal with
+            | |- wf_typ ?E _ _ T =>
+              change E with (empty ++ E ++ empty)
+            end.
+            eapply wf_typ_weakening; [apply H|simpl_env;eauto ..].
+          }
           cbn'. rewrite EmptyCls.
-          extract_binding_uniqueness.
-          constructor.
-          1 : constructor; simpl_env...
-          pick fresh y'' and apply wf_typ_arrow.
+          apply HCaptWf.
+          pick fresh y''' and apply wf_typ_arrow; [|extract_binding_uniqueness].
           1 : econstructor; binds_dec.
           cbn'.
-          extract_binding_uniqueness.
           econstructor; binds_dec.
-        - cbn'. rewrite EmptyCls.
+        + cbn'. rewrite EmptyCls.
           apply HCaptWf.
-          pick fresh y' and apply wf_typ_arrow.
-          + extract_binding_uniqueness.
-            econstructor; binds_dec.
-          + cbn'.
-            extract_binding_uniqueness.
-            assert (y <> X) by notin_solve.
-            econstructor; binds_dec.
+          pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
+          1 : econstructor; binds_dec.
+          cbn'.
+          econstructor; binds_dec.
       }
-      cbn [free_for_cv] in T2.
-      [T1__R] : exact (
-                  typ_capt {}C
-                           (typ_arrow (typ_capt {}C (typ_arrow T (typ_capt {}C (typ_arrow 0 0))))
-                                      (typ_capt {}C (typ_arrow 0 0)))
-                ).
-      replace_type_with T2. easy.
-      cbn'. rewrite TClsTt.
-      destruct_if; [|congruence].
-      reflexivity.
     }
-    cbn'. rewrite TClsTt.
+  }
+  2: {
+    cbv [free_for_cv] in *.
     apply HCaptWf.
-    pick fresh y' and apply wf_typ_arrow...
-    - apply HCaptWf.
-      pick fresh y'' and apply wf_typ_arrow...
-      + match goal with
+    pick fresh X and apply wf_typ_all; simpl_env...
+    apply HCaptWf.
+    rewrite TClsTt.
+    destruct_if; try easy.
+    pick fresh y and apply wf_typ_arrow; [|extract_binding_uniqueness].
+    + apply HCaptWf.
+      pick fresh y' and apply wf_typ_arrow; [|extract_binding_uniqueness].
+      {
+        match goal with
         | |- wf_typ ?E _ _ T =>
           change E with (empty ++ E ++ empty)
         end.
-        eapply wf_typ_weakening; simpl_env.
-        apply H.
-        all : auto.
-      + extract_binding_uniqueness.
-        cbn'. rewrite EmptyCls.
-        apply HCaptWf.
-        pick fresh y''' and apply wf_typ_arrow.
-        * econstructor; binds_dec.
-        * extract_binding_uniqueness.
-          cbn'.
-          econstructor; binds_dec.
-    - cbn'. rewrite EmptyCls.
-      extract_binding_uniqueness.
+        eapply wf_typ_weakening; [apply H|simpl_env;eauto ..].
+      }
+      cbn'. rewrite EmptyCls.
       apply HCaptWf.
-      pick fresh y'' and apply wf_typ_arrow.
-      + econstructor; binds_dec.
-      + extract_binding_uniqueness.
-        cbn'.
-        econstructor; binds_dec.
+      pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
+      1 : econstructor; binds_dec.
+      cbn'.
+      econstructor; binds_dec.
+    + cbn'. rewrite EmptyCls.
+      apply HCaptWf.
+      pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
+      1 : econstructor; binds_dec.
+      cbn'.
+      econstructor; binds_dec.
   }
-
   cbv [free_for_cv] in *.
   eapply typing_sub.
   apply H1.
