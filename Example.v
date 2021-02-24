@@ -298,7 +298,8 @@ Definition CC_cons :=
      (typ_capt cset_universal typ_top)
      (exp_abs
         (** lst : {*} List [T] *)
-        (CC_List cset_universal (typ_bvar 0)) (** is this the right type?? *)
+        (CC_List cset_universal
+                 (typ_bvar 1)) (* NOTE: List itself has a type binder, so we put 0+1 *)
         (exp_abs
           (* e : T *)
           (typ_bvar 0)
@@ -311,41 +312,268 @@ Definition CC_cons :=
               (typ_capt
                   {}C
                   (typ_arrow
-                    t
+                    1
                     (typ_capt
                         {}C
-                        (typ_arrow (typ_bvar 0) 
+                        (typ_arrow (typ_bvar 0)
                                    (typ_bvar 0)))))
-              (exp_abs 
+              (exp_abs
                 (* start : A*)
                 (typ_bvar 0)
                 (* (f e (lst f start)) *)
                 (exp_app
                   (* (f e) *)
                   (exp_app (exp_bvar 1) (exp_bvar 2))
-                  (exp_app 
+                  (exp_app
                     (* (lst f) *)
-                    (exp_app (exp_bvar 3) (exp_bvar 1))
-                    (exp_bvar 0)))))))))
+                     (exp_app
+                        (exp_tapp (exp_bvar 3) (typ_bvar 0))
+                        (exp_bvar 1))
+                    (exp_bvar 0))))))))).
 
 Definition CC_map :=
   (exp_tabs
-    (typ_capt cset_universal typ_top (** forall T <: {*} Top*)
+    (typ_capt cset_universal typ_top) (** forall T <: {*} Top*)
     (exp_tabs
       (typ_capt cset_universal typ_top) (** forall A <: {*} Top, *)
       (exp_abs
-        (CC_List cset_universal t) (** lst : {*} List [T] *)
+        (CC_List cset_universal 1) (** lst : {*} List [T] *)
         (exp_abs
-          (typ_capt {}C (typ_abs (typ_bvar 1) (typ_bvar 0))) (** f : {}C T -> A *)
+          (typ_capt {}C (typ_arrow (typ_bvar 1) (typ_bvar 0))) (** f : {}C T -> A *)
           (exp_app
             (exp_app (exp_bvar 1)
               (** \e \a -> (cons (f elem) accum) *)
-              (exp_abs t
+              (exp_abs 1
                 (exp_abs (typ_bvar 0)
                   (exp_app 
-                    (exp_app (exp_tapp CC_cons t) (exp_app (exp_bvar 2) (exp_bvar 1)))
+                    (exp_app (exp_tapp CC_cons 1) (exp_app (exp_bvar 2) (exp_bvar 1)))
                     (exp_bvar 0)))))
-            (CC_empty {}C t)))))))
+            (CC_empty {}C 1)))))).
+
+(* ---------------------------------------------------------------------- *)
+(** ** Position Markers *)
+
+(** [ltac_Mark] and [ltac_mark] are dummy definitions used as sentinel
+    by tactics, to mark a certain position in the context or in the goal. *)
+
+Inductive ltac_Mark : Type :=
+  | ltac_mark : ltac_Mark.
+
+(** [gen_until_mark] repeats [generalize] on hypotheses from the
+    context, starting from the bottom and stopping as soon as reaching
+    an hypothesis of type [Mark]. If fails if [Mark] does not
+    appear in the context. *)
+
+Ltac gen_until_mark :=
+  match goal with H: ?T |- _ =>
+  match T with
+  | ltac_Mark => clear H
+  | _ => generalize H; clear H; gen_until_mark
+  end end.
+
+(* ---------------------------------------------------------------------- *)
+(** ** Rewriting lemmas *)
+
+Lemma wf_typ_closed_tt_rec : forall k x E T,
+  wf_typ_in E T ->
+  (open_tt_rec k x T) = T.
+Proof.
+  intros.
+  erewrite <- open_tt_rec_type; eauto using type_from_wf_typ.
+Qed.
+
+Lemma wf_typ_closed_ct_rec : forall k D E T,
+  wf_typ_in E T ->
+  (open_ct_rec k D T) = T.
+Proof.
+  intros.
+  erewrite <- open_ct_rec_type; eauto using type_from_wf_typ.
+Qed.
+
+Lemma wf_cset_closed_cset : forall k D E C,
+  wf_cset_in E C ->
+  (open_cset k D C) = C.
+Proof.
+  intros.
+  erewrite <- open_cset_capt; eauto using capt_from_wf_cset.
+Qed.
+
+Lemma empty_closed_cset : forall k D,
+  (open_cset k D {}C) = {}C.
+Proof.
+  intros.
+  erewrite <- open_cset_capt.
+  reflexivity.
+  constructor.
+Qed.
+
+Lemma if_blatantly_true : forall A k (t s : A),
+  (if k === k then t else s) = t.
+Proof.
+  intros.
+  destruct_if; easy.
+Qed.
+
+Lemma if_blatantly_false : forall A k j (t s : A),
+  k <> j ->
+  (if k === j then t else s) = s.
+Proof.
+  intros.
+  destruct_if; easy.
+Qed.
+
+Lemma empty_union_idempotent : forall C,
+  {} `union` C = C.
+Proof.
+  intros.
+  fsetdec.
+Qed.
+
+Lemma idempotent_union_empty : forall C,
+  C `union` {} = C.
+Proof.
+  intros.
+  fsetdec.
+Qed.
+
+Create HintDb typ.
+
+Hint Rewrite if_blatantly_true : typ.
+Hint Rewrite if_blatantly_false using congruence : typ.
+
+Hint Rewrite empty_closed_cset : typ.
+Hint Rewrite empty_union_idempotent : typ.
+Hint Rewrite idempotent_union_empty : typ.
+
+Ltac cbn_for_open :=
+      cbn [
+          open_ee open_te open_ct open_tt
+                  open_ct_rec open_cpt_rec open_ee_rec open_te_rec open_tt_rec open_tpt_rec
+        ].
+
+Ltac cleanup :=
+    cbn_for_open;
+    cbn [free_for_cv] in *;
+    simpl_env in *;
+    cbn [fv_tt fv_et fv_tpt fv_ept fv_cset empty_cset] in *.
+
+Ltac arw :=
+  try (erewrite wf_typ_closed_tt_rec; [|progress eauto]);
+  try (erewrite wf_typ_closed_ct_rec; [|progress eauto]);
+  autorewrite with typ in *.
+
+Ltac full_cleanup :=
+  repeat progress (arw ; cleanup).
+
+(* ---------------------------------------------------------------------- *)
+(** ** Well-formedness trivia *)
+
+Lemma UniTop_wf : forall E Ap Am,
+  wf_typ E Ap Am (typ_capt cset_universal typ_top).
+Proof.
+  intros.
+  constructor.
+  - constructor.
+  - constructor.
+Qed.
+
+Lemma pretyp_capturing_empty_wf_if : forall E Ap Am T,
+  wf_pretyp E Ap Am T ->
+  wf_typ E Ap Am (typ_capt {}C T).
+Proof.
+  intros.
+  constructor.
+  - constructor.
+    + unfold allbound_typ.
+      intros. exfalso; fsetdec.
+    + fsetdec.
+  - easy.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** Glorious taktiks *)
+
+Ltac goal_env :=
+  let pass_if_env := fun E => match type of E with env => E end in
+  match goal with
+  | |- _ ?E => pass_if_env E
+  | |- _ ?E _ => pass_if_env E
+  | |- _ ?E _ _ => pass_if_env E
+  | |- _ ?E _ _ _ => pass_if_env E
+  end.
+
+Ltac assert_wf_env :=
+  let E := goal_env in assert (wf_env E).
+
+Ltac replace_type_with tp :=
+  match goal with
+  | |- typing _ _ ?T =>
+    replace T with tp
+  end;
+  unfold tp.
+
+Ltac assert_typing_with tp :=
+  match goal with
+  | |- typing ?E ?t _ =>
+    assert (typing E t tp); [unfold tp|]
+  end.
+
+Ltac promise_wf_typ H T1 :=
+  match goal with
+  | |- typing ?E _ _ =>
+    enough (wf_typ_in E T1) as H; [try unfold T1 in H|try unfold T1]
+  | |- sub ?E _ _ =>
+    enough (wf_typ_in E T1) as H; [try unfold T1 in H|try unfold T1]
+  end.
+
+Ltac extract_binding_uniqueness_rec x E :=
+  lazymatch E with
+  | [(?y, _)] =>
+    assert (x <> y) by notin_solve
+  | [(?y, _)] ++ ?G =>
+    assert (x <> y) by notin_solve; extract_binding_uniqueness_rec x G
+  end.
+
+Ltac extract_binding_uniqueness :=
+  lazymatch goal_env with
+  | empty => idtac "Nothing to extract, env empty"
+  | [(?x, _)] => idtac "Nothing to extract, single binding"
+  | [(?x, _)] ++ ?E =>
+    extract_binding_uniqueness_rec x E
+  | [(?x, _)] ++ ?E =>
+    extract_binding_uniqueness_rec x E
+  end.
+
+Ltac binds_dec :=
+  cbv [binds get]; simpl;
+    repeat first [ reflexivity | destruct_if; try congruence].
+
+Ltac wf_typ_inversion_intros H :=
+  match goal with
+  | |- _ -> _ =>
+    (let H' := fresh H in intro H'); wf_typ_inversion_intros H
+  | |- _ => idtac
+  end.
+
+Ltac wf_typ_inversion' H :=
+  pose (ltac_mark); wf_typ_inversion H; gen_until_mark; wf_typ_inversion_intros H.
+
+Ltac wf_cleanup :=
+  try apply pretyp_capturing_empty_wf_if;
+  try apply UniTop_wf.
+
+Tactic Notation "wf_step" ident(id) "with" constr(H) :=
+  wf_cleanup;
+  pick fresh id and apply H; simpl_env; [|extract_binding_uniqueness];
+  wf_cleanup.
+
+Hint Resolve allbound_typ_if.
+
+(* ---------------------------------------------------------------------- *)
+(** ** Clean notation *)
+
+Notation "C |> T" := (typ_capt C T) (at level 80).
+Notation "'UniTop'" := (typ_capt cset_universal typ_top).
 
 Lemma fast_and_furious : forall C T,
   wf_typ_in empty T ->
@@ -355,188 +583,74 @@ Proof with eauto.
   intros.
   unfold CC_empty, CC_List.
 
-  Ltac assert_typing_with tp :=
-    match goal with
-    | |- typing ?E ?t _ =>
-      assert (typing E t tp); [unfold tp|]
-    end.
-
-  Ltac replace_type_with tp :=
-    match goal with
-    | |- typing _ _ ?T =>
-      replace T with tp
-    end;
-    unfold tp.
-
-  Ltac assert_wf_env :=
-    match goal with
-    | |- typing ?E _ _ =>
-      assert (wf_env E)
-    | |- sub ?E _ _ =>
-      assert (wf_env E)
-    end.
-
-  assert (forall k x, (open_tt_rec k x T) = T) as TClsTt. {
-    intros.
-    erewrite <- open_tt_rec_type...
-    eapply type_from_wf_typ...
-  }
-
-  assert (forall k D, (open_ct_rec k D T) = T) as TClsCt. {
-    intros.
-    erewrite <- open_ct_rec_type...
-    eapply type_from_wf_typ...
-  }
-
-  assert (forall k D, (open_cset k D C) = C) as DCls. {
-    intros.
-    erewrite <- open_cset_capt...
-  }
-
-  assert (forall k C, (open_cset k C {}C) = {}C) as EmptyCls. {
-    intros.
-    erewrite <- open_cset_capt.
-    reflexivity.
-    constructor.
-  }
-
-  assert (forall E Ap Am T, wf_pretyp E Ap Am T -> wf_typ E Ap Am (typ_capt {}C T)) as HCaptWf. {
-    intros.
-    constructor.
-    - constructor.
-      + unfold allbound_typ.
-        intros. exfalso; fsetdec.
-      + fsetdec.
-    - easy.
-  }
-
-  Ltac cbn' :=
-       cbn [
-           open_ee open_te open_ct open_tt
-                   open_ct_rec open_cpt_rec open_ee_rec open_te_rec open_tt_rec open_tpt_rec
-         ].
-
-  Ltac extract_binding_uniqueness_rec x E :=
-    lazymatch E with
-    | [(?y, _)] =>
-      assert (x <> y) by notin_solve
-    | [(?y, _)] ++ ?G =>
-      assert (x <> y) by notin_solve; extract_binding_uniqueness_rec x G
-    end.
-
-  Ltac extract_binding_uniqueness :=
-    lazymatch goal with
-    | |- wf_typ_in ([(?x, _)] ++ ?E) _ =>
-      extract_binding_uniqueness_rec x E
-    | |- wf_typ ([(?x, _)] ++ ?E) _ _ _ =>
-      extract_binding_uniqueness_rec x E
-    end.
-
-  Ltac binds_dec :=
-    cbv [binds get]; simpl;
-      repeat first [ reflexivity | destruct_if; try congruence].
-
-  Hint Resolve allbound_typ_if.
-  Ltac promise_wf_typ H T1 :=
-    match goal with
-    | |- typing ?E _ _ =>
-      enough (wf_typ_in E T1) as H; [unfold T1 in H|unfold T1]
-    | |- sub ?E _ _ =>
-      enough (wf_typ_in E T1) as H; [unfold T1 in H|unfold T1]
-    end.
-
   epose (T1 := (typ_capt ?[T1__C] (typ_all ?[T1__A] ?[T1__R]))).
-  promise_wf_typ Wf__T1 T1.
+  promise_wf_typ T1__Wf T1.
   assert_typing_with T1. {
-    (* pick fresh X. *)
-    (* lazymatch goal with *)
-    (* | H : X `notin` ?L |- typing ?E _ (typ_capt _ (typ_all ?S ?T)) => *)
-    (*   enough (forall A, A `notin` L -> wf_typ ([(A, bind_sub S)] ++ E) (dom E) (dom E) (open_tt T A)) *)
-    (* end. *)
-    (* Ltac instantiate_var X := *)
-    (*   lazymatch goal with *)
-    (*   | H : X `notin` ?L |-  forall Y, Y `notin` ?L' -> _ => *)
-    (*     let Fr' := fresh "Fr" in *)
-    (*     unify L L'; clear dependent X; intros X Fr' *)
-    (*   end. *)
-    (* eapply typing_tabs; try instantiate_var X; simpl_env... *)
-    wf_typ_inversion Wf__T1.
+    wf_typ_inversion' T1__Wf.
     pick fresh X and apply typing_tabs; simpl_env...
-    {
-      assert_wf_env. {
+    { assert_wf_env. {
         constructor...
       }
 
-      cbn'.
-      destruct_if; try easy.
-      rewrite TClsTt.
+      full_cleanup.
 
       epose (T2 := (typ_capt ?[T2__C] (typ_arrow ?[T2__A] ?[T2__R]))).
-      promise_wf_typ Wf__T2 T2.
+      promise_wf_typ T2__Wf T2.
       assert_typing_with T2. {
-        wf_typ_inversion Wf__T2.
+        wf_typ_inversion' T2__Wf.
         pick fresh y and apply typing_abs...
         { assert_wf_env. {
             constructor...
           }
-          cbn'.
-          destruct_if; [congruence|].
+          full_cleanup.
 
           epose (T3 := (typ_capt ?[T3__C] (typ_arrow ?[T3__A] ?[T3__R]))).
-          promise_wf_typ Wf__T3 T3.
+          promise_wf_typ T3__Wf T3.
           assert_typing_with T3. {
-            wf_typ_inversion Wf__T3.
+            wf_typ_inversion' T3__Wf.
             pick fresh z and apply typing_abs...
-            { assert_wf_env. {
+            { full_cleanup.
+              assert_wf_env. {
                 constructor...
               }
-              cbn'.
-              destruct_if; [|easy].
+              extract_binding_uniqueness.
 
               epose (T4 := _).
               replace_type_with T4. {
                 apply typing_var_tvar with (X := X).
                 1: easy.
-                cbv [binds get]; simpl.
-                destruct_if; easy.
+                binds_dec.
               }
               [T3__R] : exact X.
-              cbn'. easy.
+              reflexivity.
             }
           }
-          {
+          { full_cleanup.
             replace_type_with T3. easy.
-            cbn [free_for_cv].
             [T2__R] : exact (typ_capt {}C (typ_arrow X X)).
-            cbn'. rewrite EmptyCls. easy.
+            now full_cleanup.
           }
-          {
+          { full_cleanup.
             constructor.
             - constructor; simpl_env...
             - assert (y <> X) by notin_solve.
               pick fresh y' and apply wf_typ_arrow...
-              + extract_binding_uniqueness.
-                cbn'.
+              + extract_binding_uniqueness; cleanup;
                 econstructor; binds_dec.
           }
         }
       }
-      { cbn [free_for_cv] in T2.
-        [T1__R] : exact (
+      { [T1__R] : exact (
                     typ_capt {}C
                              (typ_arrow (typ_capt {}C (typ_arrow T (typ_capt {}C (typ_arrow 0 0))))
                                         (typ_capt {}C (typ_arrow 0 0)))
                   ).
         replace_type_with T2. easy.
-        cbn'. rewrite TClsTt.
-        destruct_if; [|congruence].
+        full_cleanup.
         reflexivity.
       }
-      { cbv [free_for_cv] in *.
-        apply HCaptWf.
-        pick fresh y' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-        + apply HCaptWf.
-          pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
+      { wf_step y' with wf_typ_arrow.
+        + wf_step y'' with wf_typ_arrow.
           {
             match goal with
             | |- wf_typ ?E _ _ T =>
@@ -544,31 +658,22 @@ Proof with eauto.
             end.
             eapply wf_typ_weakening; [apply H|simpl_env;eauto ..].
           }
-          cbn'. rewrite EmptyCls.
-          apply HCaptWf.
-          pick fresh y''' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-          1 : econstructor; binds_dec.
-          cbn'.
-          econstructor; binds_dec.
-        + cbn'. rewrite EmptyCls.
-          apply HCaptWf.
-          pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-          1 : econstructor; binds_dec.
-          cbn'.
-          econstructor; binds_dec.
+          full_cleanup.
+          wf_step y''' with wf_typ_arrow;
+            cleanup; econstructor; binds_dec.
+        + full_cleanup.
+          wf_step y'' with wf_typ_arrow;
+            cleanup; econstructor; binds_dec.
       }
     }
   }
   2: {
-    cbv [free_for_cv] in *.
-    apply HCaptWf.
-    pick fresh X and apply wf_typ_all; simpl_env...
-    apply HCaptWf.
-    rewrite TClsTt.
-    destruct_if; try easy.
-    pick fresh y and apply wf_typ_arrow; [|extract_binding_uniqueness].
-    + apply HCaptWf.
-      pick fresh y' and apply wf_typ_arrow; [|extract_binding_uniqueness].
+    full_cleanup.
+
+    wf_step X with wf_typ_all...
+    full_cleanup.
+    wf_step y with wf_typ_arrow.
+    + wf_step y' with wf_typ_arrow.
       {
         match goal with
         | |- wf_typ ?E _ _ T =>
@@ -576,53 +681,101 @@ Proof with eauto.
         end.
         eapply wf_typ_weakening; [apply H|simpl_env;eauto ..].
       }
-      cbn'. rewrite EmptyCls.
-      apply HCaptWf.
-      pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-      1 : econstructor; binds_dec.
-      cbn'.
-      econstructor; binds_dec.
-    + cbn'. rewrite EmptyCls.
-      apply HCaptWf.
-      pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-      1 : econstructor; binds_dec.
-      cbn'.
-      econstructor; binds_dec.
+      full_cleanup.
+      wf_step y'' with wf_typ_arrow;
+        cleanup; econstructor; binds_dec.
+    + full_cleanup.
+      wf_step y'' with wf_typ_arrow;
+        cleanup; econstructor; binds_dec.
   }
-  cbv [free_for_cv] in *.
+  full_cleanup.
   eapply typing_sub.
   apply H1.
-  apply sub_capt.
-  { destruct C.
-    - constructor...
-      constructor.
-      2: fsetdec.
-      unfold allbound_typ; intros; exfalso; fsetdec.
-    - inversion H0; subst.
-      constructor...
-      intros ? ?; exfalso; fsetdec.
-  }
 
-  assert (wf_typ_in empty (typ_capt cset_universal typ_top)). {
-    constructor...
-  }
+  lazymatch goal with
+  | |- sub ?E ?S ?U =>
+    promise_wf_typ S2__Wf S; [
+      promise_wf_typ T2__Wf U
+    | ]
+  end.
+
+  Lemma empty_subcapts_all : forall E C,
+    wf_cset_in E C ->
+    subcapt E {}C C.
+  Proof with eauto.
+    intros.
+    { destruct C.
+      - constructor...
+        constructor.
+        2: fsetdec.
+        unfold allbound_typ; intros; exfalso; fsetdec.
+      - inversion H; subst.
+        constructor...
+        constructor...
+        unfold allbound_typ; intros; exfalso; fsetdec.
+        intros ? ?; exfalso; fsetdec.
+    }
+  Qed.
+
+  apply sub_capt.
+  1: now apply empty_subcapts_all.
+
+  wf_typ_inversion' S2__Wf.
+  wf_typ_inversion' T2__Wf.
   pick fresh X and apply sub_all; simpl_env...
   - apply sub_capt...
-  - cbn'.
-    destruct_if; [|congruence].
-    rewrite TClsTt.
+  - full_cleanup.
+    apply sub_capt.
+    + apply empty_subcapts_all.
+      { match goal with
+        | |- wf_cset_in ?E _ =>
+          change E with (empty ++ E ++ empty)
+        end.
+        eapply wf_cset_weakening; simpl_env.
+        eauto.
+        all : eauto.
+      }
+    + let e := goal_env in
+      apply sub_pre_reflexivity with (Ap := dom e) (Am := dom e); simpl_env...
+      { constructor...
+      }
+      specialize (T2__Wf4 X ltac:(notin_solve)).
+      Ltac cbn_for_open_in_star :=
+        cbn [
+            open_ee open_te open_ct open_tt
+                    open_ct_rec open_cpt_rec open_ee_rec open_te_rec open_tt_rec open_tpt_rec
+          ] in *.
+
+      cbn_for_open_in_star.
+      full_cleanup.
+      erewrite wf_typ_closed_tt_rec in T2__Wf4; [|eauto].
+      wf_typ_inversion' T2__Wf4.
+      set (foo := (typ_arrow ({}C |> typ_arrow T ({}C |> typ_arrow X X)) ({}C |> typ_arrow X X))) in *.
+      do 2 rewrite_nil_concat.
+      eapply wf_pretyp_weakening; simpl_env.
+      apply T2__Wf6.
+      all : eauto.
+  - full_cleanup.
     constructor.
     { match goal with
       | |- wf_cset ?E _ _ =>
         change E with (empty ++ E ++ empty)
       end.
       eapply wf_cset_weakening; simpl_env.
-      eauto.
       all : eauto.
     }
-    pick fresh y' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-    + apply HCaptWf.
-      pick fresh y'' and apply wf_typ_arrow.
+    wf_step X with wf_typ_all.
+    full_cleanup.
+    constructor.
+    { match goal with
+      | |- wf_cset ?E _ _ =>
+        change E with (empty ++ E ++ empty)
+      end.
+      eapply wf_cset_weakening; simpl_env.
+      all : eauto.
+    }
+    wf_step y' with wf_typ_arrow.
+    + wf_step y'' with wf_typ_arrow.
       {
         match goal with
         | |- wf_typ ?E _ _ T =>
@@ -630,91 +783,771 @@ Proof with eauto.
         end.
         eapply wf_typ_weakening; [apply H|simpl_env;eauto ..].
       }
-      extract_binding_uniqueness.
-      cbn'. rewrite EmptyCls.
-      apply HCaptWf.
-      pick fresh y''' and apply wf_typ_arrow.
-      1 : econstructor; binds_dec.
-      cbn'.
-      extract_binding_uniqueness.
-      econstructor; binds_dec.
-    + cbn'. rewrite EmptyCls.
-      apply HCaptWf.
-      pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-      1 : econstructor; binds_dec.
-      cbn'.
-      econstructor; binds_dec.
-  - cbn'.
-    destruct_if; [|congruence].
-    rewrite TClsTt.
-    apply HCaptWf.
-    pick fresh y' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-    + apply HCaptWf.
-      pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-      {
-        lazymatch goal with
-        | |- wf_typ ?E _ _ _ =>
-          change E with (empty ++ E ++ empty)
-        end.
-        eapply wf_typ_weakening; [apply H|simpl_env;eauto ..].
-      }
-      cbn'. rewrite EmptyCls.
-      apply HCaptWf.
-      pick fresh y''' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-      1 : econstructor; binds_dec.
-      cbn'.
-      econstructor; binds_dec.
-    + cbn'. rewrite EmptyCls.
-      extract_binding_uniqueness.
-      apply HCaptWf.
-      pick fresh y'' and apply wf_typ_arrow; [|extract_binding_uniqueness].
-      1 : econstructor; binds_dec.
-      cbn'.
-      econstructor; binds_dec.
-  - cbn'.
-    destruct_if; [|congruence].
-    rewrite TClsTt.
-    assert_wf_env. {
-      constructor...
-    }
-    apply sub_capt.
-    2: {
-      let a := constr:(dom [(X, bind_sub (typ_capt cset_universal typ_top))]) in
-      apply sub_pre_reflexivity with (Ap := a) (Am := a); simpl_env...
-      pick fresh y' and apply wf_typ_arrow.
-      + apply HCaptWf.
-        pick fresh y'' and apply wf_typ_arrow.
+      full_cleanup.
+      wf_step y''' with wf_typ_arrow;
+        cleanup; econstructor; binds_dec.
+    + full_cleanup.
+      wf_step y'' with wf_typ_arrow;
+        cleanup; econstructor; binds_dec.
+  - full_cleanup.
+    wf_step X with wf_typ_all.
+    full_cleanup.
+    + wf_step y' with wf_typ_arrow.
+      * wf_step y' with wf_typ_arrow.
         {
-          lazymatch goal with
-          | |- wf_typ ?E _ _ _ =>
+          match goal with
+          | |- wf_typ ?E _ _ T =>
             change E with (empty ++ E ++ empty)
           end.
           eapply wf_typ_weakening; [apply H|simpl_env;eauto ..].
         }
-        extract_binding_uniqueness.
-        cbn'. rewrite EmptyCls.
-        apply HCaptWf.
-        pick fresh y''' and apply wf_typ_arrow.
-        1 : econstructor; binds_dec.
-        cbn'.
-        extract_binding_uniqueness.
-        econstructor; binds_dec.
-      + cbn'. rewrite EmptyCls.
-        extract_binding_uniqueness.
-        apply HCaptWf.
-        pick fresh y'' and apply wf_typ_arrow.
-        1 : econstructor; binds_dec.
-        cbn'.
-        extract_binding_uniqueness.
-        econstructor; binds_dec.
-    }
-    { destruct C.
-      - constructor...
-        constructor.
-        2: fsetdec.
-        unfold allbound_typ; intros; exfalso; fsetdec.
-      - inversion H0; subst.
-        constructor...
-        intros ? ?; exfalso; fsetdec.
-    }
+        full_cleanup.
+        wf_step y'' with wf_typ_arrow;
+          cleanup; econstructor; binds_dec.
+      * full_cleanup.
+        wf_step y'' with wf_typ_arrow;
+          cleanup; econstructor; binds_dec.
 Qed.
+
+Lemma empty_cset_union_idempotent : forall C,
+    cset_union {}C C = C.
+Proof.
+  intros.
+  unfold cset_union.
+  destruct C; simpl.
+  - reflexivity.
+  - cset_eq_dec.
+Qed.
+
+Lemma cset_union_empty_idempotent : forall C,
+    cset_union C {}C = C.
+Proof.
+  intros.
+  unfold cset_union.
+  destruct C; simpl.
+  - reflexivity.
+  - cset_eq_dec.
+Qed.
+
+Notation "{*}" := cset_universal.
+
+Lemma universal_closed_cset : forall k D,
+  (open_cset k D {*}) = {*}.
+Proof.
+  intros.
+  erewrite <- open_cset_capt.
+  reflexivity.
+  constructor.
+Qed.
+
+Hint Rewrite empty_cset_union_idempotent : typ.
+Hint Rewrite cset_union_empty_idempotent : typ.
+Hint Rewrite universal_closed_cset : typ.
+
+Ltac assert_typ_eq T id :=
+match goal with
+| |- typing _ _ ?T' =>
+  assert (T = T') as id
+end.
+
+Lemma wf_pretyp_from_binds_typ : forall x E C V,
+  wf_env E ->
+  binds x (bind_typ (C |> V)) E ->
+  wf_pretyp_in E V.
+Proof with auto.
+  intros.
+  apply wf_typ_from_binds_typ in H0...
+  wf_typ_inversion H0...
+Qed.
+
+Lemma binds_in_dom_typ : forall x T E,
+  binds x (bind_typ T) E ->
+  x `in` dom_typ E.
+Proof.
+  intros.
+  induction E.
+  - inversion H.
+  - destruct a as (y & b).
+    cbv [binds get] in H.
+    destruct (x == y) eqn:EQ.
+    + inversion H. subst.
+      unfold dom_typ.
+      fsetdec.
+    + enough (x `in` dom_typ E) by (unfold dom_typ; destruct b; fsetdec).
+      apply IHE.
+      auto.
+Qed.
+
+Lemma wf_cset_from_binds_typ : forall T x E,
+  wf_env E ->
+  binds x (bind_typ T) E ->
+  wf_cset_in E x.
+Proof with auto.
+  intros.
+  apply binds_in_dom_typ in H0 as ?.
+  pose proof (dom_typ_subsets_dom E).
+  constructor...
+Qed.
+
+Ltac wf_cleanup ::=
+  try apply pretyp_capturing_empty_wf_if;
+  try apply wf_universal_cset;
+  try apply wf_typ_all;
+  try apply UniTop_wf.
+
+Ltac clear_until_mark :=
+  match goal with H: ?T |- _ =>
+  match T with
+  | ltac_Mark => clear H
+  | _ => clear H; clear_until_mark
+  end end.
+
+Ltac extract_binding_uniqueness_rec x E ::=
+  lazymatch E with
+  | [(?y, _)] =>
+    assert (x <> y) by assumption
+  | [(?y, _)] ++ ?G =>
+    assert (x <> y) by assumption; extract_binding_uniqueness_rec x G
+  end.
+
+Ltac extract_binding_uniqueness_intros :=
+  match goal with
+  | |- _ -> _ =>
+    let F := fresh "F" in intro F;
+    extract_binding_uniqueness_intros
+  | _ => idtac
+  end.
+
+Ltac extract_binding_uniqueness ::=
+  pose (ltac_mark);
+  notin_simpl;
+  pose (ltac_mark);
+  lazymatch goal_env with
+  | empty => idtac "Nothing to extract, env empty"
+  | [(?x, _)] => idtac "Nothing to extract, single binding"
+  | [(?x, _)] ++ ?E =>
+    extract_binding_uniqueness_rec x E
+  | [(?x, _)] ++ ?E =>
+    extract_binding_uniqueness_rec x E
+  end;
+  gen_until_mark;
+  clear_until_mark;
+  extract_binding_uniqueness_intros.
+
+Notation "{ x }" := (singleton x).
+
+Lemma too_fast_too_furious: exists T,
+  typing empty CC_cons T.
+Proof with eauto.
+  eexists ?[T0].
+
+  unfold CC_cons.
+
+  epose (T1 := ?[T1__C] |> typ_all ?[T1__A] ?[T1__R]).
+  promise_wf_typ T1__Wf T1.
+  assert_typing_with T1. {
+    wf_typ_inversion' T1__Wf.
+    pick fresh X and apply typing_tabs; simpl_env...
+    clear_frees; full_cleanup.
+    change (open_tt_rec 0 X (CC_List cset_universal 1))
+      with (CC_List cset_universal X).
+
+    epose (T2 := ?[T2__C] |> typ_arrow ?[T2__A] ?[T2__R]).
+    promise_wf_typ T2__Wf T2.
+    assert_typing_with T2. {
+
+      wf_typ_inversion' T2__Wf.
+      assert_wf_env. {
+        constructor...
+      }
+
+      clear_frees. full_cleanup.
+      epose (T3 := ?[T3__C] |> typ_arrow ?[T3__A] ?[T3__R]).
+      promise_wf_typ T3__Wf T3.
+      assert_typing_with T3. {
+        wf_typ_inversion' T3__Wf.
+        pick fresh y and apply typing_abs...
+        assert_wf_env. {
+          constructor...
+        }
+        extract_binding_uniqueness.
+        full_cleanup.
+
+        epose (T4 := ?[T4__C] |> typ_arrow ?[T4__A] ?[T4__R]).
+        promise_wf_typ T4__Wf T4.
+        assert_typing_with T4. {
+          wf_typ_inversion' T4__Wf.
+          pick fresh z and apply typing_abs...
+          assert_wf_env. {
+            constructor...
+          }
+          extract_binding_uniqueness.
+          full_cleanup.
+
+          epose (T5 := ?[T5__C] |> typ_all ?[T5__A] ?[T5__R]).
+          promise_wf_typ T5__Wf T5.
+          assert_typing_with T5. {
+            wf_typ_inversion' T5__Wf.
+            pick fresh X' and apply typing_tabs...
+            assert_wf_env. {
+              constructor...
+            }
+            extract_binding_uniqueness.
+            full_cleanup.
+
+            epose (T6 := ?[T6__C] |> typ_arrow ?[T6__A] ?[T6__R]).
+            promise_wf_typ T6__Wf T6.
+            assert_typing_with T6. {
+              wf_typ_inversion' T6__Wf.
+              pick fresh y' and apply typing_abs...
+              extract_binding_uniqueness.
+              full_cleanup.
+              assert_wf_env. {
+                constructor; autounfold; simpl_env; [trivial .. | notin_solve].
+              }
+
+              epose (T7 := ?[T7__C] |> typ_arrow ?[T7__A] ?[T7__R]).
+              promise_wf_typ T7__Wf T7.
+              assert_typing_with T7. {
+                wf_typ_inversion' T7__Wf.
+                pick fresh z' and apply typing_abs...
+                extract_binding_uniqueness.
+                full_cleanup.
+                assert_wf_env. {
+                  constructor; autounfold; simpl_env; [trivial .. | notin_solve].
+                }
+
+                (* set (y'__Typ := ({}C |> typ_arrow X ({}C |> typ_arrow X' X'))) in *. *)
+
+                Ltac epose_open_ct :=
+                  let T := fresh "T1" in
+                  let Tt := fresh T "__T" in
+                  let Tc := fresh T "__C" in
+                  let Twf := fresh T "__Wf" in
+                  epose (T := (open_ct ?[Tt] ?[Tc]));
+                  promise_wf_typ Twf T.
+
+                epose_open_ct.
+                assert_typing_with T0. {
+                  eapply typing_app.
+                  2: {
+                    eapply typing_app.
+                    2: {
+                      eapply typing_var_tvar...
+                    }
+                    3: {
+                      eapply cv_typ_var; [ binds_dec | trivial |]...
+                    }
+                    { epose (T8 := (open_ct ?[T8__T] ?[T8__C])).
+                      promise_wf_typ T8__Wf T8.
+                      assert_typing_with T8. {
+                        eapply typing_app.
+                        2: {
+                          eapply typing_var; [trivial|binds_dec].
+                        }
+                        3: {
+                          apply cv_typ_capt. trivial.
+
+                          eapply (wf_pretyp_from_binds_typ y');
+                            [ trivial | binds_dec ].
+
+                          eapply wf_cset_from_binds_typ;
+                            [ trivial | binds_dec ].
+                        }
+                        { epose (T9 := (open_tt ?[T9__T] ?[T9__C])).
+                          promise_wf_typ T9__Wf T9.
+                          assert_typing_with T9. {
+                            eapply typing_tapp. {
+                              eapply typing_var;
+                                [ trivial | binds_dec ].
+                            } {
+                              eapply sub_trans_tvar.
+                              binds_dec.
+                              apply sub_capt.
+                              constructor.
+                              constructor.
+                              constructor.
+                              trivial.
+                              constructor.
+                            }
+                          }
+                          {
+                            Ltac goal_cleanup :=
+                              repeat progress (cbn_for_open; autorewrite with typ).
+
+                            Ltac by_asserted_typing :=
+                              lazymatch goal with
+                              | H : typing _ ?t ?S |- typing _ ?t ?T =>
+                                let EQ := fresh "TMP" "EQ" in
+                                assert_typ_eq S EQ; [
+                                  unfold S;
+                                  goal_cleanup;
+                                  reflexivity
+                                | rewrite EQ in H;
+                                  assumption
+                                ]
+                              end.
+                            by_asserted_typing.
+                          }
+                          { goal_cleanup.
+
+                            Hint Extern 1 (binds _ _ _ _) => binds_dec : core.
+
+                            constructor.
+                            1: wf_cleanup.
+                            simpl_env.
+                            wf_step y'' with wf_typ_arrow.
+                            - wf_step y'' with wf_typ_arrow.
+                              + econstructor. binds_dec.
+                              + goal_cleanup.
+                                wf_step z'' with wf_typ_arrow.
+                                2: goal_cleanup.
+                                1,2: econstructor; binds_dec.
+                            - goal_cleanup.
+                              clear_frees.
+                              wf_step z'' with wf_typ_arrow.
+                              2: goal_cleanup.
+                              1,2: econstructor; binds_dec.
+                          }
+                        }
+                        apply sub_capt.
+                        eapply captures_from_binds...
+                        let G := goal_env in
+                        apply sub_pre_reflexivity with (Ap := dom G) (Am := dom G).
+                        trivial.
+                        wf_step y'' with wf_typ_arrow.
+                        - econstructor. binds_dec.
+                        - goal_cleanup.
+                          wf_step z'' with wf_typ_arrow.
+                          2: goal_cleanup.
+                          1,2: econstructor; binds_dec.
+                        - simpl_env; fsetdec.
+                        - simpl_env; fsetdec.
+                      }
+                      by_asserted_typing.
+                      goal_cleanup.
+                      wf_step z'' with wf_typ_arrow.
+                      2: goal_cleanup.
+                      1,2: econstructor; binds_dec.
+                    }
+                    apply sub_refl_tvar;
+                      [trivial | econstructor; binds_dec].
+                  }
+                  3: {
+                    goal_cleanup.
+                    eapply cv_typ_var; [binds_dec | assumption |].
+                    apply cv_typ_capt.
+                    assumption.
+                    constructor.
+                    constructor.
+                  }
+                  { epose_open_ct.
+                    assert_typing_with T8.
+                    eapply typing_app.
+                    eapply typing_var ; [assumption | binds_dec].
+                    eapply typing_var_tvar ; [assumption | binds_dec].
+                    apply sub_refl_tvar; [assumption | econstructor; binds_dec].
+                    {
+                      eapply cv_typ_var; [binds_dec | assumption |].
+                      apply cv_typ_capt.
+                      assumption.
+                      constructor.
+                      constructor.
+                    }
+                    by_asserted_typing.
+                    { goal_cleanup.
+                      wf_step z'' with wf_typ_arrow.
+                      2: goal_cleanup.
+                      1,2: econstructor; binds_dec.
+                    }
+                  }
+                  { goal_cleanup.
+                    apply sub_refl_tvar;
+                      [trivial | econstructor; binds_dec].
+                  }
+                }
+                { [T7__R]: exact X'.
+                  by_asserted_typing.
+                }
+                { goal_cleanup.
+                  econstructor; binds_dec.
+                }
+              }
+              cbv [free_for_cv cset_union] in T7.
+              simpl in T7.
+              Lemma union_empty_idempotent : forall xs,
+                xs `union` {} = xs.
+              Proof. intros. fsetdec. Qed.
+
+              Lemma funion_empty_idempotent : forall xs,
+                NatSet.F.union xs {}N = xs.
+              Proof. intros. fnsetdec. Qed.
+
+              Lemma empty_funion_idempotent : forall xs,
+                NatSet.F.union {}N xs = xs.
+              Proof. intros. fnsetdec. Qed.
+
+              Hint Rewrite union_empty_idempotent : typ.
+              Hint Rewrite funion_empty_idempotent : typ.
+              Hint Rewrite empty_funion_idempotent : typ.
+
+              Notation "[$ a ]" := (singleton a).
+              Notation "[. n ]" := (NatSet.F.singleton n).
+
+              assert (T7 = (open_ct ?T6__R y')) as HA. {
+                unfold T7.
+
+                Lemma cset_locally_closed : forall k ys xs,
+                  (open_cset k ys (cset_set xs {}N)) = (cset_set xs {}N).
+                Proof.
+                  intros.
+                  unfold open_cset.
+                  destruct_if.
+                  - unfold cset_references_bvar_dec in Heqb.
+                    set_facts_come_on_in Heqb.
+                    exfalso; fnsetdec.
+                  - reflexivity.
+                Qed.
+
+                Hint Rewrite cset_locally_closed : typ.
+
+                Lemma NatSet_mem_singleton : forall A k (t s : A),
+                  (if NatSet.F.mem k [.k] then t else s) = t.
+                Proof.
+                  intros.
+                  destruct_if.
+                  - reflexivity.
+                  - set_facts_come_on_in Heqb.
+                    exfalso. fnsetdec.
+                Qed.
+
+                Hint Rewrite NatSet_mem_singleton : typ.
+
+
+                [T6__R] :
+                  exact (
+                      (cset_union z (cset_union y 0))
+                        |> typ_arrow X' X').
+
+                goal_cleanup.
+                cbv [cset_union open_cset cset_references_bvar_dec].
+                simpl.
+                goal_cleanup.
+                cbv [cset_remove_bvar].
+
+                Lemma NatSet_mem_remove_singleton : forall k,
+                  NatSet.F.remove k [.k] = {}N.
+                Proof.
+                  intros.
+                  fnsetdec.
+                Qed.
+
+                Hint Rewrite NatSet_mem_remove_singleton : typ.
+
+                goal_cleanup.
+                replace (([$y'] `union` [$z]) `union` [$y] `union` [$y'])
+                  with ([$y'] `union` [$z] `union` [$y]) by fsetdec.
+                reflexivity.
+              }
+              rewrite <- HA.
+              assumption.
+              { goal_cleanup.
+                Require Import Fsub_CVfacts.
+                cbv [free_for_cv].
+                constructor.
+                - repeat apply wf_cset_union.
+
+                  Lemma empty_cset_wf : forall E Ap,
+                    wf_cset E Ap {}C.
+                  Proof.
+                    intros.
+                    constructor.
+                    2: fsetdec.
+                    intros ? ?.
+                    exfalso; fsetdec.
+                  Qed.
+
+                  5: apply empty_cset_wf.
+                  all : eapply wf_cset_from_binds_typ; [assumption | binds_dec].
+                - goal_cleanup.
+                  wf_step z'' with wf_typ_arrow.
+                  2: goal_cleanup.
+                  1,2: econstructor; binds_dec.
+              }
+            }
+            
+            assert (T6 = (open_tt ?T5__R X')) as HA. {
+              unfold T6.
+              cbv [free_for_cv].
+              goal_cleanup.
+              [T5__R]:
+                exact
+                  (cset_union
+                     z y
+                     |> typ_arrow ({}C |> typ_arrow X ({}C |> typ_arrow 0 0))
+                     (cset_union z (cset_union y 0) |> typ_arrow 0 0)).
+              goal_cleanup.
+              reflexivity.
+            }
+            rewrite <- HA.
+            assumption.
+            { cbv [free_for_cv].
+              goal_cleanup.
+              constructor.
+              - apply wf_cset_union.
+                all : eapply wf_cset_from_binds_typ; [assumption | binds_dec].
+              - wf_step y' with wf_typ_arrow.
+                + wf_step z' with wf_typ_arrow.
+                  * econstructor; binds_dec.
+                  * goal_cleanup.
+                    wf_step z'' with wf_typ_arrow.
+                    2: goal_cleanup.
+                    1,2: econstructor; binds_dec.
+                + goal_cleanup.
+                  replace (open_cset 0 y' (cset_union z (cset_union y 0)))
+                    with (cset_union z (cset_union y y')).
+                  2: {
+                    cbv [cset_union open_cset].
+                    simpl.
+                    goal_cleanup.
+                    cset_eq_dec.
+                  }
+                  constructor.
+                  *
+                    Lemma wf_cset_from_binds_typ' : forall E Ap x T,
+                      binds x (bind_typ T) E ->
+                      x `in` Ap ->
+                     wf_cset E Ap x.
+                    Proof.
+                      intros.
+                      constructor.
+                      2: fsetdec.
+                      unfold allbound_typ.
+                      intros y In.
+                      rewrite AtomSetFacts.singleton_iff in In.
+                      subst.
+                      eauto.
+                    Qed.
+                    repeat apply wf_cset_union.
+                    eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+                    eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+                    eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+                  * wf_step z'' with wf_typ_arrow.
+                    2: goal_cleanup.
+                    1,2: econstructor; binds_dec.
+            }
+          }
+          { assert (T5 = (open_ct ?T4__R z)). {
+              unfold T5.
+              goal_cleanup.
+              cbv [free_for_cv].
+              goal_cleanup.
+              [T4__R]:
+                exact
+                  (cset_union
+                     0 y
+                     |> typ_all UniTop
+                     (cset_union
+                        0 y |>
+                        typ_arrow ({}C |> typ_arrow X ({}C |> typ_arrow 0 0))
+                                  (cset_union 1 (cset_union y 0) |> typ_arrow 0 0))).
+              goal_cleanup.
+              replace (open_cset 0 z (cset_union 0 y))
+                with (cset_union z y).
+              2: {
+                cbv [cset_union open_cset].
+                simpl.
+                goal_cleanup.
+                cset_eq_dec.
+              }
+              replace (open_cset 1 z (cset_union 1 (cset_union y 0)))
+                with (cset_union z (cset_union y 0)).
+              2: {
+                cbv [cset_union open_cset].
+                simpl.
+                goal_cleanup.
+                destruct_if.
+                - assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
+                  cset_eq_dec.
+                - set_facts_come_on_in Heqb.
+                  exfalso; fnsetdec.
+              }
+              reflexivity.
+            }
+            rewrite <- H3.
+            assumption.
+          }
+          { cbv [free_for_cv].
+            goal_cleanup.
+            autounfold.
+            simpl_env.
+            constructor. {
+              simpl_env.
+              apply wf_cset_union.
+              all : eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+            }
+            wf_step X' with wf_typ_all.
+            goal_cleanup.
+            constructor. {
+              simpl_env.
+              apply wf_cset_union.
+              all : eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+            }
+            wf_step y' with wf_typ_arrow.
+            - wf_step y' with wf_typ_arrow.
+              + econstructor; binds_dec.
+              + goal_cleanup.
+                wf_step z'' with wf_typ_arrow.
+                2: goal_cleanup.
+                1,2: econstructor; binds_dec.
+            - goal_cleanup.
+              replace (open_cset 0 y' (cset_union z (cset_union y 0)))
+                with (cset_union z (cset_union y y')).
+              2: {
+                cbv [cset_union open_cset].
+                simpl.
+                goal_cleanup.
+                cset_eq_dec.
+              }
+              constructor. {
+                repeat apply wf_cset_union.
+                all : eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+              }
+              wf_step z'' with wf_typ_arrow.
+              2: goal_cleanup.
+              1,2: econstructor; binds_dec.
+          }
+        }
+        {
+          assert (T4 = (open_ct ?T3__R y)). {
+            unfold T4.
+            goal_cleanup.
+            cbv [free_for_cv].
+            goal_cleanup.
+            [T3__R]:
+              exact
+                (0 |>
+                   typ_arrow X
+                   (cset_union 0 1
+                               |> typ_all UniTop
+                               (cset_union 0 1
+                                           |> typ_arrow ({}C |> typ_arrow X ({}C |> typ_arrow 0 0))
+                                           (cset_union 1 (cset_union 2 0) |> typ_arrow 0 0)))).
+            goal_cleanup.
+            replace (open_cset 0 y 0) with (cset_fvar y).
+            2: {
+              cbv [cset_union open_cset].
+              simpl.
+              goal_cleanup.
+              cset_eq_dec.
+            }
+            replace (open_cset 1 y (cset_union 0 1)) with (cset_union 0 y).
+            2: {
+              cbv [cset_union open_cset].
+              simpl.
+              goal_cleanup.
+              destruct_if.
+              - assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
+                cset_eq_dec.
+              - set_facts_come_on_in Heqb.
+                exfalso; fnsetdec.
+            }
+            replace (open_cset 2 y (cset_union 1 (cset_union 2 0)))
+              with (cset_union 1 (cset_union y 0)).
+            2: {
+              cbv [cset_union open_cset].
+              simpl.
+              goal_cleanup.
+              destruct_if.
+              - assert (~ NatSet.F.In 2 [.1]) as HA by fnsetdec.
+                assert (~ NatSet.F.In 2 [.0]). {
+                  intro bogus.
+                  rewrite NatSetFacts.singleton_iff in bogus.
+                  congruence.
+                }
+                cset_eq_dec.
+              - set_facts_come_on_in Heqb.
+                exfalso; fnsetdec.
+            }
+            reflexivity.
+          }
+          rewrite <- H2.
+          assumption.
+        }
+        { autounfold.
+          full_cleanup.
+          constructor. {
+            eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+          }
+          wf_step y'' with wf_typ_arrow. {
+            econstructor; binds_dec.
+          }
+          goal_cleanup.
+          Ltac cset_prep :=
+            cbv [cset_union open_cset];
+            simpl;
+            goal_cleanup.
+          replace (open_cset 0 y'' (cset_union 0 y)) with (cset_union y'' y).
+          2: cset_prep; cset_eq_dec.
+          replace (open_cset 1 y'' (cset_union 1 (cset_union y 0)))
+            with (cset_union y'' (cset_union y 0)).
+          2: {
+            cset_prep.
+            destruct_if.
+            - assert (~ NatSet.F.In 1 [.0]) as HA by fnsetdec.
+              cset_eq_dec.
+            - set_facts_come_on_in Heqb.
+              exfalso; fnsetdec.
+          }
+          constructor. {
+            simpl_env.
+            apply wf_cset_union.
+            all : eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+          }
+          wf_step X' with wf_typ_all.
+          goal_cleanup.
+          constructor. {
+            simpl_env.
+            apply wf_cset_union.
+            all : eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+          }
+          wf_step y' with wf_typ_arrow.
+          - wf_step y' with wf_typ_arrow.
+            + econstructor; binds_dec.
+            + goal_cleanup.
+              wf_step z'' with wf_typ_arrow.
+              2: goal_cleanup.
+              1,2: econstructor; binds_dec.
+          - goal_cleanup.
+            replace (open_cset 0 y' (cset_union y'' (cset_union y 0)))
+              with (cset_union y'' (cset_union y y')).
+            2: {
+              cset_prep; cset_eq_dec.
+            }
+            constructor. {
+              repeat apply wf_cset_union.
+              all : eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
+            }
+            wf_step z'' with wf_typ_arrow.
+            2: goal_cleanup.
+            1,2: econstructor; binds_dec.
+        }
+      }                         (* here *)
+      by_asserted_typing.
+    }
+  }
+Admitted.
+
+
+          Lemma open_cset_into_union : forall k D C1 C2,
+            (open_cset k D (cset_union C1 C2)) = (cset_union (open_cset k D C1) (open_cset k D C2)).
+          Proof.
+            intros.
+            destruct C1; destruct C2; simpl; try reflexivity.
+            - unfold open_cset, cset_references_bvar_dec.
+              destruct_match; reflexivity.
+            - unfold open_cset, cset_references_bvar_dec, cset_union.
+              destruct_match; reflexivity.
+            - unfold open_cset, cset_references_bvar_dec, cset_union.
+              simpl.
+              destruct_if.
