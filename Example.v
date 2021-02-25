@@ -1,5 +1,131 @@
+Require Import Coq.Program.Equality.
 Require Import Fsub_Soundness.
 Require Import Fsub_CVfacts.
+
+Inductive subcapt' : env -> captureset -> captureset -> Prop :=
+  | subcapt__universal : forall E C,
+      wf_cset_in E C ->
+      subcapt' E C cset_universal
+  | subcapt__in : forall E x xs,
+      wf_cset_in E (cset_set (singleton x) {}N) ->
+      wf_cset_in E (cset_set xs {}N) ->
+      x `in` xs ->
+      subcapt' E (cset_set (singleton x) {}N) (cset_set xs {}N)
+  | subcapt__var : forall E x T C D,
+      binds x (bind_typ T) E ->
+      cv E T C ->
+      subcapt' E C D ->
+      subcapt' E (cset_set (singleton x) {}N) D
+  | subcapt__set : forall E xs D,
+      wf_cset_in E (cset_set xs {}N) ->
+      wf_cset_in E D ->
+      AtomSet.F.For_all (fun x => subcapt' E (cset_set (singleton x) {}N) D) xs ->
+      subcapt' E (cset_set xs {}N) D
+.
+
+Lemma subcapt__regular : forall E C D,
+  subcapt' E C D ->
+  wf_cset_in E C /\ wf_cset_in E D.
+Proof with eauto*.
+  intros* H.
+  induction H; subst...
+  split...
+  constructor.
+  2: {
+    apply binds_In in H...
+  }
+  intros y yInX.
+  rewrite AtomSetFacts.singleton_iff in yInX; subst...
+Qed.
+
+Lemma subcapt_equivalence : forall E C D,
+  subcapt' E C D <-> subcapt E C D.
+Proof with eauto.
+  intros.
+  split.
+  { intro Hsc.
+    destruct C eqn:EQ__C. {
+      inversion Hsc; subst.
+      constructor.
+      constructor.
+    }
+    destruct D eqn:EQ__D. {
+      constructor.
+      apply subcapt__regular in Hsc; eauto*.
+    }
+    apply subcapt__regular in Hsc as P.
+    destruct P as (Reg1 & Reg2).
+    inversion Reg1; subst.
+    inversion Reg2; subst.
+    constructor...
+    unfold AtomSet.F.For_all.
+    dependent induction Hsc.
+    - intros y yInX.
+      rewrite AtomSetFacts.singleton_iff in yInX; subst...
+    - intros y yInX.
+      rewrite AtomSetFacts.singleton_iff in yInX; symmetry in yInX; subst.
+      destruct C. {
+        inversion Hsc.
+      }
+      apply cv_regular in H0 as P.
+      destruct P as (_ & _ & Reg3).
+      inversion Reg3; subst.
+      eapply captures_var.
+      + apply H.
+      + apply H0.
+      + unfold AtomSet.F.For_all.
+        apply IHHsc...
+    - intros x xIn.
+      eapply H2 with (x := x) (t := (singleton x))...
+      3: fsetdec.
+      2: {
+        unfold allbound_typ in *...
+        intros x0 x0InX.
+        rewrite AtomSetFacts.singleton_iff in x0InX; symmetry in x0InX; subst...
+      }
+      {
+        constructor. {
+          unfold allbound_typ in *...
+          intros x0 x0InX.
+          rewrite AtomSetFacts.singleton_iff in x0InX; symmetry in x0InX; subst...
+        }
+        fsetdec.
+      }
+  }
+  { intro Hsc.
+    destruct C eqn:EQ__C. {
+      inversion Hsc; subst.
+      constructor.
+      constructor.
+    }
+    destruct D eqn:EQ__D. {
+      constructor.
+      apply subcapt_regular in Hsc; eauto*.
+    }
+    apply subcapt_regular in Hsc as P.
+    destruct P as (Reg1 & Reg2).
+    inversion Reg1; subst.
+    inversion Reg2; subst.
+    inversion Hsc; subst.
+    apply subcapt__set...
+    unfold AtomSet.F.For_all in *.
+    intros x xIn.
+    specialize (H8 x xIn).
+    clear xIn.
+    dependent induction H8. {
+      apply subcapt__in...
+      constructor.
+      2: fsetdec.
+      intros y yInX.
+      rewrite AtomSetFacts.singleton_iff in yInX; subst...
+    }
+    eapply subcapt__var...
+    constructor...
+    unfold AtomSet.F.For_all in *.
+    intros y yIn.
+    apply H8...
+  }
+Qed.
 
 Check (exp_abs (typ_capt cset_universal typ_top) 0).
 Check (typ_arrow (typ_capt cset_universal typ_top)
