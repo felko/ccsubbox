@@ -1,6 +1,6 @@
 Require Import Coq.Program.Equality.
-Require Export Fsub_Hints.
-Require Export Fsub_Lemmas.
+Require Export CCsub_Hints.
+Require Export CCsub_Lemmas.
 
 Local Ltac hint := idtac.
 

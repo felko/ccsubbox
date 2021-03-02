@@ -41,7 +41,7 @@ HASNATDYNLINK     := $(COQMF_HASNATDYNLINK)
 OCAMLWARN         := $(COQMF_WARN)
 
 Makefile.conf: 
-	/home/e45lee/.nix-profile/bin/coq_makefile -o Makefile AdditionalTactics.v Atom.v CaptureSets.v CoqIntro.v Environment.v Example.v FiniteSets.v FSetDecide.v FSetNotin.v Fsub_CVfacts.v Fsub_Definitions.v Fsub_Hints.v Fsub_Infrastructure.v Fsub_Lemmas.v Fsub_Soundness.v LibTactics.v ListFacts.v Metatheory.v Tactics.v
+	coq_makefile -o Makefile AdditionalTactics.v Atom.v CaptureSets.v CoqIntro.v Environment.v FiniteSets.v FSetDecide.v FSetNotin.v LibTactics.v ListFacts.v Metatheory.v Tactics.v CCsub_Definitions.v CCsub_Infrastructure.v CCsub_Lemmas.v CCsub_CvFacts.v CCsub_Hints.v CCsub_Soundness.v CCsub_Examples.v
 
 # This file can be created by the user to hook into double colon rules or
 # add any other Makefile code he may need

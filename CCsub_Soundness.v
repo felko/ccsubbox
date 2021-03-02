@@ -1,20 +1,6 @@
-(** Type-safety proofs for Fsub.
-
-    Authors: Brian Aydemir and Arthur Chargu\u00e9raud, with help from
-    Aaron Bohannon, Jeffrey Vaughan, and Dimitrios Vytiniotis.
-
-    In parentheses are given the label of the corresponding lemma in
-    the appendix (informal proofs) of the POPLmark Challenge.
-
-    Table of contents:
-      - #<a href="##subtyping">Properties of subtyping</a>#
-      - #<a href="##typing">Properties of typing</a>#
-      - #<a href="##preservation">Preservation</a>#
-      - #<a href="##progress">Progress</a># *)
-
 Require Import Coq.Program.Equality.
-Require Export Fsub_Hints.
-Require Import Fsub_CVfacts.
+Require Export CCsub_Hints.
+Require Import CCsub_CvFacts.
 
 Set Nested Proofs Allowed.
 

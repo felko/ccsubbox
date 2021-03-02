@@ -1,29 +1,6 @@
-(** Administrative lemmas for Fsub.
-
-    Authors: Brian Aydemir and Arthur Chargu\u00e9raud, with help from
-    Aaron Bohannon, Jeffrey Vaughan, and Dimitrios Vytiniotis.
-
-    This file contains a number of administrative lemmas that we
-    require for proving type-safety.  The lemmas mainly concern the
-    relations [wf_typ] and [wf_env].
-
-    This file also contains regularity lemmas, which show that various
-    relations hold only for locally closed terms.  In addition to
-    being necessary to complete the proof of type-safety, these lemmas
-    help demonstrate that our definitions are correct; they would be
-    worth proving even if they are unneeded for any "real" proofs.
-
-    Table of contents:
-      - #<a href="##wft">Properties of wf_typ</a>#
-      - #<a href="##oktwft">Properties of wf_env and wf_typ</a>#
-      - #<a href="##okt">Properties of wf_env</a>#
-      - #<a href="##subst">Properties of substitution</a>#
-      - #<a href="##regularity">Regularity lemmas</a>#
-      - #<a href="##auto">Automation</a># *)
-
 Require Import Coq.Program.Equality.
 
-Require Export Fsub_Infrastructure.
+Require Export CCsub_Infrastructure.
 Require Import Atom.
 
 (* ********************************************************************** *)

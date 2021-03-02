@@ -1,26 +1,4 @@
-(** Infrastructure lemmas and tactic definitions for Fsub.
-
-    Authors: Brian Aydemir and Arthur Chargu\u00e9raud, with help from
-    Aaron Bohannon, Jeffrey Vaughan, and Dimitrios Vytiniotis.
-
-    This file contains a number of definitions, tactics, and lemmas
-    that are based only on the syntax of the language at hand.  While
-    the exact statements of everything here would change for a
-    different language, the general structure of this file (i.e., the
-    sequence of definitions, tactics, and lemmas) would remain the
-    same.
-
-    Table of contents:
-      - #<a href="##fv">Free variables</a>#
-      - #<a href="##subst">Substitution</a>#
-      - #<a href="##pick_fresh">The "pick fresh" tactic</a>#
-      - #<a href="##apply_fresh">The "pick fresh and apply" tactic</a>#
-      - #<a href="##properties">Properties of opening and substitution</a>#
-      - #<a href="##lc">Local closure is preserved under substitution</a>#
-      - #<a href="##auto">Automation</a># *)
-
-
-Require Export Fsub_Definitions.
+Require Export CCsub_Definitions.
 
 (** Automation *)
 Lemma cset_eq_injectivity : forall a1 a2 n1 n2,

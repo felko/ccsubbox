@@ -1,5 +1,5 @@
 Require Import Coq.Program.Equality.
-Require Export Fsub_Lemmas.
+Require Export CCsub_Lemmas.
 
 Ltac rewrite_nil_concat :=
   match goal with

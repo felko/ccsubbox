@@ -1,21 +1,3 @@
-(** Definition of Fsub (System F with subtyping).
-
-    Authors: Brian Aydemir and Arthur Charguéraud, with help from
-    Aaron Bohannon, Jeffrey Vaughan, and Dimitrios Vytiniotis.
-
-    Table of contents:
-      - #<a href="##syntax">Syntax (pre-terms)</a>#
-      - #<a href="##open">Opening</a>#
-      - #<a href="##lc">Local closure</a>#
-      - #<a href="##env">Environments</a>#
-      - #<a href="##wf">Well-formedness</a>#
-      - #<a href="##sub">Subtyping</a>#
-      - #<a href="##typing_doc">Typing</a>#
-      - #<a href="##values">Values</a>#
-      - #<a href="##reduction">Reduction</a>#
-      - #<a href="##auto">Automation</a>#
-*)
-
 Require Export Metatheory.
 Require Export CaptureSets.
 Require Import Coq.Program.Wf.

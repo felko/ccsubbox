@@ -1,6 +1,6 @@
 Require Import Coq.Program.Equality.
-Require Import Fsub_Soundness.
-Require Import Fsub_CVfacts.
+Require Import CCsub_Soundness.
+Require Import CCsub_CvFacts.
 
 Inductive subcapt' : env -> captureset -> captureset -> Prop :=
   | subcapt__universal : forall E C,
