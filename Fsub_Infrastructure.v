@@ -612,7 +612,6 @@ Qed.
 (* ********************************************************************** *)
 (** ** Properties of capture substitution in types *)
 
-(** TODO: These opening lemmas should go in CaptureSet.v at some point (Edward). *)
 (** A warmup, to get started with. *)
 Lemma open_cset_singleton : forall i c,
   open_cset i i c = c.
@@ -1205,7 +1204,7 @@ Proof with auto*.
 Qed.
 
 Lemma subst_te_open_ee_rec : forall e1 e2 c Z P k,
-  type P -> (* Jonathan: I added this here, does this make sense? *)
+  type P ->
   subst_te Z P (open_ee_rec k e2 c e1) =
     open_ee_rec k (subst_te Z P e2) c (subst_te Z P e1).
 Proof with eauto using subst_tt_open_ct_rec.
@@ -1215,7 +1214,7 @@ Proof with eauto using subst_tt_open_ct_rec.
 Qed.
 
 Lemma subst_te_open_ee : forall e1 e2 c Z P,
-  type P -> (* Jonathan: I added this here, does this make sense? *)
+  type P ->
   subst_te Z P (open_ee e1 e2 c) = open_ee (subst_te Z P e1) (subst_te Z P e2) c.
 Proof with auto*.
   intros.
@@ -1224,7 +1223,7 @@ Proof with auto*.
 Qed.
 
 Lemma subst_te_open_ee_var : forall Z (x:atom) P e c,
-  type P -> (* Jonathan: I added this here, does this make sense? *)
+  type P ->
   open_ee (subst_te Z P e) x c = subst_te Z P (open_ee e x c).
 Proof with auto*.
   intros.
@@ -1234,7 +1233,7 @@ Qed.
 Lemma subst_ee_open_te_rec : forall e P z u c k,
   expr u ->
   capt c ->
-  z `notin` fv_et P -> (* Jonathan: I added this here, does this make sense? *)
+  z `notin` fv_et P ->
   subst_ee z u c (open_te_rec k P e) = open_te_rec k P (subst_ee z u c e).
 Proof with eauto using subst_ct_open_tt_rec_fresh.
   induction e; intros P z u c' k H Hc Hfv; simpl; f_equal...
@@ -1245,7 +1244,7 @@ Qed.
 Lemma subst_ee_open_te : forall e P z u c,
   expr u ->
   capt c ->
-  z `notin` fv_et P -> (* Jonathan: I added this here, does this make sense? *)
+  z `notin` fv_et P ->
   subst_ee z u c (open_te e P) = open_te (subst_ee z u c e) P.
 Proof with auto*.
   intros.
@@ -1555,14 +1554,11 @@ Proof with auto using open_cset_capt, open_cpt_rec_type, subst_ct_open_tt_rec.
   apply subst_ct_open_tt_rec...
 Qed.
 
-(* Alex: looking at the subst_tt_open_tt_* chain, there should be a better way to do this... *)
 Lemma subst_ct_open_ct : forall x c1 T c2,
-  (* not (cset_references_fvar x c2) -> *)
   capt c1 ->
   subst_ct x c1 (open_ct T c2) = (open_ct (subst_ct x c1 T) (subst_cset x c1 c2)).
 Proof with auto using open_cset_capt, open_cpt_rec_type, subst_ct_open_rec.
   intros * Hcapt.
-  (* intros Hnotin Hc1. *)
   induction T... eapply subst_ct_open_rec...
 Qed.
 

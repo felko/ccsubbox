@@ -259,7 +259,7 @@ Proof.
         apply IHE with (A := dom_typ E); eauto.
 Qed.
 
-Lemma ezy_pzy_lemon_sqzy : forall E,
+Lemma mono_id_types : forall E,
   wf_env E ->
   typing E
          (exp_abs (typ_capt cset_universal typ_top) 0)
@@ -291,7 +291,7 @@ Proof with eauto.
       replace_if_cond_with_left...
 Qed.
 
-Lemma ez_pz_lemon_sqz : forall E,
+Lemma id_types : forall E,
   wf_env E ->
   typing E
          (exp_tabs (typ_capt cset_universal typ_top)
@@ -324,11 +324,11 @@ Proof with eauto.
     eapply wf_concrete_cset...
     apply allbound_typ_if...
   - simpl_hammer.
-    apply ezy_pzy_lemon_sqzy.
+    apply mono_id_types.
     econstructor...
 Qed.
 
-Lemma ez_pz_lemon_sqz_electric_boogaloo : forall x,
+Lemma id_app_types : forall x,
   typing [(x, (bind_typ (typ_capt {}C typ_top)))]
          (exp_app (exp_tapp (exp_tabs (typ_capt cset_universal typ_top)
                              (exp_abs (typ_capt cset_universal typ_top)
@@ -351,7 +351,7 @@ Proof with eauto using allbound_typ_if.
   - epose (T2 := (open_tt _ _)).
     replace (typ_capt _ (typ_arrow _ _)) with T2; unfold T2.
     eapply typing_tapp.
-    + apply ez_pz_lemon_sqz...
+    + apply id_types...
     + econstructor...
       constructor...
       autounfold.
@@ -734,7 +734,7 @@ Hint Resolve allbound_typ_if : core.
 Notation "C |> T" := (typ_capt C T) (at level 80).
 Notation "'UniTop'" := (typ_capt cset_universal typ_top).
 
-Lemma fast_and_furious : forall C,
+Lemma nil_types : forall C,
   wf_cset_in empty C ->
   typing empty CC_empty (typ_capt {}C (typ_all (typ_capt cset_universal typ_top)
                                                (CC_List C 1))).
@@ -1171,7 +1171,7 @@ Proof.
   unfold open_cset.
   destruct_if.
   - unfold cset_references_bvar_dec in Heqb.
-    set_facts_come_on_in Heqb.
+    rewrite_set_facts_in Heqb.
     exfalso; fnsetdec.
   - reflexivity.
 Qed.
@@ -1182,7 +1182,7 @@ Proof.
   intros.
   destruct_if.
   - reflexivity.
-  - set_facts_come_on_in Heqb.
+  - rewrite_set_facts_in Heqb.
     exfalso. fnsetdec.
 Qed.
 
@@ -1205,7 +1205,7 @@ Hint Rewrite NatSet_remove_singleton : typ.
 Lemma wf_cset_from_binds_typ' : forall E Ap x T,
     binds x (bind_typ T) E ->
     x `in` Ap ->
-         wf_cset E Ap x.
+    wf_cset E Ap x.
 Proof.
   intros.
   constructor.
@@ -1248,7 +1248,7 @@ Ltac cset_prep :=
   simpl;
   goal_cleanup.
 
-Lemma too_fast_too_furious: exists T,
+Lemma cons_types: exists T,
   typing empty CC_cons T.
 Proof with eauto.
   eexists ?[T0].
@@ -1558,7 +1558,7 @@ Proof with eauto.
               destruct_if.
               - assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
                 cset_eq_dec.
-              - set_facts_come_on_in Heqb.
+              - rewrite_set_facts_in Heqb.
                 exfalso; fnsetdec.
             }
             reflexivity.
@@ -1637,7 +1637,7 @@ Proof with eauto.
             destruct_if.
             - assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
               cset_eq_dec.
-            - set_facts_come_on_in Heqb.
+            - rewrite_set_facts_in Heqb.
               exfalso; fnsetdec.
           }
           replace (open_cset 2 y (cset_union 1 (cset_union 2 0)))
@@ -1654,7 +1654,7 @@ Proof with eauto.
                 congruence.
               }
               cset_eq_dec.
-            - set_facts_come_on_in Heqb.
+            - rewrite_set_facts_in Heqb.
               exfalso; fnsetdec.
           }
           reflexivity.
@@ -1680,7 +1680,7 @@ Proof with eauto.
           destruct_if.
           - assert (~ NatSet.F.In 1 [.0]) as HA by fnsetdec.
             cset_eq_dec.
-          - set_facts_come_on_in Heqb.
+          - rewrite_set_facts_in Heqb.
             exfalso; fnsetdec.
         }
         constructor. {
@@ -1763,7 +1763,7 @@ Proof with eauto.
       2: {
         cset_prep.
         Ltac fnset_contradiction_in H :=
-          set_facts_come_on_in H; exfalso; fnsetdec.
+          rewrite_set_facts_in H; exfalso; fnsetdec.
         destruct_if; [|fnset_contradiction_in Heqb].
         assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
         cset_eq_dec.
@@ -1780,7 +1780,7 @@ Proof with eauto.
             congruence.
           }
           cset_eq_dec.
-        - set_facts_come_on_in Heqb.
+        - rewrite_set_facts_in Heqb.
           exfalso; fnsetdec.
       }
       constructor. {
@@ -1799,7 +1799,7 @@ Proof with eauto.
         destruct_if.
         - assert (~ NatSet.F.In 1 [.0]) as HA by fnsetdec.
           cset_eq_dec.
-        - set_facts_come_on_in Heqb.
+        - rewrite_set_facts_in Heqb.
           exfalso; fnsetdec.
       }
       constructor. {
@@ -1867,7 +1867,7 @@ Proof with eauto.
     destruct_if.
     - assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
       cset_eq_dec.
-    - set_facts_come_on_in Heqb.
+    - rewrite_set_facts_in Heqb.
       exfalso; fnsetdec.
   }
   replace (open_cset 2 y (cset_union 1 (cset_union 2 0)))
@@ -1882,7 +1882,7 @@ Proof with eauto.
         congruence.
       }
       cset_eq_dec.
-    - set_facts_come_on_in Heqb.
+    - rewrite_set_facts_in Heqb.
       exfalso; fnsetdec.
   }
   constructor. {

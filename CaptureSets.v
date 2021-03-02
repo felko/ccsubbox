@@ -23,7 +23,7 @@ Module NatSetImpl : NATSET.
   Module OT := Nat_as_OT.
   Module Facts := OrderedTypeFacts OT.
   Definition eq_nat_dec : forall x y : nat, {x = y} + {x <> y} :=
-    Facts.eq_dec. 
+    Facts.eq_dec.
   (* end hide *)
 End NatSetImpl.
 
@@ -87,10 +87,6 @@ Notation "{*}C" :=
   universal_cset : metatheory_scope.
 
 (** Accessors *)
-(* Jonathan: this looks dangerous. It actually might complicate proofs to assume the universal capture set
-             has an empty fvar set.
-             I am trying to reduce the usage of cset_fvar  *)
-
 Definition cset_fvars (c : captureset) : atoms :=
   match c with
   | cset_universal => {}
@@ -223,9 +219,9 @@ Definition cset_remove_fvar (a : atom) (c : captureset) : captureset :=
 
 (** Opening a capture set with a bound variable d[k -> c] *)
 Definition open_cset (k : nat) (c : captureset) (d : captureset) : captureset :=
-  if cset_references_bvar_dec k d then 
+  if cset_references_bvar_dec k d then
     cset_union c (cset_remove_bvar k d)
-  else 
+  else
     d.
 
 (** Substituting a capture set with a free variable d[a -> c] *)
@@ -239,7 +235,7 @@ Definition subst_cset (a : atom) (c : captureset) (d: captureset) : captureset :
 (** Predicates around subsets, and decidability for destruction *)
 Inductive cset_subset_prop : captureset -> captureset -> Prop :=
 | cset_subset_univ : forall c, cset_subset_prop c cset_universal
-| cset_subset_elem : forall ac nc ad nd,  
+| cset_subset_elem : forall ac nc ad nd,
   AtomSet.F.Subset ac ad -> NatSet.F.Subset nc nd -> cset_subset_prop (cset_set ac nc) (cset_set ad nd)
 .
 
@@ -247,7 +243,7 @@ Definition cset_subset_dec (c d : captureset) :=
   match c , d with
   | _ , cset_universal => true
   | cset_universal , _ => false
-  | cset_set AC NC , cset_set AD ND => AtomSet.F.subset AC AD && NatSet.F.subset NC ND  
+  | cset_set AC NC , cset_set AD ND => AtomSet.F.subset AC AD && NatSet.F.subset NC ND
   end.
 
 (** A helper, to eliminate terms like <complex computation> && false *)
@@ -270,8 +266,8 @@ Proof.
   (* --> *)
   * intro. inversion H ; unfold cset_subset_dec.
     - subst. destruct c1 ; eauto.
-    - subst. 
-      rewrite NatSetFacts.subset_iff in *. rewrite AtomSetFacts.subset_iff in *. 
+    - subst.
+      rewrite NatSetFacts.subset_iff in *. rewrite AtomSetFacts.subset_iff in *.
       rewrite H0. rewrite H1. auto.
   (* <-- *)
   * intro. unfold cset_subset_dec in H.
@@ -333,16 +329,16 @@ Ltac csetdec := repeat (
 
 Hint Constructors cset_subset_prop : core.
 
-Hint Transparent 
+Hint Transparent
   cset_references_bvar cset_references_fvar
   cset_remove_bvar cset_remove_fvar open_cset subst_cset
   disjoint
 : cset_scope.
 
-Hint Unfold 
-  cset_union cset_subset_dec   
-  cset_remove_bvar cset_remove_fvar 
-  open_cset subst_cset 
+Hint Unfold
+  cset_union cset_subset_dec
+  cset_remove_bvar cset_remove_fvar
+  open_cset subst_cset
   cset_references_bvar cset_references_fvar
   cset_all_fvars cset_all_bvars
   disjoint

@@ -428,13 +428,11 @@ Inductive wf_env : env -> Prop :=
       wf_env empty
   | wf_env_sub : forall (E : env) (X : atom) (T : typ),
       wf_env E ->
-      (* TODO verify this when we check regularity *)
       wf_typ_in E T ->
       X `notin` dom E ->
       wf_env ([(X, bind_sub T)] ++ E)
   | wf_env_typ : forall (E : env) (x : atom) (T : typ),
       wf_env E ->
-      (* TODO verify this when we check regularity *)
       wf_typ_in E T ->
       x `notin` dom E ->
       wf_env ([(x, bind_typ T)] ++ E).

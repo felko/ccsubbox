@@ -675,7 +675,7 @@ Proof with eauto.
       assert (x `notin` ys) by notin_solve.
       intros y ?.
       assert (y <> x) by notin_solve.
-      destruct (AtomSet.F.mem y xs) eqn:EQ; set_facts_come_on_in EQ.
+      destruct (AtomSet.F.mem y xs) eqn:EQ; rewrite_set_facts_in EQ.
       * constructor...
       * eapply H2 with (x0 := y) (zs := ys); trivial.
         eauto.
@@ -685,7 +685,7 @@ Proof with eauto.
   - assert (binds z (bind_typ (subst_ct x C T)) (map (subst_cb x C) F ++ E)) by auto.
     apply cv_through_subst_ct with (D := C) in H0 as H0'...
     unfold subst_cset, cset_references_fvar_dec in H0'.
-    destruct (AtomSet.F.mem x ys) eqn:EQ; set_facts_come_on_in EQ.
+    destruct (AtomSet.F.mem x ys) eqn:EQ; rewrite_set_facts_in EQ.
     + SCase "x in ys".
       destruct C; simpl in H0'.
       * specialize (H1 x EQ).
@@ -751,7 +751,7 @@ Proof with eauto.
     + eapply captures_var...
       intros y ?.
       assert (y <> x) by notin_solve.
-      destruct (AtomSet.F.mem y xs) eqn:EQ'; set_facts_come_on_in EQ'.
+      destruct (AtomSet.F.mem y xs) eqn:EQ'; rewrite_set_facts_in EQ'.
       * constructor...
       * eapply H2 with (x0 := y) (zs := ys); trivial.
         eauto*.

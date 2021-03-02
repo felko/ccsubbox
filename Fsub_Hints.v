@@ -83,7 +83,7 @@ match goal with
 | H : sub_pre ?E _ _ |- _ => apply (proj1 (sub_pre_regular _ _ _ H))
 end : core.
 
-Ltac set_facts_come_on_in H :=
+Ltac rewrite_set_facts_in H :=
   match type of H with
   | true = _ => symmetry in H
   | false = _ => symmetry in H

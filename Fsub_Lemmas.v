@@ -55,7 +55,7 @@ Ltac prepare_for_fsetdec :=
   clear_frees; simpl_env in *.
 
 Hint Extern 10 (AtomSet.F.Subset _ _) =>
-idtac "go fsetdec go" ;
+(* idtac "go fsetdec go" ; *)
 (* NOTE: "free" hypothesis are unlikely to help with subsets and they can cause fsetdec to hang *)
 try solve [prepare_for_fsetdec; fsetdec]
 : core.
@@ -284,7 +284,6 @@ Proof with simpl_env; eauto using wf_cset_narrowing_base.
     eapply wf_typ_narrowing_base...
 Qed.
 
-(* JONATHAN: Maybe those _sub variants are not needed afterall! *)
 Lemma wf_cset_narrowing_typ_base : forall C1 C2 C E A F X,
   wf_cset (F ++ [(X, bind_typ C1)] ++ E) A C ->
   ok (F ++ [(X, bind_typ C2)] ++ E) ->
@@ -326,9 +325,6 @@ Proof with simpl_env; eauto using wf_cset_narrowing_typ_base.
     rewrite <- concat_assoc.
     eapply wf_typ_narrowing_typ_base...
 Qed.
-
-(* Alex: adding a hint here right after the weakening lemmas. We really need to
-work on organising this file better, it's a complete mess right now. *)
 
 Hint Extern 5 (wf_typ ?E _ _ ?T) =>
 match goal with
@@ -485,56 +481,6 @@ Proof with eauto.
         fsetdec.
       }
 Qed.
-(*   intros *. *)
-(*   intros HOK HwfC HwfC' HokZ . *)
-(*   inversion HwfC; subst; inversion HwfC'; subst... *)
-(*   + unfold subst_cset... *)
-(*     cset_split... *)
-(*     constructor... *)
-(*     unfold allbound_typ in * ... *)
-(*     intros. *)
-(*     specialize (H x H1). *)
-(*     rewrite cset_not_references_fvar_eq in H_destruct... *)
-(*     csethyp. *)
-(*     assert (x <> Z) by fsetdec. *)
-(*     inversion H. *)
-(*     binds_cases H2... *)
-(*     exists (subst_ct Z cset_universal x0)... *)
-(*   + unfold subst_cset... *)
-(*     cset_split; inversion HwfC; inversion HwfC'; subst; try rewrite cset_not_references_fvar_eq in H_destruct; *)
-(*       try rewrite cset_references_fvar_eq in H_destruct; *)
-(*       assert (NatSet.F.union {}N {}N = {}N) by (fnsetdec; eauto* ); *)
-(*       try rewrite H1; constructor; unfold allbound_typ in *; intros... *)
-(*     * assert (x `in` (fvars `union` fvars0)) by fsetdec. *)
-(*       rewrite AtomSetFacts.union_iff in H4... inversion H4... *)
-(*       ** *)
-(*         specialize (H3 x H5). *)
-(*         inversion H3 as [T H7]. *)
-(*         exists T. *)
-(*         apply binds_weaken with (G := nil)... *)
-(*       ** *)
-(*         specialize (H6 x H5). *)
-(*         inversion H6 as [T H7]. *)
-(*         binds_cases H7; subst... *)
-(*         - contradict H2. *)
-(*           assert (x `notin` fvars). { *)
-(*             intro. specialize (H x H2)... *)
-(*             inversion H as [T' H7]... *)
-(*             (** Clearly true as x \in fvars0, x \notin fvars \cup (x - fvars0)*) *)
-(*             apply fresh_mid_tail in HokZ... *)
-(*             apply binds_In in H7... *)
-(*           } *)
-(*           fsetdec. *)
-(*         - exists (subst_ct Z (cset_set fvars {}N) T). *)
-(*           eauto*. *)
-(*     * *)
-(*       specialize (H6 x H2). *)
-(*       inversion H6 as [T H7]. *)
-(*       binds_cases H7; subst... *)
-(*       - exists (subst_ct Z (cset_set fvars {}N) T). *)
-(*         eauto*. *)
-(* Qed. *)
-
 Lemma wf_typ_subst_cb : forall F Q E Ap Am Z C T,
   wf_typ (F ++ [(Z, bind_typ Q)] ++ E) Ap Am T ->
   wf_cset E Ap C ->
@@ -776,9 +722,6 @@ Proof with eauto.
       eapply H0...
 Qed.
 
-(** Edward : OK, technically we don't need ok on the environment here,
-    but actually invoking the constructor wf_typ_var is hard if we can't
-    tell what type we're invoking it with. *)
 Lemma wf_typ_ignores_sub_bindings : forall E F x T1 T2 Ap Am T,
   ok (F ++ [(x, bind_sub T1)] ++ E) ->
   wf_typ (F ++ [(x, bind_sub T1)] ++ E) Ap Am T ->
@@ -928,7 +871,7 @@ Proof with eauto.
     constructor...
 Qed.
 
-Lemma wf_cset_come_on : forall {A' E A C},
+Lemma wf_cset_adapt : forall {A' E A C},
   wf_cset E A' C ->
   A' = A ->
   wf_cset E A C.
@@ -937,7 +880,7 @@ Proof.
   congruence.
 Qed.
 
-Lemma wf_pretyp_come_on : forall {Ap' Am' E Ap Am T},
+Lemma wf_pretyp_adapt : forall {Ap' Am' E Ap Am T},
   wf_pretyp E Ap' Am' T ->
   Ap' = Ap ->
   Am' = Am ->
@@ -947,7 +890,7 @@ Proof.
   congruence.
 Qed.
 
-Lemma wf_typ_come_on : forall {Ap' Am' E Ap Am T},
+Lemma wf_typ_adapt : forall {Ap' Am' E Ap Am T},
   wf_typ E Ap' Am' T ->
   Ap' = Ap ->
   Am' = Am ->
@@ -979,7 +922,7 @@ Proof with eauto using wf_cset_set_strengthen.
     apply (wf_typ_set_strengthen X S) in H0...
     assert (Y `notin` (Ap `union` Am `union` singleton X)) by notin_solve.
     clear Fr.
-    apply (wf_typ_come_on H0); fsetdec.
+    apply (wf_typ_adapt H0); fsetdec.
   - pick fresh Y and apply wf_typ_all...
 }
 Qed.
@@ -994,7 +937,7 @@ Proof with eauto.
   intros* Ok WfP WfC.
   apply (wf_cset_set_strengthen Z Q) in WfC...
   eapply wf_cset_subst_tb with (Q := Q) (Am := dom E).
-  - apply (wf_cset_come_on WfC)...
+  - apply (wf_cset_adapt WfC)...
     apply binding_uniq_from_ok in Ok.
     simpl_env.
     fsetdec.
@@ -1036,7 +979,7 @@ Proof with eauto.
     + simpl_env; fsetdec.
     + simpl_env; fsetdec.
   - eauto.
-  - apply (wf_typ_come_on HA).
+  - apply (wf_typ_adapt HA).
     + simpl_env; fsetdec.
     + simpl_env; fsetdec.
 }
@@ -1058,7 +1001,7 @@ Proof with eauto.
     + simpl_env; fsetdec.
     + simpl_env; fsetdec.
   - eauto.
-  - apply (wf_pretyp_come_on HA).
+  - apply (wf_pretyp_adapt HA).
     + simpl_env; fsetdec.
     + simpl_env; fsetdec.
 }
@@ -1156,7 +1099,6 @@ Proof with auto.
  - apply notin_fv_tt_open_et with (Y := Y)...
 Qed.
 
-(** Again, these proofs are all the same, but Coq isn't smart enough unfortunately. *)
 Local Lemma notin_fv_ct_open_tt_rec : forall (X : atom) T C k,
   X `notin` fv_tt (open_ct_rec k C T) ->
   X `notin` fv_tt T
@@ -1197,11 +1139,6 @@ Proof with auto.
   cset_split; destruct C eqn:HC; destruct c eqn:Hc...
 Qed.
 
-(* revert H.
-    unfold fv_cset. unfold open_cset.
-    cset_split; destruct C eqn:HC; destruct c eqn:Hcd...
-    admit.
-     *)
 Local Lemma notin_fv_ct_open_et_rec : forall (X : atom) T C k,
   C <> cset_universal ->
   X `notin` fv_et (open_ct_rec k C T) ->
@@ -1573,7 +1510,6 @@ Proof with eauto*.
     fnsetdec.
 Qed.
 
-(** argh *)
 Lemma empty_over_union : forall N1 N2,
   {}N = NatSet.F.union N1 N2 ->
   {}N = N1 /\ {}N = N2.
