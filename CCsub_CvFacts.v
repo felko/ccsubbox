@@ -255,23 +255,6 @@ Proof with hint.
   induction Hsub; destruct C; destruct D; try solve [inversion HcvC; inversion HcvD; subst; hint].
   - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
   - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq...
-  (* Alex: leaving these here in case the hint breaks... *)
-  (* - pose proof (cv_unique _ _ _ _ H H0 HcvC HcvD) as Eq; inversion Eq... *)
-  (* - apply IHHsub... *)
-  (* - econstructor... *)
-  (* - inversion HcvC; subst. *)
-  (*   assert (T0 = U). { *)
-  (*     rewrite_env (empty ++ [(X, bind_sub T0)] ++ E0) in H. *)
-  (*     apply binds_mid_eq in H... *)
-  (*     inversion H... *)
-  (*   } *)
-  (*   inversion HcvD; subst... *)
-  (*   inversion H4; subst. *)
-  (*   + assert (T0 = U). { apply binds_mid_eq in H... inversion H... } *)
-  (*     subst... *)
-  (*   + apply IHHsub... *)
-  (* - inversion HcvC. inversion HcvD. subst... *)
-  (* - inversion HcvC. inversion HcvD. subst... *)
 Qed.
 
 Lemma cv_narrowing_exists : forall T G Z Q E P C1,
