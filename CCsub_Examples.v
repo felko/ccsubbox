@@ -1248,6 +1248,119 @@ Ltac cset_prep :=
   simpl;
   goal_cleanup.
 
+Lemma if_blatantly_true' : forall A x (t s : A),
+  (if x == x then t else s) = t.
+Proof.
+  intros.
+  destruct_if; easy.
+Qed.
+
+Lemma if_blatantly_false' : forall A x y (t s : A),
+  x <> y ->
+  (if x == y then t else s) = s.
+Proof.
+  intros.
+  destruct_if; easy.
+Qed.
+
+Hint Rewrite if_blatantly_false' using congruence : typ.
+Hint Rewrite if_blatantly_true' : typ.
+
+Fixpoint close_tt_rec (K : nat) (X : atom) (T : typ) {struct T} : typ :=
+  match T with
+  | typ_bvar J => typ_bvar J
+  | typ_fvar Y => if X == Y then typ_bvar K else typ_fvar Y
+  | typ_capt C P => typ_capt C (close_tpt_rec K X P)
+  end
+with close_tpt_rec (K : nat) (X: atom) (T : pretyp) {struct T} : pretyp :=
+  match T with
+  | typ_top => typ_top
+  | typ_arrow T1 T2 => typ_arrow (close_tt_rec K X T1) (close_tt_rec K X T2)
+  | typ_all T1 T2 => typ_all (close_tt_rec K X T1) (close_tt_rec (S K) X T2)
+  end.
+
+Notation "{ n }A" := (singleton n) (format "'{' n '}A'").
+Notation "{ n }N" := (NatSet.F.singleton n) (format "'{' n '}N'").
+
+Definition close_cset (k : nat) (x : atom) (d : captureset) : captureset :=
+  match d with
+  | {*} => {*}
+  | (cset_set fvs bvs) =>
+    if (AtomSet.F.mem x fvs)
+    then cset_set (fvs `remove` x) (NatSet.F.union {k}N bvs)
+    else cset_set fvs bvs
+  end.
+
+Fixpoint close_ct_rec (k : nat) (x : atom) (T : typ)  {struct T} : typ :=
+  match T with
+  | typ_bvar i => typ_bvar i
+  | typ_fvar x => typ_fvar x
+  | typ_capt C P => typ_capt (close_cset k x C) (close_cpt_rec k x P)
+  end
+with close_cpt_rec (k : nat) (x : atom) (T : pretyp)  {struct T} : pretyp :=
+  match T with
+  | typ_top => typ_top
+  | typ_arrow T1 T2 => typ_arrow (close_ct_rec k x T1) (close_ct_rec (S k) x T2)
+  | typ_all T1 T2 => typ_all (close_ct_rec k x T1) (close_ct_rec k x T2)
+  end.
+Notation "C ∪ D" := (cset_union C D) (at level 69, right associativity).
+Lemma close_cset_distributive : forall k x C D,
+  close_cset k x (cset_union C D) =
+  cset_union (close_cset k x C) (close_cset k x D).
+Admitted.
+Lemma close_cset_uni : forall k x,
+  close_cset k x {*}C = {*}C.
+Admitted.
+Lemma close_cset_empty : forall k x,
+  close_cset k x {}C = {}C.
+Admitted.
+Lemma close_cset_blatantly : forall k x,
+  (close_cset k x x) = k.
+Admitted.
+Lemma close_cset_blatantly_not : forall (k j : nat) x,
+  (close_cset k x j) = j.
+Admitted.
+Lemma close_cset_not : forall k x y,
+  x <> y ->
+  (close_cset k x y) = y.
+Admitted.
+
+Hint Rewrite close_cset_distributive : typ.
+Hint Rewrite close_cset_uni : typ.
+Hint Rewrite close_cset_empty : typ.
+Hint Rewrite close_cset_blatantly : typ.
+Hint Rewrite close_cset_blatantly_not : typ.
+Hint Rewrite close_cset_not using congruence : typ.
+
+Lemma open_cset_distributive : forall k x C D,
+  open_cset k x (cset_union C D) =
+  cset_union (open_cset k x C) (open_cset k x D).
+Admitted.
+Lemma open_cset_uni : forall k x,
+  open_cset k x {*}C = {*}C.
+Admitted.
+Lemma open_cset_empty : forall k x,
+  open_cset k x {}C = {}C.
+Admitted.
+Lemma open_cset_blatantly : forall k C,
+  (open_cset k C k) = C.
+Admitted.
+Lemma open_cset_blatantly_not : forall k C (a : atom),
+  (open_cset k C a) = a.
+Admitted.
+Lemma open_cset_not : forall k C j,
+  k <> j ->
+  (open_cset k C j) = j.
+Admitted.
+
+Hint Rewrite open_cset_distributive : typ.
+Hint Rewrite open_cset_uni : typ.
+Hint Rewrite open_cset_empty : typ.
+Hint Rewrite open_cset_blatantly : typ.
+Hint Rewrite open_cset_blatantly_not : typ.
+Hint Rewrite open_cset_not using congruence : typ.
+
+
 Lemma cons_types: exists T,
   typing empty CC_cons T.
 Proof with eauto.
@@ -1450,22 +1563,14 @@ Proof with eauto.
                 econstructor; binds_dec.
               }
             }
-            { assert (T7 = (open_ct ?T6__R y')) as HA. {
-                unfold T7.
-
-                [T6__R] :
-                  exact (
-                      (cset_union z (cset_union y 0))
-                        |> typ_arrow X' X').
-
-                goal_cleanup.
-                cbv [cset_union open_cset cset_references_bvar_dec cset_remove_bvar].
-                simpl.
-                goal_cleanup.
-                f_equal.
-                cset_eq_dec.
+            {
+              assert (?T6__R = (close_ct_rec 0 y' T7)) as _. {
+                cbv [close_ct_rec T7].
+                full_cleanup.
+                reflexivity.
               }
-              rewrite <- HA.
+              subst T7.
+              full_cleanup.
               assumption.
             }
             { goal_cleanup.
@@ -1481,20 +1586,13 @@ Proof with eauto.
                 1,2: econstructor; binds_dec.
             }
           }
-          { assert (T6 = (open_tt ?T5__R X')) as HA. {
-              unfold T6.
-              cbv [free_for_cv].
-              goal_cleanup.
-              [T5__R]:
-                exact
-                  (cset_union
-                     z y
-                     |> typ_arrow ({}C |> typ_arrow X ({}C |> typ_arrow 0 0))
-                     (cset_union z (cset_union y 0) |> typ_arrow 0 0)).
-              goal_cleanup.
+          { assert (?T5__R = (close_tt_rec 0 X' T6)) as _. {
+              cbv [close_tt_rec T6].
+              full_cleanup.
               reflexivity.
             }
-            rewrite <- HA.
+            subst T6.
+            full_cleanup.
             assumption.
           }
           { cbv [free_for_cv].
@@ -1526,44 +1624,13 @@ Proof with eauto.
                   1,2: econstructor; binds_dec.
           }
         }
-        { assert (T5 = (open_ct ?T4__R z)). {
-            unfold T5.
-            goal_cleanup.
-            cbv [free_for_cv].
-            goal_cleanup.
-            [T4__R]:
-              exact
-                (cset_union
-                   0 y
-                   |> typ_all UniTop
-                   (cset_union
-                      0 y |>
-                      typ_arrow ({}C |> typ_arrow X ({}C |> typ_arrow 0 0))
-                      (cset_union 1 (cset_union y 0) |> typ_arrow 0 0))).
-            goal_cleanup.
-            replace (open_cset 0 z (cset_union 0 y))
-              with (cset_union z y).
-            2: {
-              cbv [cset_union open_cset].
-              simpl.
-              goal_cleanup.
-              cset_eq_dec.
-            }
-            replace (open_cset 1 z (cset_union 1 (cset_union y 0)))
-              with (cset_union z (cset_union y 0)).
-            2: {
-              cbv [cset_union open_cset].
-              simpl.
-              goal_cleanup.
-              destruct_if.
-              - assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
-                cset_eq_dec.
-              - rewrite_set_facts_in Heqb.
-                exfalso; fnsetdec.
-            }
+        { assert (?T4__R = (close_ct_rec 0 z T5)) as _. {
+            cbv [close_ct_rec T5].
+            full_cleanup.
             reflexivity.
           }
-          rewrite <- H3.
+          subst T5.
+          full_cleanup.
           assumption.
         }
         { cbv [free_for_cv].
@@ -1606,60 +1673,13 @@ Proof with eauto.
             1,2: econstructor; binds_dec.
         }
       }
-      {
-        assert (T4 = (open_ct ?T3__R y)). {
-          unfold T4.
-          goal_cleanup.
-          cbv [free_for_cv].
-          goal_cleanup.
-          [T3__R]:
-            exact
-              (0 |>
-                 typ_arrow X
-                 (cset_union 0 1
-                             |> typ_all UniTop
-                             (cset_union 0 1
-                                         |> typ_arrow ({}C |> typ_arrow X ({}C |> typ_arrow 0 0))
-                                         (cset_union 1 (cset_union 2 0) |> typ_arrow 0 0)))).
-          goal_cleanup.
-          replace (open_cset 0 y 0) with (cset_fvar y).
-          2: {
-            cbv [cset_union open_cset].
-            simpl.
-            goal_cleanup.
-            cset_eq_dec.
-          }
-          replace (open_cset 1 y (cset_union 0 1)) with (cset_union 0 y).
-          2: {
-            cbv [cset_union open_cset].
-            simpl.
-            goal_cleanup.
-            destruct_if.
-            - assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
-              cset_eq_dec.
-            - rewrite_set_facts_in Heqb.
-              exfalso; fnsetdec.
-          }
-          replace (open_cset 2 y (cset_union 1 (cset_union 2 0)))
-            with (cset_union 1 (cset_union y 0)).
-          2: {
-            cbv [cset_union open_cset].
-            simpl.
-            goal_cleanup.
-            destruct_if.
-            - assert (~ NatSet.F.In 2 [.1]) as HA by fnsetdec.
-              assert (~ NatSet.F.In 2 [.0]). {
-                intro bogus.
-                rewrite NatSetFacts.singleton_iff in bogus.
-                congruence.
-              }
-              cset_eq_dec.
-            - rewrite_set_facts_in Heqb.
-              exfalso; fnsetdec.
-          }
+      { assert (?T3__R = (close_ct_rec 0 y T4)) as _. {
+          cbv [close_ct_rec T4].
+          full_cleanup.
           reflexivity.
         }
-        rewrite <- H2.
+        subst T4.
+        full_cleanup.
         assumption.
       }
       { autounfold.
@@ -1717,25 +1737,13 @@ Proof with eauto.
           1,2: econstructor; binds_dec.
       }
     }
-    { assert (T3 = (open_tt ?T1__R X)). {
-        unfold T3.
-        full_cleanup.
-        [T1__R]:
-          exact (
-              ({}C
-                 |>
-                 typ_arrow (CC_List {*} 1)
-                 (0
-                    |> typ_arrow 0
-                    (cset_union 0 1
-                                |> typ_all UniTop
-                                (cset_union 0 1
-                                            |> typ_arrow ({}C |> typ_arrow 1 ({}C |> typ_arrow 0 0))
-                                            (cset_union 1 (cset_union 2 0) |> typ_arrow 0 0)))))).
+    { assert (?T1__R = (close_tt_rec 0 X T3)) as _. {
+        cbv [close_tt_rec T3 CC_List].
         full_cleanup.
         reflexivity.
       }
-      rewrite <- H1.
+      subst T3.
+      full_cleanup.
       assumption.
     }
     { full_cleanup.
@@ -1839,10 +1847,10 @@ Proof with eauto.
   wf_step X with wf_typ_all.
   arw.
   fold open_tt_rec.
-  change (open_tt_rec 0 X (CC_List cset_universal 1))
-    with (CC_List cset_universal X).
+  (* change (open_tt_rec 0 X (CC_List cset_universal 1)) *)
+  (*   with (CC_List cset_universal X). *)
   wf_step y with wf_typ_arrow. {
-    unfold CC_List.
+    (* unfold CC_List. *)
     constructor; wf_cleanup.
     wf_step X' with wf_typ_all.
     full_cleanup.
@@ -1859,32 +1867,6 @@ Proof with eauto.
         cleanup; econstructor; binds_dec.
   }
   goal_cleanup.
-  replace (open_cset 0 y 0) with (cset_fvar y).
-  2: cset_prep; cset_eq_dec.
-  replace (open_cset 1 y (cset_union 0 1)) with (cset_union 0 y).
-  2: {
-    cset_prep.
-    destruct_if.
-    - assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
-      cset_eq_dec.
-    - rewrite_set_facts_in Heqb.
-      exfalso; fnsetdec.
-  }
-  replace (open_cset 2 y (cset_union 1 (cset_union 2 0)))
-    with (cset_union 1 (cset_union y 0)).
-  2: {
-    cset_prep.
-    destruct_if.
-    - assert (~ NatSet.F.In 2 [.1]) as HA by fnsetdec.
-      assert (~ NatSet.F.In 2 [.0]). {
-        intro bogus.
-        rewrite NatSetFacts.singleton_iff in bogus.
-        congruence.
-      }
-      cset_eq_dec.
-    - rewrite_set_facts_in Heqb.
-      exfalso; fnsetdec.
-  }
   constructor. {
     eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
   }
@@ -1892,16 +1874,6 @@ Proof with eauto.
     econstructor; binds_dec.
   }
   goal_cleanup.
-  replace (open_cset 0 y'' (cset_union 0 y)) with (cset_union y'' y).
-  2: cset_prep; cset_eq_dec.
-  replace (open_cset 1 y'' (cset_union 1 (cset_union y 0)))
-    with (cset_union y'' (cset_union y 0)).
-  2: {
-    cset_prep.
-    destruct_if; [| fnset_contradiction_in Heqb].
-    assert (~ NatSet.F.In 1 [.0]) by fnsetdec.
-    cset_eq_dec.
-  }
   constructor. {
     apply wf_cset_union.
     all : eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
@@ -1920,11 +1892,6 @@ Proof with eauto.
       2: goal_cleanup.
       1,2: econstructor; binds_dec.
   - goal_cleanup.
-    replace (open_cset 0 y' (cset_union y'' (cset_union y 0)))
-      with (cset_union y'' (cset_union y y')).
-    2: {
-      cset_prep; cset_eq_dec.
-    }
     constructor. {
       repeat apply wf_cset_union.
       all : eapply wf_cset_from_binds_typ'; [ binds_dec | fsetdec].
