@@ -1303,27 +1303,75 @@ with close_cpt_rec (k : nat) (x : atom) (T : pretyp)  {struct T} : pretyp :=
   | typ_arrow T1 T2 => typ_arrow (close_ct_rec k x T1) (close_ct_rec (S k) x T2)
   | typ_all T1 T2 => typ_all (close_ct_rec k x T1) (close_ct_rec k x T2)
   end.
+
 Notation "C ∪ D" := (cset_union C D) (at level 69, right associativity).
-Lemma close_cset_distributive : forall k x C D,
-  close_cset k x (cset_union C D) =
-  cset_union (close_cset k x C) (close_cset k x D).
-Admitted.
+
+Ltac destruct_set_mem a bs :=
+  match type of bs with
+  | AtomSet.F.t =>
+    let H := fresh a "In" in
+    destruct (AtomSet.F.mem a bs) eqn:H; rewrite_set_facts_in H
+  | NatSet.F.t =>
+    let H := fresh a "In" in
+    destruct (NatSet.F.mem a bs) eqn:H; rewrite_set_facts_in H
+  end.
+
 Lemma close_cset_uni : forall k x,
   close_cset k x {*}C = {*}C.
-Admitted.
+Proof. intros. cbv. reflexivity. Qed.
 Lemma close_cset_empty : forall k x,
   close_cset k x {}C = {}C.
-Admitted.
+Proof.
+  intros; cbv.
+  destruct_if ; [ rewrite_set_facts_in Heqb; exfalso; fsetdec | reflexivity].
+Qed.
 Lemma close_cset_blatantly : forall k x,
   (close_cset k x x) = k.
-Admitted.
+Proof.
+  intros; cbv.
+  destruct_if ; [ cset_eq_dec | rewrite_set_facts_in Heqb; exfalso; fsetdec].
+Qed.
 Lemma close_cset_blatantly_not : forall (k j : nat) x,
   (close_cset k x j) = j.
-Admitted.
+Proof.
+  intros; cbv.
+  destruct_if ; [ rewrite_set_facts_in Heqb; exfalso; fsetdec | reflexivity].
+Qed.
 Lemma close_cset_not : forall k x y,
   x <> y ->
   (close_cset k x y) = y.
-Admitted.
+Proof.
+  intros; cbv.
+  destruct_if ; [ rewrite_set_facts_in Heqb; exfalso; fsetdec | reflexivity].
+Qed.
+Lemma close_cset_distributive : forall k x C D,
+  close_cset k x (cset_union C D) =
+  cset_union (close_cset k x C) (close_cset k x D).
+Proof.
+  intros.
+  destruct C; simpl. {
+    destruct D; simpl.
+    1: reflexivity.
+    destruct_match; reflexivity.
+  }
+  destruct D; simpl. {
+    unfold cset_union.
+    destruct_match; reflexivity.
+  }
+
+  destruct_set_mem x t.
+  - destruct_set_mem x (t `union` t1).
+    2: exfalso; fsetdec.
+    destruct_set_mem x t1.
+    1,2: cbv; cset_eq_dec.
+  - destruct_set_mem x t1.
+    + destruct_set_mem x (t `union` t1).
+      2: exfalso; fsetdec.
+      cbv; cset_eq_dec.
+    + destruct_set_mem x (t `union` t1).
+      1: exfalso; fsetdec.
+      cset_eq_dec.
+Qed.
 
 Hint Rewrite close_cset_distributive : typ.
 Hint Rewrite close_cset_uni : typ.
@@ -1332,26 +1380,65 @@ Hint Rewrite close_cset_blatantly : typ.
 Hint Rewrite close_cset_blatantly_not : typ.
 Hint Rewrite close_cset_not using congruence : typ.
 
-Lemma open_cset_distributive : forall k x C D,
-  open_cset k x (cset_union C D) =
-  cset_union (open_cset k x C) (open_cset k x D).
-Admitted.
 Lemma open_cset_uni : forall k x,
   open_cset k x {*}C = {*}C.
-Admitted.
+Proof. intros. cbv. reflexivity. Qed.
 Lemma open_cset_empty : forall k x,
   open_cset k x {}C = {}C.
-Admitted.
+Proof.
+  intros; cbv.
+  destruct_if ; [ rewrite_set_facts_in Heqb; exfalso; fnsetdec | reflexivity].
+Qed.
 Lemma open_cset_blatantly : forall k C,
   (open_cset k C k) = C.
-Admitted.
+Proof.
+  intros; cbv.
+  destruct_if ; [ destruct C; [reflexivity | cset_eq_dec]
+                | rewrite_set_facts_in Heqb; exfalso; fnsetdec].
+Qed.
 Lemma open_cset_blatantly_not : forall k C (a : atom),
   (open_cset k C a) = a.
-Admitted.
+Proof.
+  intros; cbv.
+  destruct_if ; [ rewrite_set_facts_in Heqb; exfalso; fnsetdec | reflexivity].
+Qed.
 Lemma open_cset_not : forall k C j,
   k <> j ->
   (open_cset k C j) = j.
-Admitted.
+Proof.
+  intros; cbv.
+  destruct_if ; [ rewrite_set_facts_in Heqb; exfalso; fnsetdec | reflexivity].
+Qed.
+Lemma open_cset_distributive : forall k x C D,
+  open_cset k x (cset_union C D) =
+  cset_union (open_cset k x C) (open_cset k x D).
+Proof.
+  intros.
+  destruct C; simpl. {
+    destruct D; simpl.
+    1: reflexivity.
+    destruct_match; reflexivity.
+  }
+  destruct D; simpl. {
+    unfold cset_union.
+    destruct_match; reflexivity.
+  }
+
+  unfold open_cset, cset_references_bvar_dec.
+  destruct_set_mem k t0.
+  - destruct_set_mem k (NatSet.F.union t0 t2).
+    2: exfalso; fnsetdec.
+    destruct_set_mem k t2.
+    1,2: destruct x; cbv; (reflexivity || cset_eq_dec).
+  - destruct_set_mem k t2.
+    + destruct_set_mem k (NatSet.F.union t0 t2).
+      2: exfalso; fnsetdec.
+      destruct_set_mem k t2.
+      1,2: destruct x; cbv; (reflexivity || cset_eq_dec).
+    + destruct_set_mem k (NatSet.F.union t0 t2).
+      1: exfalso; fnsetdec.
+      cset_eq_dec.
+Qed.
 
 Hint Rewrite open_cset_distributive : typ.
 Hint Rewrite open_cset_uni : typ.
@@ -1359,7 +1446,6 @@ Hint Rewrite open_cset_empty : typ.
 Hint Rewrite open_cset_blatantly : typ.
 Hint Rewrite open_cset_blatantly_not : typ.
 Hint Rewrite open_cset_not using congruence : typ.
-
 
 Lemma cons_types: exists T,
   typing empty CC_cons T.
