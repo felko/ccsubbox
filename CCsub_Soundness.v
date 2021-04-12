@@ -1,4 +1,5 @@
 Require Import Coq.Program.Equality.
+Require Import TaktikZ.
 Require Export CCsub_Hints.
 Require Import CCsub_CvFacts.
 
@@ -113,18 +114,6 @@ Proof with eauto using cv_free_never_universal.
         cset_eq_dec.
 Qed.
 
-Require Import LibTactics.
-Tactic Notation "destruct_if" :=
-  match goal with
-  | |- context[if ?t then _ else _] =>
-    destruct t eqn:?
-  end.
-
-Tactic Notation "destruct_match" :=
-  match goal with
-  | |- context[match ?t with _ => _ end] =>
-    destruct t eqn:?
-  end.
 
 Lemma notin_dom_is_notin_fv_ee : forall x E e T,
   x `notin` dom E ->
@@ -1115,10 +1104,8 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
       all : trivial...
     + apply sub_reflexivity with (Ap := dom E) (Am := dom E)...
       inversion H0; subst.
-      match goal with
-      | H : binds X _ _ |- _ =>
-        binds_cases H
-      end...
+      rename select (binds X _ _) into BndX.
+      binds_cases BndX...
       enough (binds X (subst_tb Z P (bind_sub U)) (map (subst_tb Z P) F ++ E))...
   - Case "sub_trans_tvar".
     assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as WfE by auto.
@@ -1132,7 +1119,7 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
       * rewrite (subst_tt_fresh Z P Q).
         2: {
           assert (wf_typ_in E Q) as HA by auto.
-          apply (notin_fv_wf_typ _ _ _ Z Q) in HA...
+          lets: notin_fv_wf_typ Z Q HA...
         }
         binds_get H.
         inversion H1; subst.
@@ -1146,10 +1133,10 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
           assert (wf_typ_in E U) as HA. {
             eapply wf_typ_from_binds_sub...
           }
-          apply (notin_fv_wf_typ _ _ _ Z) in HA...
+          lets: notin_fv_wf_typ Z HA...
         }
         apply (IHSsubT Q)...
-      * apply (sub_trans_tvar (subst_tt Z P U)); [auto| eapply IHSsubT]...
+      * apply (sub_trans_tvar (subst_tt Z P U)); [auto | eapply IHSsubT]...
   - simpl.
     apply sub_capt.
     + apply subcapt_through_subst_tt with (Q := Q)...
@@ -1372,7 +1359,9 @@ Qed.
 
 Ltac rewrite_empty_bvars_from_cv H :=
   let H' := fresh "H" in
-  pose proof (cv_implies_bvars_empty _ _ _ _ H) as H'; rewrite H' in *; clear H'.
+  lets H': cv_implies_bvars_empty H;
+  (* pose proof (cv_implies_bvars_empty _ _ _ _ H) as H'; *)
+  rewrite H' in *; clear H'.
 
 Lemma captures_through_subst_atoms_forall : forall x U ds F E ys zs,
   wf_env (F ++ [(x, bind_typ U)] ++ E) ->
@@ -2527,9 +2516,9 @@ Lemma values_have_precise_captures : forall E u T,
   value u ->
   typing E u T ->
   exists U, typing E u (typ_capt (free_for_cv u) U) /\ sub E (typ_capt (free_for_cv u) U) T.
-Local Ltac hint' :=
+Local Ltac hint ::=
   simpl; eauto.
-Proof with hint'.
+Proof with hint.
   intros *.
   intros Hv Htyp.
   assert (wf_cset_in E (free_for_cv u)) by eauto using typing_cv.
@@ -2577,9 +2566,9 @@ Lemma typing_through_subst_ee : forall P E F x T e u,
   typing (map (subst_cb x (free_for_cv u)) F ++ E)
          (subst_ee x u (free_for_cv u) e)
          (subst_ct x (free_for_cv u) T).
-Local Ltac hint' ::=
+Local Ltac hint ::=
   eauto 4 using wf_env_subst_cb, typing_cv.
-Proof with hint'.
+Proof with hint.
   intros *.
   intros HtypT HvalU HtypU.
   assert (wf_env E) as HwfE. {
@@ -3027,10 +3016,7 @@ Proof with eauto.
   destruct C...
   eapply wf_typ_from_binds_typ in Binds as WfT...
   inversion WfT;
-    match goal with
-    | H : wf_cset _ _ _ |- _ =>
-      inversion H
-    end;
+    inversion select (wf_cset _ _ _);
     subst.
   apply subcapt_set...
   unfold AtomSet.F.For_all.
@@ -3269,9 +3255,7 @@ Proof with auto.
   dependent induction Htyp; intros U1 U2 C Hsub.
   - Case "typing_abs".
     inversion Hsub; subst.
-    match goal with H : sub_pre _ _ _ |- _ =>
-      inversion H; subst
-    end.
+    inversion select (sub_pre _ _ _); subst.
     split...
     exists T1.
     exists (L `union` L0).
@@ -3300,9 +3284,7 @@ Proof with auto.
   dependent induction Htyp; intros U1 U2 C Hsub.
   - Case "typing_abs".
     inversion Hsub; subst.
-    match goal with H : sub_pre _ _ _ |- _ =>
-      inversion H; subst
-    end.
+    inversion select (sub_pre _ _ _); subst.
     split...
     exists T1.
     exists (L `union` L0).
@@ -3353,7 +3335,7 @@ Proof with simpl_env; eauto.
         eapply sub_reflexivity...
       }
       pick fresh x.
-      destruct (P2 x ltac:(notin_solve)) as [? [? ?]]...
+      forwards (? & ? & ?): P2 x...
       rewrite (subst_ee_intro x)...
       rewrite (subst_ct_intro x)...
       apply typing_through_subst_ee'
@@ -3362,7 +3344,7 @@ Proof with simpl_env; eauto.
             (Am := dom E) ...
       * apply (typing_sub (open_ct S2 x))...
         -- rewrite_nil_concat.
-           destruct (inversion_toplevel_type E T1') as [C [P Eq]]; subst...
+           lets (C & P & Eq): inversion_toplevel_type E T1'; subst...
            rewrite_nil_concat.
            eapply (typing_narrowing_typ' T)...
            eauto using (sub_transitivity T1).
@@ -3382,7 +3364,7 @@ Proof with simpl_env; eauto.
       eapply sub_reflexivity...
     }
     pick fresh X.
-    destruct (P2 X ltac:(notin_solve)) as [S2 ?]...
+    forwards (S2 & ?): P2 X...
     rewrite (subst_te_intro X)...
     rewrite (subst_tt_intro X)...
     rewrite_env (map (subst_tb X T) empty ++ E).
