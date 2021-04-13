@@ -328,7 +328,7 @@ Tactic Notation "rewrite_env" constr(E) "in" hyp(H) :=
 
 Hint Constructors ok : core.
 
-Hint Extern 1 (~ In _ _) => simpl_env in *; [notin_solve || fsetdec] : core.
+Hint Extern 1 (~ In _ _) => simpl_env in *; [notin_solve] : core.
 
 
 (* ********************************************************************** *)

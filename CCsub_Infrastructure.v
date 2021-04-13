@@ -1358,6 +1358,8 @@ Proof.
   cset_split; cset_cleanup.
 Qed.
 
+Local Hint Extern 1 (~ AtomSet.F.In _ _) => simpl_env in *; [fsetdec] : core.
+
 Lemma subst_ct_open_fresh : forall k z C T X,
   (* X fresh requirement here in z c T *)
   X `notin` (singleton z `union` fv_tt T `union` fv_et T) /\ X `notin` fv_cset C ->
@@ -1376,10 +1378,8 @@ Proof with eauto*.
   induction T; intro k; simpl in *; try reflexivity.
   * (* Case typ_capt *)
     f_equal.
-    + apply open_capt_subst_aux.
-      (* csetdec; destruct .... should be a tactic at some point .*)
-      destruct c... fsetdec. fsetdec.
-      destruct C...
+    + apply open_capt_subst_aux...
+      fsetdec.
     + apply subst_cpt_open_fresh...
      (* apply IHT. split. fsetdec. apply HXfresh. *)
 ------

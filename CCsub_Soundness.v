@@ -1119,7 +1119,8 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
       * rewrite (subst_tt_fresh Z P Q).
         2: {
           assert (wf_typ_in E Q) as HA by auto.
-          lets: notin_fv_wf_typ Z Q HA...
+          lets: notin_fv_wf_typ Z Q HA.
+          fsetdec.
         }
         binds_get H.
         inversion H1; subst.
@@ -1133,7 +1134,8 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
           assert (wf_typ_in E U) as HA. {
             eapply wf_typ_from_binds_sub...
           }
-          lets: notin_fv_wf_typ Z HA...
+          lets: notin_fv_wf_typ Z HA.
+          fsetdec.
         }
         apply (IHSsubT Q)...
       * apply (sub_trans_tvar (subst_tt Z P U)); [auto | eapply IHSsubT]...
