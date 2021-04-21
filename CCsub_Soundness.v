@@ -3323,12 +3323,12 @@ Proof with eauto.
 Qed.
 
 Lemma preservation : forall E e e' T,
-  no_type_bindings E ->
+  (* no_type_bindings E -> *)
   typing E e T ->
   red e e' ->
   typing E e' T.
 Proof with simpl_env; eauto.
-  intros * NoTyp Typ. generalize dependent e'.
+  intros * Typ. generalize dependent e'.
   induction Typ; intros e' Red; try solve [ inversion Red; subst; eauto ].
   - Case "typing_app".
     inversion Red; subst...
@@ -3346,10 +3346,16 @@ Proof with simpl_env; eauto.
             (Am := dom E) ...
       * apply (typing_sub (open_ct S2 x))...
         -- rewrite_nil_concat.
-           lets (C & P & Eq): inversion_toplevel_type E T1'; subst...
-           rewrite_nil_concat.
+           forwards: values_have_precise_captures e2; eauto.
+           destruct H6 as [U [HtypU HsubU]].
+           inversion HsubU; subst.
            eapply (typing_narrowing_typ' T)...
            eauto using (sub_transitivity T1).
+
+           (* lets (C & P & Eq): inversion_toplevel_type E T1'; subst... *)
+           (* rewrite_nil_concat. *)
+           (* eapply (typing_narrowing_typ' T)... *)
+           (* eauto using (sub_transitivity T1). *)
         -- rewrite_nil_concat.
           apply (sub_narrowing_typ) with (Q := T1)...
       * replace (singleton x `union` dom E)
