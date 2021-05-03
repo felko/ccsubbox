@@ -101,7 +101,7 @@ Fixpoint open_tt_rec (K : nat) (U : typ) (T : typ)  {struct T} : typ :=
 with open_tpt_rec (K : nat) (U : typ) (T : pretyp)  {struct T} : pretyp :=
   match T with
   | typ_top => typ_top
-  | typ_arrow T1 T2 => typ_arrow (open_tt_rec K U T1) (open_tt_rec K U T2)
+  | typ_arrow T1 T2 => typ_arrow (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
   | typ_all T1 T2 => typ_all (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
   end
 .
@@ -110,7 +110,7 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   match e with
   | exp_bvar i => exp_bvar i
   | exp_fvar x => exp_fvar x
-  | exp_abs V e1 => exp_abs  (open_tt_rec K U V)  (open_te_rec K U e1)
+  | exp_abs V e1 => exp_abs  (open_tt_rec K U V)  (open_te_rec (S K) U e1)
   | exp_app e1 e2 => exp_app  (open_te_rec K U e1) (open_te_rec K U e2)
   | exp_tabs V e1 => exp_tabs (open_tt_rec K U V)  (open_te_rec (S K) U e1)
   | exp_tapp e1 V => exp_tapp (open_te_rec K U e1) (open_tt_rec K U V)
@@ -126,7 +126,7 @@ with open_cpt_rec (k : nat) (c : captureset) (T : pretyp)  {struct T} : pretyp :
   match T with
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
-  | typ_all T1 T2 => typ_all (open_ct_rec k c T1) (open_ct_rec k c T2)
+  | typ_all T1 T2 => typ_all (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
   end.
 
 Fixpoint open_ee_rec (k : nat) (f : exp) (c : captureset) (e : exp)  {struct e} : exp :=
@@ -135,7 +135,7 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (c : captureset) (e : exp)  {struct e} 
   | exp_fvar x => exp_fvar x
   | exp_abs t e1 => exp_abs (open_ct_rec k c t) (open_ee_rec (S k) f c e1)
   | exp_app e1 e2 => exp_app (open_ee_rec k f c e1) (open_ee_rec k f c e2)
-  | exp_tabs t e1 => exp_tabs (open_ct_rec k c t) (open_ee_rec k f c e1)
+  | exp_tabs t e1 => exp_tabs (open_ct_rec k c t) (open_ee_rec (S k) f c e1)
   | exp_tapp e1 t => exp_tapp (open_ee_rec k f c e1) (open_ct_rec k c t)
   end.
 
