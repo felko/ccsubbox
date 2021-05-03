@@ -10,11 +10,6 @@ Require Import FSetFacts.
 Require Import Atom.
 Require Import Nat.
 
-Definition disjoint (xs : atoms) (ys: atoms) : Prop :=
-  AtomSet.F.Empty (AtomSet.F.inter xs ys).
-
-Notation "a `disjoint` b" := (disjoint a b) (at level 1)  : metatheory_scope.
-
 Declare Scope cset_scope.
 
 (** A captureset -- a pair of free variables and bound variables. *)

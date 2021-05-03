@@ -54,6 +54,13 @@ Notation "{}" :=
 
 Notation singleton := (AtomSet.F.singleton).
 
+(** Disjointness is also useful. *)
+Definition disjoint (xs : atoms) (ys: atoms) : Prop :=
+  AtomSet.F.Empty (AtomSet.F.inter xs ys).
+
+Notation "a `disjoint` b" := (disjoint a b) (at level 1)  : metatheory_scope.
+
+
 (** Open the notation scopes declared above. *)
 
 Open Scope metatheory_scope.
