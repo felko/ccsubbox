@@ -1,5 +1,20 @@
 (* ====================================================================== *)
 (* ====================================================================== *)
+(** * Bespoke *)
+
+Ltac note0 T id :=
+  assert (T) as id by auto;
+  inversion id;
+  subst.
+
+Tactic Notation "note" constr(T) :=
+  let H := fresh "Note" in note0 T H.
+
+Tactic Notation "note" constr(T) "as" ident(id) :=
+  note0 T id.
+
+(* ====================================================================== *)
+(* ====================================================================== *)
 (** * Borrowed from LibTactics *)
 
 Set Implicit Arguments.

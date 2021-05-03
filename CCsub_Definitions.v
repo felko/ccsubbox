@@ -437,31 +437,24 @@ Inductive cv : env -> typ -> captureset -> Prop :=
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
 
-
-Inductive captures : env -> atoms -> atom -> Prop :=
-  (* xs captures x if it includes it verbatim *)
-  | captures_in : forall E x xs,
-      x `in` xs ->
-      captures E xs x
-  (* xs captures x if it includes its capture set (cv) *)
-  | captures_var : forall E T x xs ys,
-      binds x (bind_typ T) E ->
-      cv E T (cset_set ys {}N) ->
-      AtomSet.F.For_all (captures E xs) ys ->
-      captures E xs x
-.
-
 Inductive subcapt : env -> captureset -> captureset -> Prop :=
   | subcapt_universal : forall E C,
       wf_cset_in E C ->
       subcapt E C cset_universal
-  | subcapt_set : forall E xs ys,
+  | subcapt_in : forall E x xs,
+      wf_cset_in E (cset_set (singleton x) {}N) ->
       wf_cset_in E (cset_set xs {}N) ->
-      wf_cset_in E (cset_set ys {}N) ->
-      AtomSet.F.For_all (captures E ys) xs ->
-      subcapt E (cset_set xs {}N) (cset_set ys {}N)
-.
-
+      x `in` xs ->
+      subcapt E (cset_set (singleton x) {}N) (cset_set xs {}N)
+  | subcapt_var : forall E x T C D,
+      binds x (bind_typ T) E ->
+      cv E T C ->
+      subcapt E C D ->
+      subcapt E (cset_set (singleton x) {}N) D
+  | subcapt_set : forall E xs D,
+      wf_cset_in E D ->
+      AtomSet.F.For_all (fun x => subcapt E (cset_set (singleton x) {}N) D) xs ->
+      subcapt E (cset_set xs {}N) D.
 
 (** The definition of subtyping is straightforward.  It uses the
     [binds] relation from the [Environment] library (in the
@@ -645,7 +638,7 @@ Inductive red : exp -> exp -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type pretype expr capt wf_typ wf_pretyp wf_env value red cv sub captures subcapt typing wf_cset : core.
+Hint Constructors type pretype expr capt wf_typ wf_pretyp wf_env value red cv sub subcapt typing wf_cset : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
 Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound_typ : core.

@@ -1363,21 +1363,34 @@ Qed.
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)
 
-Lemma subcapt_regular : forall E C1 C2,
-  subcapt E C1 C2 ->
-  wf_cset E (dom E) C1 /\ wf_cset E (dom E) C2.
-Proof with eauto*.
-  intros. inversion H...
-Qed.
+Require Import TaktikZ.
 
-(* Lemma captures_regular : forall E C x,
-  captures E C x ->
-  wf_env E /\ wf_cset E C.
+Lemma subcapt_regular : forall E C D,
+  subcapt E C D ->
+  wf_cset_in E C /\ wf_cset_in E D.
 Proof with eauto*.
-  intros. inversion H...
-  - pose proof (subcapt_regular _ _ _ H1) as [WFenv [_ WfC]]...
-  - pose proof (subcapt_regular _ _ _ H1) as [WFenv [_ WfC]]...
-Qed. *)
+  intros* H.
+  induction H; subst...
+  - split...
+    constructor.
+    2: {
+      apply binds_In in H...
+    }
+    intros y yInX.
+    rewrite AtomSetFacts.singleton_iff in yInX; subst...
+  - split...
+    constructor.
+    + intros y yIn.
+      forwards (WfX & _): H1 y yIn.
+      inversion WfX; subst.
+      rename select (allbound_typ _ _) into HABnd.
+      applys HABnd y.
+      fsetdec.
+    + intros y yIn.
+      forwards (WfX & _): H1 y yIn.
+      inversion WfX; subst.
+      fsetdec.
+Qed.
 
 Hint Unfold wf_typ_in : core.
 Hint Unfold wf_pretyp_in : core.
