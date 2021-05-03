@@ -6,6 +6,7 @@
 
 Require Export AdditionalTactics.
 Require Export Atom.
+Require Export Nat.
 Require Export Environment.
 
 Declare Scope metatheory_scope.

@@ -2,8 +2,6 @@ Require Export Metatheory.
 Require Export CaptureSets.
 Require Import Coq.Program.Wf.
 
-Require Import Atom.
-
 (* ********************************************************************** *)
 (** * #<a name="syntax"></a># Syntax (pre-terms) *)
 
