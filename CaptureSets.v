@@ -335,7 +335,7 @@ Lemma subset_union_left : forall C1 C2,
 Proof.
   intros. destruct C1. destruct C2. unfold cset_subset_prop, cset_union, cset_fvars,
     cset_bvars, cset_has_universal. repeat split. fsetdec. fnsetdec.
-    unfold leb; destruct b; destruct b0; auto*.
+    destr_bool.
 Qed.
 
 Lemma subset_union_right : forall C1 C2,
@@ -343,7 +343,7 @@ Lemma subset_union_right : forall C1 C2,
 Proof.
   intros. destruct C1. destruct C2. unfold cset_subset_prop, cset_union, cset_fvars,
     cset_bvars, cset_has_universal. repeat split. fsetdec. fnsetdec.
-    unfold leb; destruct b; destruct b0; auto*. 
+    destr_bool.
 Qed.
 
 Lemma subset_trans : forall A B C,
@@ -352,6 +352,7 @@ Proof.
   intros * AB BC.
   inversion AB as [ABF [ABN ABL]]; subst; inversion BC as [BCF [BCN BCL]]; subst...
   repeat (econstructor; try fsetdec; try fnsetdec)...
+  destruct A; destruct B; destruct C; unfold cset_has_universal in *; destr_bool.
 Qed.
 
 Hint Immediate subset_union_left subset_union_right  subset_refl: core.
@@ -372,14 +373,12 @@ Ltac rewrite_set_facts_in H :=
   | NatSet.F.mem _ _ = false => rewrite <- NatSetFacts.not_mem_iff in H
   | AtomSet.F.mem _ _ = true => rewrite <- AtomSetFacts.mem_iff in H
   | AtomSet.F.mem _ _ = false => rewrite <- AtomSetFacts.not_mem_iff in H
-  | LabelSet.F.mem _ _ = true => rewrite <- LabelSetFacts.mem_iff in H
-  | LabelSet.F.mem _ _ = false => rewrite <- LabelSetFacts.not_mem_iff in H
   | cset_references_bvar_dec _ _ = true => rewrite <- cset_bvar_mem_iff in H
   | cset_references_fvar_dec _ _ = true => rewrite <- cset_fvar_mem_iff in H
-  | cset_references_lvar_dec _ _ = true => rewrite <- cset_lvar_mem_iff in H
+  | cset_references_univ_dec _ _ = true => rewrite <- cset_univ_mem_iff in H
   | cset_references_bvar_dec _ _ = false => rewrite <- cset_bvar_not_mem_iff in H
   | cset_references_fvar_dec _ _ = false => rewrite <- cset_fvar_not_mem_iff in H
-  | cset_references_lvar_dec _ _ = false => rewrite <- cset_lvar_not_mem_iff in H
+  | cset_references_univ_dec _ _ = false => rewrite <- cset_univ_not_mem_iff in H
   end.
 
 Ltac rewrite_set_facts_back_in H :=
@@ -393,14 +392,12 @@ Ltac rewrite_set_facts_back_in H :=
   | (~ NatSet.F.In _ _)      => rewrite -> NatSetFacts.not_mem_iff in H
   | AtomSet.F.In _ _         => rewrite -> AtomSetFacts.mem_iff in H
   | (~ AtomSet.F.In _ _)     => rewrite -> AtomSetFacts.not_mem_iff in H
-  | LabelSet.F.In _ _         => rewrite -> LabelSetFacts.mem_iff in H
-  | (~ LabelSet.F.In _ _)     => rewrite -> LabelSetFacts.not_mem_iff in H
   | cset_references_bvar _ _ => rewrite -> cset_bvar_mem_iff in H
   | cset_references_fvar _ _ => rewrite -> cset_fvar_mem_iff in H
-  | cset_references_lvar _ _ => rewrite -> cset_lvar_mem_iff in H
+  | cset_references_univ _ _ => rewrite -> cset_univ_mem_iff in H
   | (~ cset_references_bvar _ _) => rewrite -> cset_bvar_not_mem_iff in H
   | (~ cset_references_fvar _ _) => rewrite -> cset_fvar_not_mem_iff in H
-  | (~ cset_references_lvar _ _) => rewrite -> cset_lvar_not_mem_iff in H
+  | (~ cset_references_univ _ _) => rewrite -> cset_univ_not_mem_iff in H
   end.
 
 
@@ -412,8 +409,8 @@ Ltac simpl_in_cset :=
   | H: (cset_references_bvar _ _)   |- _ => go H
   | H: ~ (cset_references_fvar _ _) |- _ => go H
   | H: (cset_references_fvar _ _)   |- _ => go H
-  | H: ~ (cset_references_lvar _ _) |- _ => go H
-  | H: (cset_references_lvar _ _)   |- _ => go H
+  | H: ~ (cset_references_univ _ _) |- _ => go H
+  | H: (cset_references_univ _ _)   |- _ => go H
   end.
 
 Ltac destruct_set_mem a bs :=
@@ -424,9 +421,6 @@ Ltac destruct_set_mem a bs :=
   | NatSet.F.t =>
     let H := fresh a "In" in
     destruct (NatSet.F.mem a bs) eqn:H; rewrite_set_facts_in H
-  | LabelSet.F.t =>
-    let H := fresh a "In" in
-    destruct (LabelSet.F.mem a bs) eqn:H; rewrite_set_facts_in H
   | cap =>
     match type of a with
     | atom => 
@@ -435,9 +429,6 @@ Ltac destruct_set_mem a bs :=
     | nat =>
       let H := fresh a "In" in
       destruct (cset_references_bvar_dec a bs) eqn:H; rewrite_set_facts_in H; trivial
-    | label => 
-      let H := fresh a "In" in
-      destruct (cset_references_lvar_dec a bs) eqn:H; rewrite_set_facts_in H; trivial
     end
   end.
 
@@ -458,18 +449,27 @@ Lemma empty_union_idempotent : forall xs,
     AtomSet.F.union {} xs = xs.
 Proof. intros. fsetdec. Qed.
 
-Lemma lunion_empty_idempotent : forall xs,
-    LabelSet.F.union xs {}L = xs.
-Proof. intros. lsetdec. Qed.
+Lemma false_or_idempotent : forall xs,
+    false || xs = xs.
+Proof. destr_bool. Qed.
 
-Lemma empty_lunion_idempotent : forall xs,
-    LabelSet.F.union {}L xs = xs.
-Proof. intros. lsetdec. Qed.
+Lemma or_false_idempotent : forall xs,
+    xs || false = xs.
+Proof. destr_bool. Qed.
+
+Lemma true_or_true : forall xs,
+    true || xs = true.
+Proof. destr_bool. Qed.
+
+Lemma or_true_true : forall xs,
+    xs || true = true.
+Proof. destr_bool. Qed.
 
 Hint Rewrite 
   funion_empty_idempotent empty_funion_idempotent 
   union_empty_idempotent empty_union_idempotent 
-  lunion_empty_idempotent empty_lunion_idempotent 
+  or_false_idempotent false_or_idempotent
+  true_or_true or_true_true
 : csets.
 
 Lemma cunion_empty_idempotent : forall xs,
@@ -492,7 +492,20 @@ Tactic Notation "csetsimpl" "in" hyp(H) := csetsimplIn H.
 
 Ltac csetdec := csetsimpl; try fsetdec; try fnsetdec.
 
+(** Some more facts about Bool *)
+Lemma leb_reflexive : forall xs,
+  leb xs xs.
+Proof. destr_bool. Qed.
 
+Lemma leb_true : forall xs,
+  leb xs true.
+Proof. destr_bool. Qed.
+
+Lemma false_leb : forall xs,
+  leb false xs.
+Proof. destr_bool. Qed.
+
+Hint Resolve leb_reflexive leb_true false_leb : core.
 
 (** ************************************************** *)
 (** Locally Namelesss *)
@@ -540,8 +553,9 @@ Proof.
   unfold cset_subset_prop in *.
   destruct H as [HF [HB HL]].
   unfold subst_cset, cset_references_fvar_dec; destruct C1; destruct C2; simpl in *.
-    destruct_set_mem x t; destruct_set_mem x t2; simpl in *; repeat split;
-    try fsetdec; try fnsetdec; try lsetdec; exfalso; fsetdec.
+    destruct_set_mem x t; destruct_set_mem x t1; simpl in *; repeat split;
+    try fsetdec; try fnsetdec; try (repeat destr_bool; autorewrite with csets); 
+    try solve [exfalso; fsetdec]; eauto*.
 Qed.
 
 Lemma subst_subset_intro : forall C1 C2 x,
@@ -558,8 +572,9 @@ Proof.
   destruct H0 as [HF [HB HL]]; simpl in *; csetsimpl; destruct_set_mem x t; csetsimpl;
     try fsetdec;
     try fnsetdec;
-    try lsetdec.
-  unfold AtomSet.F.Subset in HF. specialize (HF x). fsetdec.
+    try (repeat destr_bool; autorewrite with csets);
+    eauto.
+  exfalso. specialize (HF x). fsetdec.
 Qed.
 
 Lemma subst_cset_union : forall x D C1 C2,
@@ -568,8 +583,9 @@ Proof with eauto.
   intros.
   unfold subst_cset, cset_fvars, cset_union, cset_fvar, cset_references_fvar_dec, cset_remove_fvar; simpl in *.
   destruct C1; destruct C2; destruct D; simpl.
-  destruct_set_mem x (t `union` t2); destruct_set_mem x t; destruct_set_mem x t2;
-    unfold cset_bvars, cset_fvars, cset_lvars; f_equal; try fsetdec; try fnsetdec; try lsetdec...
+  destruct_set_mem x (t `union` t1); destruct_set_mem x t; destruct_set_mem x t1;
+    unfold cset_bvars, cset_fvars; f_equal; try fsetdec; try fnsetdec; 
+    try (repeat destr_bool; autorewrite with csets)...
 Qed.
 
 Lemma subst_cset_singleton : forall x C,
@@ -594,10 +610,10 @@ Proof with eauto.
   notin_solve.
 Qed.
 
-Lemma singleton_lvar : forall l,
-  cset_references_lvar l (cset_lvar l).
-Proof.
-  unfold cset_references_lvar, cset_lvars, cset_lvar; lsetdec.
+Lemma singleton_univ :
+  cset_references_univ (cset_universal).
+Proof with eauto.
+  autorewrite with csets...
 Qed.
 
 Lemma subst_cset_fresh_id : forall x X C,
@@ -618,19 +634,12 @@ Proof with eauto.
   apply subst_cset_union.
 Qed.
 
-Lemma subst_cset_lvar : forall x C l R,
-  cset_references_lvar l R ->
-  cset_references_lvar l (subst_cset x C R).
+Lemma subst_cset_univ : forall x C R,
+  cset_references_univ R ->
+  cset_references_univ (subst_cset x C R).
 Proof with eauto.
-  destruct R; unfold cset_lvars, subst_cset, cset_references_lvar, cset_lvars, cset_references_fvar_dec, cset_remove_fvar, cset_union in *; simpl.
-  destruct_set_mem x t; try lsetdec.
-Qed.
-
-Lemma subst_cset_lvar_idempotent : forall x C l,
-  (subst_cset x C (cset_lvar l)) = (cset_lvar l).
-Proof with eauto.
-  unfold cset_lvar, subst_cset, cset_references_fvar_dec, cset_union, cset_fvars, cset_lvars, cset_bvars. csetsimpl.
-  destruct C; destruct_set_mem x {}... fsetdec.
+  destruct R; unfold cset_has_universal, subst_cset, cset_references_univ, cset_references_fvar_dec, cset_remove_fvar, cset_union in *; simpl.
+  destruct_set_mem x t; intro; subst; autorewrite with csets...
 Qed.
 
 Lemma open_cset_capt : forall i C c,
@@ -656,15 +665,15 @@ Proof with auto*.
   destruct_set_mem k t0; simpl. autorewrite with csets.
   unfold cset_union, cset_fvars.
   destruct_set_mem X (singleton X `union` t); simpl; autorewrite with csets; f_equal;
-    try fsetdec; try lsetdec.
+    try fsetdec; try (repeat destr_bool; autorewrite with csets).
   
   destruct_set_mem X t; auto.
   fsetdec.
 Qed.
 
 
-Hint Resolve singleton_closed singleton_lvar open_cset_capt subst_cset_lvar : core.
-Hint Rewrite subst_cset_singleton subst_cset_union subst_cset_lvar_idempotent : csets.
+Hint Resolve singleton_closed open_cset_capt : core.
+Hint Rewrite subst_cset_singleton subst_cset_union : csets.
 
 
 (* unfold subst_cb, subst_cset, cset_references_fvar_dec, cset_fvar, cset_remove_fvar, cset_union.  
@@ -673,52 +682,50 @@ Hint Rewrite subst_cset_singleton subst_cset_union subst_cset_lvar_idempotent : 
 Lemma open_cset_rec_capt_aux : forall c j V i U,
   i <> j ->
   capt V ->
-  (* TODO probably, we also want disjointness of labels here? *)
-  (cset_fvars V) `disjoint` (cset_fvars U) ->
-  labels_disjoint (cset_lvars V) (cset_lvars U) ->
+  (* TODO probably, we also want disjointness of labels here?, and that V
+      and U do not both contain universal*)
+  cset_has_universal V <> cset_has_universal U ->
+  AtomSet.F.Empty (AtomSet.F.inter (cset_fvars V) (cset_fvars U)) ->
   open_cset j V c = open_cset i U (open_cset j V c) ->
   c = open_cset i U c.
 Proof with eauto.
-  intros * Hfresh Hempty HdisjointV HdisjointL.
-  unfold cset_fvars, disjoint, labels_disjoint, capt, open_cset, cset_remove_bvar, cset_references_bvar_dec, cset_union,
-    cset_bvars, cset_lvars in *.
+  intros * Hfresh Hempty HdisjointUniv HdisjointV HdisjointL.
+  unfold cset_fvars, capt, open_cset, cset_remove_bvar, cset_references_bvar_dec, cset_union,
+    cset_bvars in *.
   destruct c eqn:Hc; destruct U eqn:HU; destruct V eqn:HV; destruct_set_mem j t0; unfold cset_fvars in *;
     destruct_set_mem i t0;
-    destruct (NatSet.F.mem i (NatSet.F.union t6 (NatSet.F.remove j t0))) eqn:iInUnion;
-    rewrite_set_facts_in iInUnion;
-    intro Heq;
-    inversion Heq; f_equal; assert (t6 = {}N) by fnsetdec; subst; autorewrite with csets in *; try fsetdec; try fnsetdec; try lsetdec...
-  * assert (t2 `subset` t). {
+    destruct (NatSet.F.mem i (NatSet.F.union t4 (NatSet.F.remove j t0))) eqn:iInUnion;
+    rewrite_set_facts_in iInUnion; f_equal; autorewrite with csets in *;
+      (* try (repeat destr_bool;autorewrite with csets)...*)
+    inversion HdisjointL; autorewrite with csets;  try fsetdec; try fnsetdec.
+  * assert (t1 `subset` t). {
       intros e Het1.
-      assert (e `in` (t2 `union` t5 `union` t)) by fsetdec.
-      assert (e `notin` t5) by fsetdec.
+      assert (e `in` (t1 `union` t3 `union` t)) by fsetdec.
+      assert (e `notin` t3) by fsetdec.
       rewrite <- H0 in H. fsetdec.
     }
     fsetdec.
   * assert (NatSet.F.In i (NatSet.F.remove j t0)) by fnsetdec.
     assert (~NatSet.F.In i (NatSet.F.remove i (NatSet.F.remove j t0))) by fnsetdec.
-    assert (NatSet.F.In i t3). {
-      destruct_set_mem i t3...
+    assert (NatSet.F.In i t2). {
+      destruct_set_mem i t2...
       exfalso.
-      assert (~ NatSet.F.In i (NatSet.F.union t3 (NatSet.F.remove i (NatSet.F.remove j t0)))) by fnsetdec.
+      assert (~ NatSet.F.In i (NatSet.F.union t2 (NatSet.F.remove i (NatSet.F.union t4 (NatSet.F.remove j t0)))))
+         by fnsetdec.
       rewrite <- H1 in H4. fnsetdec.
     }
-    assert (NatSet.F.Subset t3 t0). {
+    assert (NatSet.F.Subset t2 t0). {
       intros e Het3.
       destruct (e === i); subst...
-      assert (NatSet.F.In e (NatSet.F.union t3 (NatSet.F.remove i (NatSet.F.remove j t0)))) by fnsetdec.
+      assert (NatSet.F.In e (NatSet.F.union t2 (NatSet.F.remove i (NatSet.F.union t4  (NatSet.F.remove j t0)))))
+        by fnsetdec.
       rewrite <- H1 in H5...
       assert (e <> j) by fnsetdec.
       fnsetdec.
     }
     fnsetdec.
-  * assert (LabelSet.F.Subset t4 t1). {
-      intros e Het4.
-      assert (LabelSet.F.In e (LabelSet.F.union t4 (LabelSet.F.union t7 t1))) by lsetdec.
-      assert (~ LabelSet.F.In e t7) by lsetdec.
-      rewrite <- H2 in H. lsetdec.
-    }
-    lsetdec.
+  * destr_bool...
+  * destr_bool...
 Qed.
 
 Lemma subst_cset_open_cset_rec : forall x k C1 C2 D,
@@ -728,21 +735,23 @@ Proof with eauto*.
   intros x k C1 C2 D Closed.
   destruct D eqn:Hc; destruct C1 eqn:HC1; destruct C2 eqn:HC2;
   unfold capt, subst_cset, open_cset, cset_references_fvar_dec,
-    cset_references_bvar_dec, cset_remove_bvar, cset_remove_fvar, cset_union, cset_fvars, cset_bvars, cset_lvars in *; subst; csetsimpl.
+    cset_references_bvar_dec, cset_remove_bvar, cset_remove_fvar, cset_union, cset_fvars, cset_bvars in *; subst; csetsimpl.
 
-    assert (t3 = {}N) by fnsetdec; subst.
+    assert (t2 = {}N) by fnsetdec; subst.
 
     autorewrite with csets.
 
     destruct (NatSet.F.mem k t0) eqn:kT0;
     destruct (AtomSet.F.mem x t) eqn:xT;
-    destruct (AtomSet.F.mem x t5) eqn:xT3;
-    destruct (AtomSet.F.mem x (t5 `union` t)) eqn:xUnion;
+    destruct (AtomSet.F.mem x t3) eqn:xT3;
+    destruct (AtomSet.F.mem x (t3 `union` t)) eqn:xUnion;
     f_equal;
     rewrite_set_facts_in kT0;
     rewrite_set_facts_in xT;
     rewrite_set_facts_in xT3;
     rewrite_set_facts_in xUnion;
-    try fsetdec; try fnsetdec; try lsetdec;
-    rewrite_set_facts_back_in kT0; try rewrite kT0; rewrite_set_facts_in kT0; f_equal; try fsetdec; try fnsetdec; try lsetdec.
+    try fsetdec; try fnsetdec;
+    rewrite_set_facts_back_in kT0;
+    try rewrite kT0;
+    rewrite_set_facts_in kT0; f_equal; try fsetdec; try fnsetdec; try destr_bool.
 Qed.
