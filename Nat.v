@@ -1,3 +1,5 @@
+Require Import List.
+Require Import Max.
 Require Import OrderedTypeEx.
 Require Import OrderedType.
 
@@ -5,6 +7,9 @@ Require Import FiniteSets.
 Require Import FSetDecide.
 Require Import FSetNotin.
 Require Import ListFacts.
+
+Require Import FSetFacts.
+
 (** Helpers, defining a set of natural numbers. *)
 Module Type NATSET.
   Declare Module OT : UsualOrderedType with Definition t := nat.

@@ -2,6 +2,9 @@
 
 AdditionalTactics.v
 Atom.v
+Nat.v
+Environment.v
+Metatheory.v
 CCsub_CvFacts.v
 CCsub_Definitions.v
 CCsub_Examples.v
@@ -11,13 +14,10 @@ CCsub_Lemmas.v
 CCsub_Soundness.v
 CaptureSets.v
 CoqIntro.v
-Environment.v
 FSetDecide.v
 FSetNotin.v
 FiniteSets.v
 LibTactics.v
 ListFacts.v
-Metatheory.v
-Nat.v
 Tactics.v
 TaktikZ.v
