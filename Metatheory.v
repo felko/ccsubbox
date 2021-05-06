@@ -7,6 +7,7 @@
 Require Export AdditionalTactics.
 Require Export Atom.
 Require Export Nat.
+Require Export Bool.
 Require Export Environment.
 
 Declare Scope metatheory_scope.
@@ -60,6 +61,7 @@ Definition disjoint (xs : atoms) (ys: atoms) : Prop :=
 
 Notation "a `disjoint` b" := (disjoint a b) (at level 1)  : metatheory_scope.
 
+Hint Unfold disjoint : core.
 
 (** Open the notation scopes declared above. *)
 

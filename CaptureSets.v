@@ -9,7 +9,7 @@ Require Import OrderedType.
 Require Import FSetFacts.
 Require Import Atom.
 Require Import Nat.
-Require Import Bool.
+Require Export Bool.
 
 Create HintDb csets.
 
@@ -505,7 +505,15 @@ Lemma false_leb : forall xs,
   leb false xs.
 Proof. destr_bool. Qed.
 
-Hint Resolve leb_reflexive leb_true false_leb : core.
+Lemma andb_false_false : forall xs,
+  andb xs false = false.
+Proof. destr_bool. Qed.
+
+Lemma false_andb_false : forall xs,
+  andb false xs = false.
+Proof. destr_bool. Qed.
+
+Hint Resolve leb_reflexive leb_true false_leb andb_false_false false_andb_false : core.
 
 (** ************************************************** *)
 (** Locally Namelesss *)
@@ -527,8 +535,13 @@ Proof.
   intros. unfold capt, cset_fvar in *. fnsetdec. 
 Qed.
 
+Lemma capt_concrete_cset : forall xs b,
+  capt (cset_set xs {}N b).
+Proof.
+  intros. unfold capt, cset_bvars. fnsetdec.
+Qed.
 Hint Unfold capt : core.
-Hint Resolve capt_empty_bvar : core.
+Hint Resolve capt_empty_bvar capt_concrete_cset : core.
 
 
 (** Opening a capture set with a bound variable d[k -> c] *)
@@ -684,7 +697,7 @@ Lemma open_cset_rec_capt_aux : forall c j V i U,
   capt V ->
   (* TODO probably, we also want disjointness of labels here?, and that V
       and U do not both contain universal*)
-  cset_has_universal V <> cset_has_universal U ->
+  (andb (cset_has_universal V) (cset_has_universal U)) = false ->
   AtomSet.F.Empty (AtomSet.F.inter (cset_fvars V) (cset_fvars U)) ->
   open_cset j V c = open_cset i U (open_cset j V c) ->
   c = open_cset i U c.

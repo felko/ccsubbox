@@ -24,7 +24,7 @@ Require Import Coq.Program.Wf.
     the definitions below of the opening operations. *)
 Inductive typ : Type :=
   (* C P *)
-  | typ_capt : captureset -> pretyp -> typ
+  | typ_capt : cap -> pretyp -> typ
   (* X *)
   | typ_bvar : nat -> typ
   | typ_fvar : atom -> typ
@@ -55,8 +55,8 @@ Coercion typ_bvar : nat >-> typ.
 Coercion typ_fvar : atom >-> typ.
 Coercion exp_bvar : nat >-> exp.
 Coercion exp_fvar : atom >-> exp.
-Coercion cset_bvar : nat >-> captureset.
-Coercion cset_fvar : atom >-> captureset.
+Coercion cset_bvar : nat >-> cap.
+Coercion cset_fvar : atom >-> cap.
 
 (* ********************************************************************** *)
 (** * #<a name="open"></a># Opening terms *)
@@ -114,20 +114,20 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   | exp_tapp e1 V => exp_tapp (open_te_rec K U e1) (open_tt_rec K U V)
   end.
 
-Fixpoint open_ct_rec (k : nat) (c : captureset) (T : typ)  {struct T} : typ :=
+Fixpoint open_ct_rec (k : nat) (c : cap) (T : typ)  {struct T} : typ :=
   match T with
   | typ_bvar i => typ_bvar i
   | typ_fvar x => typ_fvar x
   | typ_capt C P => typ_capt (open_cset k c C) (open_cpt_rec k c P)
   end
-with open_cpt_rec (k : nat) (c : captureset) (T : pretyp)  {struct T} : pretyp :=
+with open_cpt_rec (k : nat) (c : cap) (T : pretyp)  {struct T} : pretyp :=
   match T with
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
   | typ_all T1 T2 => typ_all (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
   end.
 
-Fixpoint open_ee_rec (k : nat) (f : exp) (c : captureset) (e : exp)  {struct e} : exp :=
+Fixpoint open_ee_rec (k : nat) (f : exp) (c : cap) (e : exp)  {struct e} : exp :=
   match e with
   | exp_bvar i => if k === i then f else (exp_bvar i)
   | exp_fvar x => exp_fvar x
@@ -204,11 +204,6 @@ Definition open_cpt T c := open_cpt_rec 0 c T.
     principles.  With some work, one can show that the definitions
     below are equivalent to ones that use existential, and hence also
     universal, quantification. *)
-
-Inductive capt : captureset -> Prop :=
-  | capt_universal : capt cset_universal
-  | capt_capturing : forall xs, capt (cset_set xs {}N)
-  .
 
 Inductive type : typ -> Prop :=
   | type_var : forall X,
@@ -348,16 +343,14 @@ Notation "[ x ]" := (x :: nil).
 Definition allbound_typ (E : env) (X : atoms) : Prop :=
   forall x, AtomSet.F.In x X -> exists T, binds x (bind_typ T) E.
 
-Inductive wf_cset : env -> atoms -> captureset -> Prop :=
-  | wf_universal_cset : forall E A,
-    wf_cset E A cset_universal
-  | wf_concrete_cset : forall E A fvars,
+Inductive wf_cset : env -> atoms -> cap -> Prop :=
+  | wf_concrete_cset : forall E A fvars univ,
     allbound_typ E fvars ->
     AtomSet.F.Subset fvars A ->
-    wf_cset E A (cset_set fvars {}N)
+    wf_cset E A (cset_set fvars {}N univ)
 .
 
-Definition wf_cset_in (E : env) (C : captureset) : Prop :=
+Definition wf_cset_in (E : env) (C : cap) : Prop :=
   wf_cset E (dom E) C.
 
 (* Wellformedness of types where locally bound variables are only
@@ -418,7 +411,7 @@ Inductive wf_env : env -> Prop :=
       wf_env ([(x, bind_typ T)] ++ E).
 
 (** Dealing with cv -- as a fixpoint is problematic. *)
-Inductive cv : env -> typ -> captureset -> Prop :=
+Inductive cv : env -> typ -> cap -> Prop :=
   (** Looking up in the environment; we ask that T is wf in the environment
       and that the environment is well formed so lookup is well defined. *)
   | cv_typ_var : forall (X : atom) T E CT,
@@ -435,24 +428,29 @@ Inductive cv : env -> typ -> captureset -> Prop :=
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
 
-Inductive subcapt : env -> captureset -> captureset -> Prop :=
-  | subcapt_universal : forall E C,
-      wf_cset_in E C ->
-      subcapt E C cset_universal
+Inductive subcapt : env -> cap -> cap -> Prop :=
+  | subcapt_universal : forall E x xs,
+      wf_cset_in E (cset_fvar x) ->
+      wf_cset_in E (cset_set xs {}N true) ->
+      subcapt E (cset_fvar x) (cset_set xs {}N true)
   | subcapt_in : forall E x xs,
-      wf_cset_in E (cset_set (singleton x) {}N) ->
-      wf_cset_in E (cset_set xs {}N) ->
+      wf_cset_in E (cset_fvar x) ->
+      wf_cset_in E (cset_set xs {}N false) ->
       x `in` xs ->
-      subcapt E (cset_set (singleton x) {}N) (cset_set xs {}N)
+      subcapt E (cset_fvar x) (cset_set xs {}N false)
   | subcapt_var : forall E x T C D,
       binds x (bind_typ T) E ->
       cv E T C ->
       subcapt E C D ->
-      subcapt E (cset_set (singleton x) {}N) D
+      subcapt E (cset_fvar x) D
   | subcapt_set : forall E xs D,
       wf_cset_in E D ->
-      AtomSet.F.For_all (fun x => subcapt E (cset_set (singleton x) {}N) D) xs ->
-      subcapt E (cset_set xs {}N) D.
+      AtomSet.F.For_all (fun x => subcapt E (cset_fvar x) D) xs ->
+      subcapt E (cset_set xs {}N false) D
+  | subcapt_set_univ : forall E xs D,
+      wf_cset_in E D ->
+      cset_references_univ D ->
+      subcapt E (cset_set xs {}N true) D.
 
 (** The definition of subtyping is straightforward.  It uses the
     [binds] relation from the [Environment] library (in the
@@ -532,7 +530,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
 (** * #<a name="typing_doc"></a># Typing *)
 
 (** The definition of "fv" used in typing jdmgnts*)
-Fixpoint free_for_cv (e : exp) : captureset :=
+Fixpoint free_for_cv (e : exp) : cap :=
 match e with
   | exp_bvar i => {}C
   | exp_fvar x => (cset_fvar x)
@@ -636,7 +634,7 @@ Inductive red : exp -> exp -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type pretype expr capt wf_typ wf_pretyp wf_env value red cv sub subcapt typing wf_cset : core.
+Hint Constructors type pretype expr wf_typ wf_pretyp wf_env value red cv sub subcapt typing wf_cset : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
 Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound_typ : core.
