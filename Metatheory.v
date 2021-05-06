@@ -63,6 +63,11 @@ Notation "a `disjoint` b" := (disjoint a b) (at level 1)  : metatheory_scope.
 
 Hint Unfold disjoint : core.
 
+(** Hints *)
+Hint Extern 1 (~ AtomSet.F.In _ _) => simpl_env in *; try notin_solve; try fsetdec : core.
+Hint Extern 1 (~ NatSet.F.In _ _) => simpl_env in *; try nnotin_solve; try fnsetdec : core.
+
+
 (** Open the notation scopes declared above. *)
 
 Open Scope metatheory_scope.

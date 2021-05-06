@@ -768,3 +768,18 @@ Proof with eauto*.
     try rewrite kT0;
     rewrite_set_facts_in kT0; f_equal; try fsetdec; try fnsetdec; try destr_bool.
 Qed.
+
+Lemma subst_cset_useless_repetition : forall x C1 C2 D,
+  x `notin` cset_fvars C2 ->
+  subst_cset x C1 (subst_cset x C2 D) = (subst_cset x C2 D).
+Proof.
+  intros.
+  symmetry.
+  eapply subst_cset_fresh with (C1 := subst_cset x C2 D)...
+  destruct D; destruct C2.
+  cbv [cset_fvars subst_cset cset_references_fvar_dec
+        cset_union cset_remove_fvar cset_bvars cset_has_universal].
+  destruct_set_mem x t...
+  fsetdec.
+  fsetdec.
+Qed.

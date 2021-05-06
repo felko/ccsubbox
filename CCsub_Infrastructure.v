@@ -1049,7 +1049,10 @@ Lemma subst_cset_open_cset_fresh : forall k X C1 C2 c,
   subst_cset X C1 (open_cset k C2 c) = open_cset k C2 (subst_cset X C1 c).
 Proof with auto*.
   intros.
-  assert (C2 = subst_cset X C1 C2) by admit.
+  assert (C2 = subst_cset X C1 C2). {
+    unfold subst_cset; rewrite_set_facts_back_in H1...
+    rewrite H1...
+  }
   rewrite H2 at 2.
   eapply subst_cset_open_cset_rec...
 Qed.
@@ -1076,7 +1079,7 @@ Proof with auto.
   induction T; intros; simpl; try trivial.
 
   f_equal.
-  - eapply subst_cset_open_cset_rec.
+  - apply subst_cset_open_cset_fresh...
   - apply subst_cpt_open_cpt_rec...
 ------
   intros X C1 T C2.
@@ -1124,8 +1127,7 @@ Proof with auto*.
   unfold open_ct.
   symmetry.
   apply subst_ct_open_ct_rec...
-  - constructor.
-  - cbv [cset_references_fvar cset_all_fvars cset_fvar]. (* like unfold but a bit different *)
+  - cbv [cset_references_fvar cset_fvars cset_fvar]. (* like unfold but a bit different *)
     fsetdec.
 Qed.
 
@@ -1196,10 +1198,8 @@ with open_cpt_subst_cpt_var : forall x c t k,
   open_cpt_rec k c t = subst_cpt x c (open_cpt_rec k (cset_fvar x) t).
 Proof with auto.
 ------
-  induction t ; intros ; simpl in * ; f_equal; try solve [
-    apply subst_cset_singleton; intro;
-    destruct c0; simpl in *; fsetdec
-  ]...
+  induction t ; intros ; simpl in * ; f_equal...
+  apply subst_cc_intro_rec...
 ------
   induction t ; intros ; simpl in * ; f_equal...
 Qed.
@@ -1289,34 +1289,19 @@ Qed.
     This lemma can be cleaned up quite a bit -- just making it go through for now.
 *)
 
-Lemma open_capt_subst_aux : forall k x z C' C,
-  x `notin` fv_cset C ->
-  x `notin` fv_cset C' ->
-  z <> x ->
-  capt C' ->
-  open_cset k (cset_fvar x) (subst_cset z C' C) =
-  subst_cset z C' (open_cset k (cset_fvar x) C).
-Proof.
-  intros k x z C C' HxfC HxfC' Hxfz HkfC'.
-  (* There really should be a nice proof of this lemma.  Probably
-     wants some automation here. *)
-  unfold cset_fvar.
-  csetdec.
-  destruct C eqn:HC; destruct C' eqn:HC'; inversion HkfC';
-  cset_split; cset_cleanup.
-Qed.
-
 Local Hint Extern 1 (~ AtomSet.F.In _ _) => simpl_env in *; [fsetdec] : core.
 
 Lemma subst_ct_open_fresh : forall k z C T X,
   (* X fresh requirement here in z c T *)
-  X `notin` (singleton z `union` fv_tt T `union` fv_et T) /\ X `notin` fv_cset C ->
+  X `notin` (singleton z `union` fv_tt T `union` fv_et T) 
+    /\ X `notin` cset_fvars C ->
   capt C ->
   (open_ct_rec k (cset_fvar X) (subst_ct z C T)) =
     (subst_ct z C (open_ct_rec k (cset_fvar X) T))
 with subst_cpt_open_fresh : forall k z C T X,
     (* X fresh requirement here in z c T *)
-    X `notin` (singleton z `union` fv_tpt T `union` fv_ept T) /\ X `notin` fv_cset C ->
+    X `notin` (singleton z `union` fv_tpt T `union` fv_ept T)
+      /\ X `notin` cset_fvars C ->
     capt C ->
     (open_cpt_rec k (cset_fvar X) (subst_cpt z C T)) =
       (subst_cpt z C (open_cpt_rec k (cset_fvar X) T)).
@@ -1325,22 +1310,27 @@ Proof with eauto*.
   intros k z C T X HXfresh HCfresh. revert k.
   induction T; intro k; simpl in *; try reflexivity.
   * (* Case typ_capt *)
-    f_equal.
-    + apply open_capt_subst_aux...
-      fsetdec.
-    + apply subst_cpt_open_fresh...
-     (* apply IHT. split. fsetdec. apply HXfresh. *)
+    f_equal...
+    (** pull this out into a tactic.*)
+    symmetry.
+    assert (cset_fvar X = subst_cset z C X). {
+      unfold subst_cset, cset_references_fvar_dec, cset_fvars, cset_fvar...
+      destruct_set_mem z (singleton X)...
+      exfalso. fsetdec.
+    }
+    rewrite H at 2.
+    apply subst_cset_open_cset_rec...
 ------
   intros k z C T X HXfresh HCfresh. revert k.
   induction T; intro k; simpl in *; try reflexivity; f_equal...
 Qed.
 
 Lemma open_tt_subst_ct_aux : forall k X z C T,
-  X `notin` fv_cset C ->
+  X `notin` cset_fvars C ->
   open_tt_rec k X (subst_ct z C T) =
   subst_ct z C (open_tt_rec k X T)
 with open_tpt_subst_ct_aux : forall k X z C T,
-  X `notin` fv_cset C ->
+  X `notin` cset_fvars C ->
   open_tpt_rec k X (subst_cpt z C T) =
   subst_cpt z C (open_tpt_rec k X T).
 Proof with eauto*.
@@ -1351,15 +1341,18 @@ Proof with eauto*.
   intros k X z C T HXfresh. revert k. induction T; intro k; simpl in *; f_equal...
 Qed.
 
-
+(** TODO : move to CaptureSets.v *)
 Lemma capt_subst : forall z c1 c2,
   capt c1 ->
   capt c2 ->
   capt (subst_cset z c1 c2).
 Proof with eauto*.
-  intros z c1 c2 Hc1 Hc2.
-  destruct Hc1;  destruct Hc2; unfold subst_cset; cset_split...
-  - assert (NatSet.F.union {}N {}N = {}N) by fnsetdec. rewrite H...
+  intros z c1 c2 Hc1 Hc2...
+  unfold capt in *; destruct c1; destruct c2; 
+    unfold cset_bvars, subst_cset, cset_union, cset_remove_fvar,
+           cset_references_fvar_dec in *;
+    simpl in *...
+  destruct_set_mem z t1... fnsetdec.
 Qed.
 
 Lemma subst_ct_type : forall T z c,
@@ -1511,30 +1504,6 @@ Proof with auto*.
   unfold open_ct.
   symmetry.
   apply subst_tt_open_ct_rec...
-Qed.
-
-Lemma subst_cset_useless_repetition : forall x C1 C2 D,
-  x `notin` cset_fvars C2 ->
-  subst_cset x C1 (subst_cset x C2 D) = (subst_cset x C2 D).
-Proof.
-  intros.
-  destruct D.
-  {
-    unfold subst_cset, cset_references_fvar_dec.
-    reflexivity.
-  }
-  unfold subst_cset, cset_references_fvar_dec.
-  destruct (AtomSet.F.mem x t) eqn:EQ.
-  - unfold cset_remove_fvar at 1.
-    unfold cset_union at 1.
-    destruct C2.
-    + reflexivity.
-    + rewrite <- AtomSetFacts.mem_iff in EQ.
-      unfold cset_fvars in H.
-      replace (AtomSet.F.mem x (t1 `union` t `remove` x)) with false by fset_mem_dec.
-      reflexivity.
-  - rewrite EQ.
-    reflexivity.
 Qed.
 
 Lemma subst_ct_useless_repetition : forall x C D T,
