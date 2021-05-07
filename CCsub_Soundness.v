@@ -446,8 +446,8 @@ Qed.
 
 
 Lemma empty_cset_union : forall C1 C2,
-  cset_union C1 C2 = {}C ->
-  C1 = {}C /\ C2 = {}C.
+  cset_union C1 C2 = {} ->
+  C1 = {} /\ C2 = {}.
 Proof with eauto.
   intros.
   destruct C1; destruct C2; simpl in H; try discriminate.
@@ -455,7 +455,7 @@ Proof with eauto.
   unfold empty_cset.
   split; f_equal.
   - destruct (AtomSet.F.choose (t `union` t1)) eqn:Eq.
-    + assert (AtomSet.F.Equal (t `union` t1) {}) as HA. {
+    + assert (AtomSet.F.Equal (t `union` t1) {}A) as HA. {
         rewrite H1.
         fsetdec.
       }
@@ -491,7 +491,7 @@ Proof with eauto.
       }
       fnsetdec.
   - destruct (AtomSet.F.choose (t `union` t1)) eqn:Eq.
-    + assert (AtomSet.F.Equal (t `union` t1) {}) as HA. {
+    + assert (AtomSet.F.Equal (t `union` t1) {}A) as HA. {
         rewrite H1.
         fsetdec.
       }
@@ -2149,7 +2149,7 @@ Proof with hint.
         unfold subst_cset, cset_references_fvar_dec, cset_fvar.
         replace (AtomSet.F.mem x (singleton x)) with true by fset_mem_dec.
         unfold cset_remove_fvar.
-        replace (cset_set _ _) with {}C by cset_eq_dec.
+        replace (cset_set _ _) with {} by cset_eq_dec.
         destruct (free_for_cv u).
         - unfold cset_union.
           destruct_match; reflexivity.

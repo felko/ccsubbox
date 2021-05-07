@@ -29,16 +29,12 @@ Inductive cap : Type :=
 (** Constructors *)
 (** ************************************************** *)
 
-Definition empty_cset := cset_set {} {}N false.
-
-(** The empty set may be written similarly to informal practice. *)
-Notation "{}C" :=
-  empty_cset : metatheory_scope.
+Definition empty_cset := (cset_set {}A {}N false).
 
 (** Singletons *)
 Definition cset_fvar (a : atom) :=
   (cset_set (AtomSet.F.singleton a) NatSet.F.empty false).
-  
+
 Definition cset_bvar (k : nat) :=
   (cset_set AtomSet.F.empty (NatSet.F.singleton k) false).
 
@@ -99,6 +95,7 @@ Definition cset_references_univ_dec := cset_has_universal.
 Definition cset_references_univ (c : cap) :=
     cset_references_univ_dec c = true.
 
+
 (** Capture set unions are what you'd expect. *)
 Definition cset_union (c1 c2 : cap) : cap :=
   cset_set 
@@ -110,6 +107,26 @@ Definition cset_subset_dec (C D : cap) :=
   AtomSet.F.subset (cset_fvars C) (cset_fvars D) 
     && NatSet.F.subset (cset_bvars C) (cset_bvars D)
     && (implb (cset_has_universal C) (cset_has_universal D)).
+
+Notation "{}" := empty_cset : metatheory_scope.
+Notation "{*}" := cset_universal : metatheory_scope.
+
+Notation "C `u` D" := (cset_union C D) (at level 69) : metatheory_scope.
+
+Notation "C A`\` x" := (cset_remove_fvar x C) (at level 69) : metatheory_scope.
+Notation "x A`in` C" := (cset_references_fvar x C) (at level 69) : metatheory_scope.
+Notation "x A`mem` C" := (cset_references_fvar_dec x C) (at level 69) : metatheory_scope.
+
+Notation "C N`\` x" := (cset_remove_bvar x C) (at level 69) : metatheory_scope.
+Notation "x N`in` C" := (cset_references_bvar x C) (at level 69) : metatheory_scope.
+Notation "x N`mem` C" := (cset_references_bvar_dec x C) (at level 69) : metatheory_scope.
+
+(* Check (fun x =>  fun N => x N`in` N). *)
+
+Declare Scope experimental_set_scope.
+
+Notation "{ x 'as' A}" := (cset_fvar x) : experimental_set_scope.
+Notation "{ x 'as' N}" := (cset_bvar x) : experimental_set_scope.
 
 (** ************************************************** *)
 (** Logical Predicates *)
@@ -433,36 +450,28 @@ Ltac destruct_set_mem a bs :=
   end.
 
 
-Lemma funion_empty_idempotent : forall xs,
-    NatSet.F.union xs {}N = xs.
+Lemma funion_empty_idempotent : forall xs, xs `u`N {}N = xs.
 Proof. intros. fnsetdec. Qed.
 
-Lemma empty_funion_idempotent : forall xs,
-    NatSet.F.union {}N xs = xs.
+Lemma empty_funion_idempotent : forall xs, {}N `u`N xs = xs.
 Proof. intros. fnsetdec. Qed.
 
-Lemma union_empty_idempotent : forall xs,
-    AtomSet.F.union xs {} = xs.
+Lemma union_empty_idempotent : forall xs, xs `u`A {}A = xs.
 Proof. intros. fsetdec. Qed.
 
-Lemma empty_union_idempotent : forall xs,
-    AtomSet.F.union {} xs = xs.
+Lemma empty_union_idempotent : forall xs, {}A `u`A xs = xs.
 Proof. intros. fsetdec. Qed.
 
-Lemma false_or_idempotent : forall xs,
-    false || xs = xs.
+Lemma false_or_idempotent : forall xs, false || xs = xs.
 Proof. destr_bool. Qed.
 
-Lemma or_false_idempotent : forall xs,
-    xs || false = xs.
+Lemma or_false_idempotent : forall xs, xs || false = xs.
 Proof. destr_bool. Qed.
 
-Lemma true_or_true : forall xs,
-    true || xs = true.
+Lemma true_or_true : forall xs, true || xs = true.
 Proof. destr_bool. Qed.
 
-Lemma or_true_true : forall xs,
-    xs || true = true.
+Lemma or_true_true : forall xs, xs || true = true.
 Proof. destr_bool. Qed.
 
 Hint Rewrite 
@@ -472,12 +481,10 @@ Hint Rewrite
   true_or_true or_true_true
 : csets.
 
-Lemma cunion_empty_idempotent : forall xs,
-    cset_union xs {}C = xs.
+Lemma cunion_empty_idempotent : forall xs, xs `u` {} = xs.
 Proof. intros. destruct xs. unfold cset_union. autorewrite with csets; trivial. Qed.
 
-Lemma empty_cunion_idempotent : forall xs,
-    cset_union {}C xs = xs.
+Lemma empty_cunion_idempotent : forall xs, {} `u` xs = xs.
 Proof. intros. destruct xs. unfold cset_union. autorewrite with csets; trivial. Qed.
 
 Hint Rewrite cunion_empty_idempotent empty_cunion_idempotent : csets.
@@ -543,7 +550,6 @@ Qed.
 Hint Unfold capt : core.
 Hint Resolve capt_empty_bvar capt_concrete_cset : core.
 
-
 (** Opening a capture set with a bound variable d[k -> c] *)
 Definition open_cset (k : nat) (c : cap) (d : cap) : cap :=
   if cset_references_bvar_dec k d then 
@@ -607,7 +613,7 @@ Proof.
   unfold subst_cset, cset_fvar, cset_fvars, cset_references_fvar_dec, cset_remove_fvar in *; simpl.
   intros.
   destruct_set_mem x (singleton x).
-  replace (singleton x `remove` x) with {}; try fsetdec.
+  replace (singleton x `remove` x) with {}A; try fsetdec.
   destruct C; unfold cset_union; simpl; autorewrite with csets; trivial.
   fsetdec.
 Qed.

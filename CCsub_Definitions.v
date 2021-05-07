@@ -532,7 +532,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
 (** The definition of "fv" used in typing jdmgnts*)
 Fixpoint free_for_cv (e : exp) : cap :=
 match e with
-  | exp_bvar i => {}C
+  | exp_bvar i => {}
   | exp_fvar x => (cset_fvar x)
   | exp_abs t e1 => (free_for_cv e1)
   | exp_app e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))

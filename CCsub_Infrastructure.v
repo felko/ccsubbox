@@ -64,13 +64,13 @@ Ltac destruct_match :=
 (* These are the TYPE variables in types *)
 Fixpoint fv_tt (T : typ) {struct T} : atoms :=
   match T with
-  | typ_bvar J => {}
+  | typ_bvar J => {}A
   | typ_fvar X => singleton X
   | typ_capt C P => fv_tpt P
   end
 with fv_tpt (T : pretyp) {struct T} : atoms :=
   match T with
-  | typ_top => {}
+  | typ_top => {}A
   | typ_arrow T1 T2 => (fv_tt T1) `union` (fv_tt T2)
   | typ_all T1 T2 => (fv_tt T1) `union` (fv_tt T2)
   end
@@ -79,21 +79,21 @@ with fv_tpt (T : pretyp) {struct T} : atoms :=
 (* Only in TERM variables in types should capture sets be mentioned *)
 Fixpoint fv_et (T : typ) {struct T} : atoms :=
   match T with
-  | typ_bvar J => {}
-  | typ_fvar X => {}
+  | typ_bvar J => {}A
+  | typ_fvar X => {}A
   | typ_capt C P => (cset_fvars C) `union` (fv_ept P)
   end
 with fv_ept (T : pretyp) {struct T} : atoms :=
   match T with
-  | typ_top => {}
+  | typ_top => {}A
   | typ_arrow T1 T2 => (fv_et T1) `union` (fv_et T2)
   | typ_all T1 T2 => (fv_et T1) `union` (fv_et T2)
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
   match e with
-  | exp_bvar i => {}
-  | exp_fvar x => {}
+  | exp_bvar i => {}A
+  | exp_fvar x => {}A
   | exp_abs V e1  => (fv_tt V) `union` (fv_te e1)
   | exp_app e1 e2 => (fv_te e1) `union` (fv_te e2)
   | exp_tabs V e1 => (fv_tt V) `union` (fv_te e1)
@@ -102,7 +102,7 @@ Fixpoint fv_te (e : exp) {struct e} : atoms :=
 
 Fixpoint fv_ee (e : exp) {struct e} : atoms :=
   match e with
-  | exp_bvar i => {}
+  | exp_bvar i => {}A
   | exp_fvar x => singleton x
   | exp_abs V e1 => (fv_et V) `union` (fv_ee e1)
   | exp_app e1 e2 => (fv_ee e1) `union` (fv_ee e2)

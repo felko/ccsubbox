@@ -426,7 +426,7 @@ Proof.
     fsetdec.
   }
   unfold cset_remove_fvar, cset_fvar.
-  replace (cset_set _ _) with {}C.
+  replace (cset_set _ _) with {}.
   2: {
     apply cset_eq_injectivity; [fsetdec|fnsetdec].
   }

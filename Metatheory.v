@@ -27,9 +27,9 @@ Notation "i === j" :=
 (** Common set operations may be written using infix notation. *)
 
 Notation "E `union` F" :=
-  (AtomSet.F.union E F)
-  (at level 69, right associativity, format "E  `union`  '/' F")
+  (AtomSet.F.union E F) (at level 69, right associativity, only parsing, format "E  `union`  '/' F")
   : set_scope.
+
 Notation "x `in` E" :=
   (AtomSet.F.In x E) (at level 69) : set_scope.
 Notation "x `notin` E" :=
@@ -45,23 +45,45 @@ Notation "E `remove` x" :=
   (at level 68)
   : set_scope.
 
-(** The empty set may be written similarly to informal practice. *)
-
-Notation "{}" :=
-  (AtomSet.F.empty) : metatheory_scope.
 
 (** It is useful to have an abbreviation for constructing singleton
     sets. *)
 
-Notation singleton := (AtomSet.F.singleton).
+Notation singleton := (AtomSet.F.singleton) (only parsing).
 
 (** Disjointness is also useful. *)
 Definition disjoint (xs : atoms) (ys: atoms) : Prop :=
   AtomSet.F.Empty (AtomSet.F.inter xs ys).
 
-Notation "a `disjoint` b" := (disjoint a b) (at level 1)  : metatheory_scope.
+Notation "a `disjoint` b" := (disjoint a b) (at level 1, only parsing)  : metatheory_scope.
 
 Hint Unfold disjoint : core.
+
+Notation "E `u`A F" :=
+  (AtomSet.F.union E F) (at level 69, right associativity, format "E  `u`A  '/' F") : set_scope.
+Notation "E `c`A F" := (AtomSet.F.Subset E F) (at level 68) : set_scope.
+Notation "E `\`A x" := (AtomSet.F.remove E x) (at level 69, right associativity) : set_scope.
+Notation "x `in`A F" := (AtomSet.F.In x F) (at level 69) : set_scope.
+Notation "x `~in`A F" := (~ AtomSet.F.In x F) (at level 69) : set_scope.
+
+Notation "E `u`N F" :=
+  (NatSet.F.union E F) (at level 69, right associativity, format "E  `u`N  '/' F") : set_scope.
+Notation "E `c`N F" := (NatSet.F.Subset E F) (at level 68) : set_scope.
+Notation "E `\`N x" := (NatSet.F.remove E x) (at level 69, right associativity) : set_scope.
+Notation "x `in`N F" := (NatSet.F.In x F) (at level 69) : set_scope.
+Notation "x `~in`N F" := (~ NatSet.F.In x F) (at level 69) : set_scope.
+
+Notation "{ x }A" := (AtomSet.F.singleton x) (at level 0, format "{ x }A") : set_scope.
+Notation "{}A" := (AtomSet.F.empty) (at level 0) : set_scope.
+
+Notation "{ x }N" := (NatSet.F.singleton x) (at level 0, format "{ x }N") : set_scope.
+Notation "{}N" := (NatSet.F.empty) (at level 0) : set_scope.
+
+(* Open Scope set_scope. *)
+(* Open Scope metatheory_scope. *)
+
+(* Check (fun x => (AtomSet.F.union { x }A {}A)). *)
+
 
 (** Hints *)
 Hint Extern 1 (~ AtomSet.F.In _ _) => simpl_env in *; try notin_solve; try fsetdec : core.
