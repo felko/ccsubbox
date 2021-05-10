@@ -1302,7 +1302,6 @@ Proof with auto.
   induction HT; simpl...
   - Case "type_fvar".
     destruct (X == Z)...
-  - rewrite <- idempotent_subst_cset_self...
 ------
   intros Z P T HT HP.
   induction HT; simpl...
@@ -1330,7 +1329,8 @@ Proof with eauto using subst_tt_type.
    rewrite subst_te_open_ee_var.
    apply H1.
    fsetdec.
-   apply Hp.
+   apply Hp...
+   csetdec.
 
   (* case exp_tabs *)
   - instantiate (1 := L `union` singleton Z). intros.
@@ -1368,9 +1368,7 @@ Proof with eauto*.
     (** pull this out into a tactic.*)
     symmetry.
     assert (cset_fvar X = subst_cset z C X). {
-      unfold subst_cset, cset_references_fvar_dec, cset_fvars, cset_fvar...
-      destruct_set_mem z (singleton X)...
-      exfalso. fsetdec.
+      cbv [subst_cset]; csetdec.
     }
     rewrite H at 2.
     apply subst_cset_open_cset_rec...
@@ -1397,20 +1395,6 @@ Proof with eauto*.
   intros k X z C T HXfresh. revert k. induction T; intro k; simpl in *; f_equal...
 Qed.
 
-(** TODO : move to CaptureSets.v *)
-Lemma capt_subst : forall z c1 c2,
-  capt c1 ->
-  capt c2 ->
-  capt (subst_cset z c1 c2).
-Proof with eauto*.
-  intros z c1 c2 Hc1 Hc2...
-  unfold capt in *; destruct c1; destruct c2; 
-    unfold cset_bvars, subst_cset, cset_union, cset_remove_fvar,
-           cset_references_fvar_dec in *;
-    simpl in *...
-  destruct_set_mem z t1... fnsetdec.
-Qed.
-
 Lemma subst_ct_type : forall T z c,
   type T ->
   capt c ->
@@ -1419,7 +1403,7 @@ with subst_cpt_type : forall T z c,
   pretype T ->
   capt c ->
   pretype (subst_cpt z c T).
-Proof with auto using capt_subst.
+Proof with auto.
 ------
   intros T z c Tpe Closed.
   induction Tpe; simpl; try econstructor...
@@ -1541,10 +1525,11 @@ Qed.
 
 Lemma open_ct_subst_tt : forall x C S T,
   type S ->
+  x `notin` cset_fvars C ->
   open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
 Proof with auto using open_cset_capt, open_cpt_rec_type, subst_ct_open_rec,
   subst_ct_open_tt_var, open_ct_subst_ct_var.
-  intros * HS.
+  intros * HS Hfr.
   cbv [open_ct]...
   pick fresh y for (fv_et (subst_tt x S T)).
   erewrite open_ct_subst_ct_var. 
@@ -1561,7 +1546,8 @@ Proof with auto*.
   intros *; intros Neq Wu.
   unfold open_ct.
   symmetry.
-  apply subst_tt_open_ct_rec...
+  apply subst_tt_open_ct_rec; trivial.
+  notin_solve.
 Qed.
 
 Lemma subst_ct_useless_repetition : forall x C D T,

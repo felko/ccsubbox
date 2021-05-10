@@ -721,8 +721,17 @@ Proof with auto*.
   csetdec.
 Qed.
 
+Lemma subst_cset_capt : forall Z C1 C,
+  capt C1 ->
+  capt C ->
+  capt (subst_cset Z C1 C).
+Proof.
+  intros.
+  cbv [subst_cset capt] in *.
+  csetdec...
+Qed.
 
-Hint Resolve singleton_closed open_cset_capt : core.
+Hint Resolve singleton_closed open_cset_capt subst_cset_capt : core.
 Hint Rewrite subst_cset_singleton subst_cset_union : csets.
 
 
