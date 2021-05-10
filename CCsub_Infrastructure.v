@@ -132,7 +132,7 @@ Fixpoint subst_tt (Z : atom) (U : typ) (T : typ) {struct T} : typ :=
   match T with
   | typ_bvar J => typ_bvar J
   | typ_fvar X => if X == Z then U else T
-  | typ_capt C P => typ_capt (subst_cset Z (cv T) C) (subst_tpt Z U P)
+  | typ_capt C P => typ_capt (subst_cset Z (cv U) C) (subst_tpt Z U P)
   end
 with subst_tpt (Z : atom) (U : typ) (T : pretyp) {struct T} : pretyp :=
   match T with
@@ -392,7 +392,9 @@ with subst_tpt_fresh : forall Z U T,
 Proof with auto*.
 ------
   induction T; simpl; intro H; f_equal...
-  Case "typ_fvar".
+  - Case "typ_capt".
+    apply subst_cset_fresh...
+  - Case "typ_fvar".
     destruct (a == Z)...
     contradict H; fsetdec.
 ------
@@ -402,6 +404,15 @@ Qed.
 (** Substitution commutes with opening under certain conditions.  This
     lemma depends on the fact that opening a locally closed term is
     the identity. *)
+
+Lemma type_implies_capt_cv : forall T,
+  type T -> capt (cv T).
+Proof with eauto.
+  intros. induction H...
+  * csetdec.
+Qed.
+
+Hint Resolve type_implies_capt_cv : core.
 
 Lemma subst_tt_open_tt_rec : forall T1 T2 X P k,
   type P ->
@@ -415,8 +426,7 @@ Proof with auto*.
 ------
   intros T1 T2 X P k WP. revert k.
   induction T1; intros k; simpl; f_equal...
-  - rewrite <- idempotent_open_cset_self.
-    rewrite <- idempotent_subst_cset_self...
+  - eapply subst_cset_open_cset_rec...
   - Case "typ_bvar".
     destruct (k === n); subst...
   - Case "typ_fvar".
@@ -470,6 +480,9 @@ with subst_tpt_intro_rec : forall X T2 U k,
 Proof with auto*.
 ------
   induction T2; intros U k Fr; simpl in *; f_equal...
+  Case "typ_capt".
+    apply subst_cset_fresh...
+    rewrite <- idempotent_open_cset_self...
   Case "typ_bvar".
     destruct (k === n)... simpl. destruct (X == X)...
   Case "typ_fvar".
@@ -880,16 +893,19 @@ Qed.
  *)
 Lemma subst_tt_open_ct_rec : forall (X : atom) P T C k,
   type P ->
+  X `notin` cset_fvars C ->
   subst_tt X P (open_ct_rec k C T) = open_ct_rec k C (subst_tt X P T)
 with subst_tpt_open_cpt_rec : forall (X : atom) P T C k,
   type P ->
+  X `notin` cset_fvars C ->
   subst_tpt X P (open_cpt_rec k C T) = open_cpt_rec k C (subst_tpt X P T).
 Proof with auto using open_cset_capt, open_cpt_rec_type.
 ------
   intros X P T C.
   induction T ; intros ; simpl; f_equal...
-  - rewrite <- idempotent_subst_cset_self.
-    rewrite <- idempotent_subst_cset_self...
+  - assert (C = subst_cset X (cv P) C). apply subst_cset_fresh...
+    rewrite H1 at 2.
+    eapply subst_cset_open_cset_rec...
   - destruct (a == X)...
     inversion H ; simpl ; f_equal; subst...
 ------
@@ -900,6 +916,7 @@ Qed.
 (* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
 Lemma subst_tt_open_ct : forall (X : atom) P T C,
   type P ->
+  X `notin` cset_fvars C ->
   subst_tt X P (open_ct T C) = open_ct (subst_tt X P T) C.
 Proof with auto*.
   intros X P T C.
@@ -1166,16 +1183,18 @@ Qed.
 
 Lemma subst_te_open_ee_rec : forall e1 e2 c Z P k,
   type P ->
+  Z `notin` cset_fvars c ->
   subst_te Z P (open_ee_rec k e2 c e1) =
     open_ee_rec k (subst_te Z P e2) c (subst_te Z P e1).
 Proof with eauto using subst_tt_open_ct_rec.
-  induction e1; intros e2 c' Z P k Tpe; simpl; f_equal...
+  induction e1; intros e2 c' Z P k Tpe Zfr; simpl; f_equal...
   Case "exp_bvar".
     destruct (k === n)...
 Qed.
 
 Lemma subst_te_open_ee : forall e1 e2 c Z P,
   type P ->
+  Z `notin` cset_fvars c ->
   subst_te Z P (open_ee e1 e2 c) = open_ee (subst_te Z P e1) (subst_te Z P e2) c.
 Proof with auto*.
   intros.
@@ -1185,6 +1204,7 @@ Qed.
 
 Lemma subst_te_open_ee_var : forall Z (x:atom) P e c,
   type P ->
+  Z `notin` cset_fvars c ->
   open_ee (subst_te Z P e) x c = subst_te Z P (open_ee e x c).
 Proof with auto*.
   intros.
