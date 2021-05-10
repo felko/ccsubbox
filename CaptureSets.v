@@ -129,6 +129,8 @@ Declare Scope experimental_set_scope.
 Notation "{ x 'as' A}" := (cset_fvar x) : experimental_set_scope.
 Notation "{ x 'as' N}" := (cset_bvar x) : experimental_set_scope.
 
+Open Scope experimental_set_scope.
+
 (** ************************************************** *)
 (** Logical Predicates *)
 (** ************************************************** *)

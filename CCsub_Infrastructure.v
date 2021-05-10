@@ -66,13 +66,13 @@ Fixpoint fv_tt (T : typ) {struct T} : atoms :=
   match T with
   | typ_bvar J => {}A
   | typ_fvar X => singleton X
-  | typ_capt C P => fv_tpt P
+  | typ_capt C P => (cset_fvars C) `u`A fv_tpt P
   end
 with fv_tpt (T : pretyp) {struct T} : atoms :=
   match T with
   | typ_top => {}A
-  | typ_arrow T1 T2 => (fv_tt T1) `union` (fv_tt T2)
-  | typ_all T1 T2 => (fv_tt T1) `union` (fv_tt T2)
+  | typ_arrow T1 T2 => (fv_tt T1) `u`A (fv_tt T2)
+  | typ_all T1 T2 => (fv_tt T1) `u`A (fv_tt T2)
   end
 .
 
@@ -81,33 +81,33 @@ Fixpoint fv_et (T : typ) {struct T} : atoms :=
   match T with
   | typ_bvar J => {}A
   | typ_fvar X => {}A
-  | typ_capt C P => (cset_fvars C) `union` (fv_ept P)
+  | typ_capt C P => (cset_fvars C) `u`A (fv_ept P)
   end
 with fv_ept (T : pretyp) {struct T} : atoms :=
   match T with
   | typ_top => {}A
-  | typ_arrow T1 T2 => (fv_et T1) `union` (fv_et T2)
-  | typ_all T1 T2 => (fv_et T1) `union` (fv_et T2)
+  | typ_arrow T1 T2 => (fv_et T1) `u`A (fv_et T2)
+  | typ_all T1 T2 => (fv_et T1) `u`A (fv_et T2)
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
   match e with
   | exp_bvar i => {}A
   | exp_fvar x => {}A
-  | exp_abs V e1  => (fv_tt V) `union` (fv_te e1)
-  | exp_app e1 e2 => (fv_te e1) `union` (fv_te e2)
-  | exp_tabs V e1 => (fv_tt V) `union` (fv_te e1)
-  | exp_tapp e1 V => (fv_tt V) `union` (fv_te e1)
+  | exp_abs V e1  => (fv_tt V) `u`A (fv_te e1)
+  | exp_app e1 e2 => (fv_te e1) `u`A (fv_te e2)
+  | exp_tabs V e1 => (fv_tt V) `u`A (fv_te e1)
+  | exp_tapp e1 V => (fv_tt V) `u`A (fv_te e1)
   end.
 
 Fixpoint fv_ee (e : exp) {struct e} : atoms :=
   match e with
   | exp_bvar i => {}A
   | exp_fvar x => singleton x
-  | exp_abs V e1 => (fv_et V) `union` (fv_ee e1)
-  | exp_app e1 e2 => (fv_ee e1) `union` (fv_ee e2)
-  | exp_tabs V e1 => (fv_et V) `union` (fv_ee e1)
-  | exp_tapp e1 V => (fv_et V) `union` (fv_ee e1)
+  | exp_abs V e1 => (fv_et V) `u`A (fv_ee e1)
+  | exp_app e1 e2 => (fv_ee e1) `u`A (fv_ee e2)
+  | exp_tabs V e1 => (fv_et V) `u`A (fv_ee e1)
+  | exp_tapp e1 V => (fv_et V) `u`A (fv_ee e1)
   end.
 
 
@@ -132,23 +132,13 @@ Fixpoint subst_tt (Z : atom) (U : typ) (T : typ) {struct T} : typ :=
   match T with
   | typ_bvar J => typ_bvar J
   | typ_fvar X => if X == Z then U else T
-  | typ_capt C P => typ_capt C (subst_tpt Z U P)
+  | typ_capt C P => typ_capt (subst_cset Z (cv T) C) (subst_tpt Z U P)
   end
 with subst_tpt (Z : atom) (U : typ) (T : pretyp) {struct T} : pretyp :=
   match T with
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (subst_tt Z U T1) (subst_tt Z U T2)
   | typ_all T1 T2 => typ_all (subst_tt Z U T1) (subst_tt Z U T2)
-  end.
-
-Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
-  match e with
-  | exp_bvar i => exp_bvar i
-  | exp_fvar x => exp_fvar x
-  | exp_abs V e1 => exp_abs   (subst_tt Z U V)  (subst_te Z U e1)
-  | exp_app e1 e2 => exp_app  (subst_te Z U e1) (subst_te Z U e2)
-  | exp_tabs V e1 => exp_tabs (subst_tt Z U V)  (subst_te Z U e1)
-  | exp_tapp e1 V => exp_tapp (subst_te Z U e1) (subst_tt Z U V)
   end.
 
 Fixpoint subst_ct (z : atom) (c : cap) (T : typ) {struct T} : typ :=
@@ -162,6 +152,16 @@ with subst_cpt (z : atom) (c : cap) (T : pretyp) {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (subst_ct z c T1) (subst_ct z c T2)
   | typ_all T1 T2 => typ_all (subst_ct z c T1) (subst_ct z c T2)
+  end.
+
+Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
+  match e with
+  | exp_bvar i => exp_bvar i
+  | exp_fvar x => exp_fvar x
+  | exp_abs V e1 => exp_abs   (subst_tt Z U V)  (subst_te Z U e1)
+  | exp_app e1 e2 => exp_app  (subst_te Z U e1) (subst_te Z U e2)
+  | exp_tabs V e1 => exp_tabs (subst_tt Z U V)  (subst_te Z U e1)
+  | exp_tapp e1 V => exp_tapp (subst_te Z U e1) (subst_tt Z U V)
   end.
 
 Fixpoint subst_ee (z : atom) (u : exp) (c : cap) (e : exp) {struct e} : exp :=
@@ -281,6 +281,32 @@ Tactic Notation
     term is the identity.  This lemma is not otherwise independently
     useful. *)
 
+(* Require Export Btauto. *)
+(* Ltac csetdec ::= csetsimpl; try (fsetdec||fnsetdec||btauto). *)
+
+Lemma idempotent_open_cset_self : forall c i,
+  c = open_cset i c c.
+Proof with eauto*.
+  intros *.
+  destruct c.
+  unfold open_cset.
+  destruct_if...
+  unfold cset_union; f_equal; csetdec.
+Qed.
+
+Lemma idempotent_subst_cset_self : forall c i,
+  c = subst_cset i c c.
+Proof with eauto*.
+  intros *.
+  destruct c.
+  unfold subst_cset.
+  destruct_if...
+  unfold cset_union; f_equal; csetdec.
+Qed.
+
+Hint Resolve idempotent_open_cset_self : core.
+Hint Resolve idempotent_subst_cset_self : core.
+
 Lemma open_tt_rec_type_aux : forall T j V i U,
   i <> j ->
   open_tt_rec j V T = open_tt_rec i U (open_tt_rec j V T) ->
@@ -389,6 +415,8 @@ Proof with auto*.
 ------
   intros T1 T2 X P k WP. revert k.
   induction T1; intros k; simpl; f_equal...
+  - rewrite <- idempotent_open_cset_self.
+    rewrite <- idempotent_subst_cset_self...
   - Case "typ_bvar".
     destruct (k === n); subst...
   - Case "typ_fvar".
@@ -807,6 +835,7 @@ with open_cpt_rec_type_aux : forall T j S i C,
 Proof with eauto*.
 ------
   induction T; intros j C i S H; simpl in *; inversion H; f_equal...
+  replace c with (open_cset j c c)...
 ------
   induction T; intros j C i S H; simpl in *; inversion H; f_equal...
 Qed.
@@ -859,8 +888,10 @@ Proof with auto using open_cset_capt, open_cpt_rec_type.
 ------
   intros X P T C.
   induction T ; intros ; simpl; f_equal...
-  destruct (a == X)...
-  inversion H ; simpl ; f_equal; subst...
+  - rewrite <- idempotent_subst_cset_self.
+    rewrite <- idempotent_subst_cset_self...
+  - destruct (a == X)...
+    inversion H ; simpl ; f_equal; subst...
 ------
   intros X P T C.
   induction T ; intros ; simpl; f_equal...
@@ -1101,7 +1132,9 @@ with subst_cpt_open_tpt_rec_fresh : forall c z P t k,
 Proof with eauto.
 ------
   induction t ; intros ; simpl ; f_equal...
-  Case "exp_bvar".
+  - rewrite <- idempotent_open_cset_self.
+    rewrite <- idempotent_open_cset_self...
+  - Case "exp_bvar".
     destruct (k === n)... symmetry.
     apply subst_ct_fresh...
 ------
@@ -1249,6 +1282,7 @@ Proof with auto.
   induction HT; simpl...
   - Case "type_fvar".
     destruct (X == Z)...
+  - rewrite <- idempotent_subst_cset_self...
 ------
   intros Z P T HT HP.
   induction HT; simpl...
@@ -1336,7 +1370,9 @@ with open_tpt_subst_ct_aux : forall k X z C T,
 Proof with eauto*.
 ------
   intros k X z C T HXfresh. revert k. induction T; intro k; simpl in *; f_equal...
-  destruct (k === n)...
+  - rewrite <- idempotent_open_cset_self.
+    rewrite <- idempotent_open_cset_self...
+  - destruct (k === n)...
 ------
   intros k X z C T HXfresh. revert k. induction T; intro k; simpl in *; f_equal...
 Qed.
@@ -1456,11 +1492,13 @@ with subst_cpt_open_tpt_rec : forall c z P t k,
   capt c ->
   subst_cpt z c (open_tpt_rec k P t) = open_tpt_rec k (subst_ct z c P) (subst_cpt z c t).
 Proof with eauto.
-  ------
+------
   induction t ; intros ; simpl ; f_equal...
-  Case "exp_bvar".
+  - rewrite <- idempotent_open_cset_self.
+    rewrite <- idempotent_open_cset_self...
+  - Case "exp_bvar".
     destruct (k === n)... 
-  ------
+------
   induction t ; intros ; simpl ; f_equal...
 Qed.
 
