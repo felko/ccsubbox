@@ -90,11 +90,18 @@ Coercion cset_fvar : atom >-> cap.
     index in the term.  This eliminates the need to possibly subtract
     one in the case of indices. *)
 
+Definition cv (T : typ) : cap :=
+  match T with
+  | typ_bvar n => {}      (* TODO is there a better way to do this? *)
+  | typ_fvar x => (cset_fvar x)
+  | typ_capt C _ => C
+  end.
+
 Fixpoint open_tt_rec (K : nat) (U : typ) (T : typ)  {struct T} : typ :=
   match T with
   | typ_bvar J => if K === J then U else (typ_bvar J)
   | typ_fvar X => typ_fvar X
-  | typ_capt C P => typ_capt C (open_tpt_rec K U P)
+  | typ_capt C P => typ_capt (open_cset K (cv T) C) (open_tpt_rec K U P)
   end
 with open_tpt_rec (K : nat) (U : typ) (T : pretyp)  {struct T} : pretyp :=
   match T with
@@ -340,13 +347,21 @@ Notation "[ x ]" := (x :: nil).
 
 (** For our current calculus, we disallow type variables from showing up in capture
   sets -- only term variables are allowed. *)
-Definition allbound_typ (E : env) (X : atoms) : Prop :=
-  forall x, AtomSet.F.In x X -> exists T, binds x (bind_typ T) E.
+Inductive bound (x : atom) (T : typ) (E : env) : Prop :=
+  | bound_typ :
+    binds x (bind_typ T) E ->
+    bound x T E
+  | bound_sub :
+    binds x (bind_sub T) E ->
+    bound x T E.
+
+Definition allbound (E : env) (fvars : atoms) : Prop :=
+  forall x, x `in`A fvars -> exists T, bound x T E.
 
 Inductive wf_cset : env -> atoms -> cap -> Prop :=
   | wf_concrete_cset : forall E A fvars univ,
-    allbound_typ E fvars ->
-    AtomSet.F.Subset fvars A ->
+    allbound E fvars ->
+    fvars `c`A A ->
     wf_cset E A (cset_set fvars {}N univ)
 .
 
@@ -410,21 +425,6 @@ Inductive wf_env : env -> Prop :=
       x `notin` dom E ->
       wf_env ([(x, bind_typ T)] ++ E).
 
-(** Dealing with cv -- as a fixpoint is problematic. *)
-Inductive cv : env -> typ -> cap -> Prop :=
-  (** Looking up in the environment; we ask that T is wf in the environment
-      and that the environment is well formed so lookup is well defined. *)
-  | cv_typ_var : forall (X : atom) T E CT,
-    binds X (bind_sub T) E ->
-    wf_env E ->
-    cv E T CT ->
-    cv E (typ_fvar X) CT
-  | cv_typ_capt : forall E C P,
-    wf_env E ->
-    wf_pretyp_in E P ->
-    wf_cset_in E C ->
-    cv E (typ_capt C P) C.
-
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
 
@@ -438,11 +438,10 @@ Inductive subcapt : env -> cap -> cap -> Prop :=
       wf_cset_in E (cset_set xs {}N false) ->
       x `in` xs ->
       subcapt E (cset_fvar x) (cset_set xs {}N false)
-  | subcapt_var : forall E x T C D,
+  | subcapt_var : forall E x T C,
       binds x (bind_typ T) E ->
-      cv E T C ->
-      subcapt E C D ->
-      subcapt E (cset_fvar x) D
+      subcapt E (cv T) C ->
+      subcapt E (cset_fvar x) C
   | subcapt_set : forall E xs D,
       wf_cset_in E D ->
       AtomSet.F.For_all (fun x => subcapt E (cset_fvar x) D) xs ->
@@ -556,12 +555,11 @@ Inductive typing : env -> exp -> typ -> Prop :=
       (forall x : atom, x `notin` L ->
         typing ([(x, bind_typ V)] ++ E) (open_ee e1 x x) (open_ct T1 x)) ->
       typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
-  | typing_app : forall T1 E e1 e2 T2 Cf Cv' T1',
+  | typing_app : forall T1 E e1 e2 T2 Cf T1',
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
       typing E e2 T1' ->
       sub E T1' T1 ->
-      cv E T1' Cv' ->
-      typing E (exp_app e1 e2) (open_ct T2 Cv')
+      typing E (exp_app e1 e2) (open_ct T2 (cv T1'))
   | typing_tabs : forall L E V e1 T1,
       wf_typ_in E V ->
       (forall x : atom, x `notin` L ->
@@ -634,7 +632,7 @@ Inductive red : exp -> exp -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type pretype expr wf_typ wf_pretyp wf_env value red cv sub subcapt typing wf_cset : core.
+Hint Constructors type pretype expr bound wf_cset wf_typ wf_pretyp wf_env value red sub subcapt typing : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
-Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound_typ : core.
+Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound : core.

@@ -73,41 +73,32 @@ Qed.
 
 Ltac wf_cset_simpl instantiate_ext :=
   match goal with
-  | H : _ |- (wf_cset _ _ cset_universal) =>
+  | H : _ |- (wf_cset _ _ {*}) =>
     constructor
   | H : (wf_cset _ _ ?C) |- (wf_cset _ _ ?C) =>
-    let Hdestruct := fresh "Hdestruct" in
     let x  := fresh "x" in
-    let Hx := fresh "Hxin" in
+    let Hx := fresh "In" x in
     let Hexists := fresh "Hexists" in
     let T := fresh "T" in
     let Hbound := fresh "Hbound" in
-    let E := fresh "E" in
-    let A := fresh "A" in
-    let fvars := fresh "fvars" in
-    let Hclosed := fresh "Hclosed" in
-    inversion H as [E A fvars univ Hbound Hclosed]; subst; [
-      constructor; [
-        unfold allbound_typ in Hbound;
-        intros x Hx;
-        destruct (Hbound x Hx) as [T Hexists];
-        lazymatch instantiate_ext with
-        | True => exists T
-        | False => idtac
-        end |
-        fsetdec
-      ]
+    inversion H as [? ? ? ? Hbound ?]; subst; constructor;
+    [ intros x Hx;
+      destruct (Hbound x Hx) as [T Hexists];
+      lazymatch instantiate_ext with
+      | True => exists T; destruct Hexists
+      | False => idtac
+      end
+    | fsetdec
     ]
   end.
 
 Lemma wf_cset_weakening : forall E A A' F G C,
-    wf_cset (G ++ E) A C ->
-    ok (G ++ F ++ E) ->
-    AtomSet.F.Subset A A' ->
-    wf_cset (G ++ F ++ E) A' C.
+  wf_cset (G ++ E) A C ->
+  ok (G ++ F ++ E) ->
+  A `c`A A' ->
+  wf_cset (G ++ F ++ E) A' C.
 Proof with auto*.
-  intros *.
-  intros Hcset Henv Hpres.
+  intros * Hcset Henv Hpres.
   wf_cset_simpl True...
 Qed.
 
@@ -221,8 +212,8 @@ Lemma wf_cset_narrowing_base : forall V U C E A F X,
 Proof with simpl_env; eauto.
   intros *.
   intros Hwf Hok.
-  wf_cset_simpl True...
-  binds_cases Hexists...
+  wf_cset_simpl False...
+  destruct Hexists; binds_cases H0...
 Qed.
 
 Lemma wf_typ_narrowing_base : forall V U T E Ap Am F X,
@@ -267,7 +258,7 @@ Lemma wf_cset_narrowing_typ_base : forall C1 C2 C E A F X,
 Proof with simpl_env; eauto.
   intros *. intros Hwf Hok.
   wf_cset_simpl False.
-  binds_cases Hexists...
+  destruct Hexists; binds_cases H0...
 Qed.
 
 Lemma wf_typ_narrowing_typ_base : forall V U T E Ap Am F X,
@@ -310,18 +301,73 @@ match goal with
   unfold wf_typ_in in H; apply wf_typ_set_weakening with (Ap := (dom E)) (Am := (dom E))
 end : core.
 
+Notation "x `mem`A E" := (AtomSet.F.mem x E) (at level 69) : metatheory_scope.
 
-(** Substitution lemmas *)
+Definition subst_atoms (a : atom) (bs : atoms) (cs : atoms) : atoms :=
+  if a `mem`A cs then
+    bs `u`A (cs `\`A a)
+  else
+    cs.
+
+(* (** Substitution lemmas *) *)
 Lemma wf_cset_subst_tb : forall F Q E Ap Am Z P C,
   wf_cset (F ++ [(Z, bind_sub Q)] ++ E) Ap C ->
   wf_typ E Ap Am P ->
   ok (map (subst_tb Z P) F ++ E) ->
-  wf_cset (map (subst_tb Z P) F ++ E) Ap C.
+  wf_cset (map (subst_tb Z P) F ++ E)
+          (subst_atoms Z (cset_fvars (cv P)) Ap)
+          (subst_cset Z (cv P) C).
 Proof with simpl_env; eauto*.
   intros *. intros HwfC HwfP Hok.
-  wf_cset_simpl False...
-  binds_cases Hexists...
-  * exists (subst_tt Z P T)...
+  inversion HwfC; subst.
+  unfold subst_cset, cset_references_fvar_dec, cset_fvars.
+  destruct_set_mem Z fvars.
+  - destruct HwfP; simpl.
+    + unfold cset_union; csetsimpl.
+      unfold subst_atoms.
+      destruct_set_mem Z Ap; [|exfalso; fsetdec].
+      constructor.
+      2: apply binds_In in H1; fsetdec.
+      intros y yIn.
+      rewrite AtomSetFacts.union_iff in yIn; destruct yIn. {
+        rewrite AtomSetFacts.singleton_iff in H2; symmetry in H2; subst...
+      }
+      specialize (H y ltac:(fsetdec)).
+      destruct H as [S H].
+      destruct H; binds_cases H...
+      * exists (subst_tt Z X S)...
+      * exfalso; fsetdec.
+      * exists (subst_tt Z X S)...
+    + destruct H1.
+      rename fvars0 into cs, univ0 into b.
+      unfold subst_atoms.
+      destruct_set_mem Z A; [|exfalso; fsetdec].
+      unfold cset_union; csetsimpl.
+      constructor.
+      2: fsetdec.
+      intros y yIn.
+      rewrite AtomSetFacts.union_iff in yIn; destruct yIn.
+      * specialize (H1 y ltac:(fsetdec)).
+        destruct H1 as [S H1].
+        destruct H1; binds_cases H1...
+      * inversion HwfC; subst.
+        match goal with
+        | H : allbound _ fvars |- _ =>
+          specialize (H y ltac:(fsetdec));
+            destruct H as [S H];
+            destruct H; binds_cases H
+        end...
+        -- exists (subst_tt Z (typ_capt (cset_set cs {}N b) P) S)...
+        -- exfalso; fsetdec.
+        -- exists (subst_tt Z (typ_capt (cset_set cs {}N b) P) S)...
+  - inversion HwfC as [? ? ? ? Hbound ?]; subst; constructor. {
+      intros x xIn.
+      destruct (Hbound x xIn) as [T Hexists].
+      destruct Hexists; binds_cases H2...
+      + exists (subst_tt Z P T)...
+      + exists (subst_tt Z P T)...
+    }
+    destruct HwfP; simpl; unfold subst_atoms; destruct_set_mem Z Ap...
 Qed.
 
 Lemma wf_typ_subst_tb : forall F Q E Ap Am Z P T,
