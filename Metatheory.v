@@ -62,14 +62,14 @@ Hint Unfold disjoint : core.
 Notation "E `u`A F" :=
   (AtomSet.F.union E F) (at level 69, right associativity, format "E  `u`A  '/' F") : set_scope.
 Notation "E `c`A F" := (AtomSet.F.Subset E F) (at level 68) : set_scope.
-Notation "E `\`A x" := (AtomSet.F.remove E x) (at level 69, right associativity) : set_scope.
+Notation "E `\`A x" := (AtomSet.F.remove x E) (at level 69, right associativity) : set_scope.
 Notation "x `in`A F" := (AtomSet.F.In x F) (at level 69) : set_scope.
 Notation "x `~in`A F" := (~ AtomSet.F.In x F) (at level 69) : set_scope.
 
 Notation "E `u`N F" :=
   (NatSet.F.union E F) (at level 69, right associativity, format "E  `u`N  '/' F") : set_scope.
 Notation "E `c`N F" := (NatSet.F.Subset E F) (at level 68) : set_scope.
-Notation "E `\`N x" := (NatSet.F.remove E x) (at level 69, right associativity) : set_scope.
+Notation "E `\`N x" := (NatSet.F.remove x E) (at level 69, right associativity) : set_scope.
 Notation "x `in`N F" := (NatSet.F.In x F) (at level 69) : set_scope.
 Notation "x `~in`N F" := (~ NatSet.F.In x F) (at level 69) : set_scope.
 
