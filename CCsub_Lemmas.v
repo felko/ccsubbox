@@ -86,8 +86,7 @@ Ltac wf_cset_simpl instantiate_ext :=
     let A := fresh "A" in
     let fvars := fresh "fvars" in
     let Hclosed := fresh "Hclosed" in
-    inversion H as [|E A fvars Hbound Hclosed]; subst; [
-      auto |
+    inversion H as [E A fvars univ Hbound Hclosed]; subst; [
       constructor; [
         unfold allbound_typ in Hbound;
         intros x Hx;
@@ -376,21 +375,23 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
       eapply wf_typ_subst_tb...
 Qed.
 
-
 Lemma wf_cset_over_subst : forall F Q E A Z C C',
   ok (map (subst_cb Z C) F ++ E) ->
   wf_cset E A C ->
   wf_cset (F ++ [(Z, bind_typ Q)] ++ E) A C' ->
   ok (F ++ [(Z, bind_typ Q)] ++ E) ->
   wf_cset (map (subst_cb Z C) F ++ E) (A `remove` Z) (subst_cset Z C C').
-Proof with eauto.
+Proof with eauto*.
     intros F Q E A Z C C'.
     intros HokFE HwfC HwfC' Hok.
     inversion HwfC; inversion HwfC'; subst...
     (** Case analysis : this should maybe go through better, hopefully? *)
-    + unfold subst_cset; cset_split; try constructor...
+    + unfold subst_cset; try constructor...
+    find_and_destroy_if.
+      destruct_set_mem Z (cset_set fvars0 {}N univ0)...
       {
-        unfold allbound_typ in *.
+        csetdecplus.
+        constructor...
         intros x Hfvx.
         specialize (H2 _ Hfvx).
         rewrite cset_not_references_fvar_eq in H_destruct...
