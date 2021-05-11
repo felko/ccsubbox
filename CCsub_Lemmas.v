@@ -309,7 +309,7 @@ Definition subst_atoms (a : atom) (bs : atoms) (cs : atoms) : atoms :=
   else
     cs.
 
-(* (** Substitution lemmas *) *)
+(** Substitution lemmas *)
 Lemma wf_cset_subst_tb : forall F Q E Ap Am Z P C,
   wf_cset (F ++ [(Z, bind_sub Q)] ++ E) Ap C ->
   wf_typ E Ap Am P ->
@@ -379,7 +379,7 @@ Lemma wf_typ_subst_tb : forall F Q E Ap Am Z P T,
   ok (map (subst_tb Z P) F ++ E) ->
   wf_typ (map (subst_tb Z P) F ++ E)
          (subst_atoms Z (cset_fvars (cv P)) Ap)
-         (subst_atoms Z (cset_fvars (cv P)) Am) 
+         (subst_atoms Z (cset_fvars (cv P)) Am)
          (subst_tt Z P T)
 with wf_pretyp_subst_tb : forall F Q E Ap Am Z P T,
   wf_pretyp (F ++ [(Z, bind_sub Q)] ++ E) Ap Am T ->
@@ -387,15 +387,16 @@ with wf_pretyp_subst_tb : forall F Q E Ap Am Z P T,
   wf_typ E Am Ap P ->
   ok (map (subst_tb Z P) F ++ E) ->
   wf_pretyp (map (subst_tb Z P) F ++ E)
-    (subst_atoms Z (cset_fvars (cv P)) Ap)
-    (subst_atoms Z (cset_fvars (cv P)) Am)
-    (subst_tpt Z P T).
+            (subst_atoms Z (cset_fvars (cv P)) Ap)
+            (subst_atoms Z (cset_fvars (cv P)) Am)
+            (subst_tpt Z P T).
 Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_subst_tb.
 ------
   intros *. intros HwfT HwfPp HwfPm Hok.
-  remember (F ++ [(Z, bind_sub Q)] ++ E).
-  generalize dependent F.
-  induction HwfT; intros F EQF Hok; subst; simpl subst_tt.
+  (* remember (F ++ [(Z, bind_sub Q)] ++ E). *)
+  (* generalize dependent F. *)
+  (* induction HwfT; intros F EQF Hok; subst; simpl subst_tt. *)
+  dependent induction HwfT.
   - Case "wf_typ_var".
     destruct (X == Z); subst.
     + eapply wf_typ_weaken_head with (Ap := Ap) (Am := Am)...
@@ -405,8 +406,9 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
       binds_cases H...
       apply (wf_typ_var (subst_tt Z P U))...
   - unfold wf_typ_in in *.
+    simpl subst_tt.
     econstructor...
-    apply wf_cset_subst_tb.
+    eapply wf_cset_subst_tb.
 ------
   intros *. intros HwfT HwfPp HwfPm Hok.
   remember (F ++ [(Z, bind_sub Q)] ++ E).

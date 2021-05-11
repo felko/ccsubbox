@@ -1,4 +1,6 @@
 Require Export CCsub_Definitions.
+Require Import Program.Equality.
+Require Import Lia.
 
 (** Automation *)
 Lemma cset_eq_injectivity : forall a1 a2 n1 n2,
@@ -6,10 +8,7 @@ Lemma cset_eq_injectivity : forall a1 a2 n1 n2,
     n1 = n2 ->
     cset_set a1 n1 = cset_set a2 n2.
 Proof.
-  intros *. intros EqA EqN.
-  rewrite EqA.
-  rewrite EqN.
-  trivial.
+  intros. congruence.
 Qed.
 
 Ltac fnset_mem_dec :=
@@ -42,6 +41,21 @@ Ltac destruct_if :=
   | |- context[if ?t then _ else _] =>
     destruct t eqn:?
   end.
+
+Ltac destruct_if_in_as t id :=
+  match type of t with
+  | context[if ?t then _ else _] =>
+    destruct t eqn:id
+  end.
+
+Tactic Notation "destruct_if" :=
+  destruct_if.
+
+Tactic Notation "destruct_if" "in" constr(t) "as" simple_intropattern(id) :=
+  destruct_if_in_as t id.
+
+Tactic Notation "destruct_if" "in" constr(t) :=
+  destruct_if in t as ?.
 
 Ltac destruct_match :=
   match goal with
@@ -281,49 +295,124 @@ Tactic Notation
     term is the identity.  This lemma is not otherwise independently
     useful. *)
 
-(* Require Export Btauto. *)
-(* Ltac csetdec ::= csetsimpl; try (fsetdec||fnsetdec||btauto). *)
+Notation "`succ`" := Datatypes.S.
 
-Lemma idempotent_open_cset_self : forall c i,
-  c = open_cset i c c.
+Inductive typeN : nat -> typ -> Prop :=
+  | typeN_bvar : forall n m,
+      m < n ->
+      typeN n (typ_bvar m)
+  | typeN_fvar : forall n x,
+      typeN n (typ_fvar x)
+  | typeN_capt : forall n C P,
+      NatSet.F.For_all (fun m => m < n) (cset_bvars C) ->
+      pretypeN n P ->
+      typeN n (typ_capt C P)
+with pretypeN : nat -> pretyp -> Prop :=
+  | typeN_top : forall n, pretypeN n typ_top
+  | typeN_arrow : forall n T1 T2,
+    typeN n T1 ->
+    typeN (`succ` n) T2 ->
+    pretypeN n (typ_arrow T1 T2)
+  | typeN_all : forall n T1 T2,
+    typeN n T1 ->
+    typeN (`succ` n) T2 ->
+    pretypeN n (typ_all T1 T2).
+
+Lemma into_typeN_type_aux : forall n S T,
+  typeN n (open_tt_rec n S T) ->
+  typeN (`succ` n) T
+with into_pretypeN_type_aux : forall n S T,
+  pretypeN n (open_tpt_rec n S T) ->
+  pretypeN (`succ` n) T.
 Proof with eauto*.
-  intros *.
-  destruct c.
-  unfold open_cset.
-  destruct_if...
-  unfold cset_union; f_equal; csetdec.
+{ intros * H.
+  dependent induction T.
+  - inversion H; subst.
+    econstructor.
+    2: eapply into_pretypeN_type_aux...
+    unfold open_cset, cset_references_bvar_dec in H3.
+    destruct_set_mem n (cset_bvars c).
+    2: intros i iIn; specialize (H3 i iIn)...
+    intros i iIn.
+    destruct (i === n).
+    + subst...
+    + specialize (H3 i ltac:(csetdec))...
+  - unfold open_tt_rec in H.
+    destruct (n === n0)...
+    + subst; constructor...
+    + inversion H; subst.
+      constructor...
+  - constructor.
+}
+{ intros * H.
+  dependent induction T.
+  - constructor.
+  - inversion H; subst.
+    constructor...
+  - inversion H; subst.
+    constructor...
+}
 Qed.
 
-Lemma idempotent_subst_cset_self : forall c i,
-  c = subst_cset i c c.
+Lemma into_typeN_capt_aux : forall n S T,
+  typeN n (open_ct_rec n S T) ->
+  typeN (`succ` n) T
+with into_pretypeN_capt_aux : forall n S T,
+  pretypeN n (open_cpt_rec n S T) ->
+  pretypeN (`succ` n) T.
 Proof with eauto*.
-  intros *.
-  destruct c.
-  unfold subst_cset.
-  destruct_if...
-  unfold cset_union; f_equal; csetdec.
+{ intros * H.
+  dependent induction T.
+  - inversion H; subst.
+    econstructor.
+    2: eapply into_pretypeN_capt_aux...
+    unfold open_cset, cset_references_bvar_dec in H3.
+    destruct_set_mem n (cset_bvars c).
+    2: intros i iIn; specialize (H3 i iIn)...
+    intros i iIn.
+    destruct (i === n).
+    + subst...
+    + specialize (H3 i ltac:(csetdec))...
+  - inversion H; subst.
+    constructor...
+  - constructor.
+}
+{ intros * H.
+  dependent induction T.
+  - constructor.
+  - inversion H; subst.
+    constructor...
+  - inversion H; subst.
+    constructor...
+}
 Qed.
 
-Hint Resolve idempotent_open_cset_self : core.
-Hint Resolve idempotent_subst_cset_self : core.
-
-Lemma open_tt_rec_type_aux : forall T j V i U,
-  i <> j ->
-  open_tt_rec j V T = open_tt_rec i U (open_tt_rec j V T) ->
-  T = open_tt_rec i U T
-with open_tpt_rec_type_aux : forall T j V i U,
-  i <> j ->
-  open_tpt_rec j V T = open_tpt_rec i U (open_tpt_rec j V T) ->
-  T = open_tpt_rec i U T.
-Proof with eauto*.
-------
-  induction T; intros j V i U Neq H; simpl in *; inversion H; f_equal...
-  Case "typ_bvar".
-    destruct (j === n)... destruct (i === n)...
-------
-  induction T; intros j V i U Neq H; simpl in *; inversion H; f_equal...
+Lemma into_typeN : forall t,
+  type t -> typeN 0 t
+with into_pretypeN : forall t,
+  pretype t -> pretypeN 0 t.
+Proof with eauto.
+{ intros * H.
+  dependent induction H.
+  - constructor.
+  - constructor...
+    intros i iIn.
+    unfold capt in H.
+    exfalso; fnsetdec.
+}
+{ intros * H.
+  dependent induction H.
+  - constructor.
+  - constructor...
+    pick fresh X.
+    unfold open_ct in H0.
+    eapply (into_typeN_capt_aux 0 X)...
+  - constructor...
+    pick fresh X.
+    unfold open_ct in H0.
+    eapply (into_typeN_type_aux 0 X)...
+  }
 Qed.
-
 
 Lemma natset_inclusion_lemma : forall (A B : nats),
   B = NatSet.F.union A B ->
@@ -341,21 +430,40 @@ Proof.
   rewrite H. fsetdec.
 Qed.
 
-Lemma open_tt_rec_capt_aux : forall T j C i S,
-  open_ct_rec j C T = open_tt_rec i S (open_ct_rec j C T) ->
-  T = open_tt_rec i S T
-with open_tpt_rec_capt_aux : forall T j C i S,
-  open_cpt_rec j C T = open_tpt_rec i S (open_cpt_rec j C T) ->
-  T = open_tpt_rec i S T.
+Lemma idempotent_typeN_open_tt : forall n m S T,
+  typeN n T ->
+  m >= n ->
+  T = (open_tt_rec m S T)
+with idempotent_pretypeN_open_tt : forall n m S T,
+  pretypeN n T ->
+  m >= n ->
+  T = (open_tpt_rec m S T).
 Proof with eauto*.
-------
-  induction T; intros j X i S H; simpl in *; inversion H; f_equal...
-------
-  induction T; intros j X i S H; simpl in *; inversion H; f_equal...
+{ intros * H1 H2.
+  induction T; simpl.
+  - inversion H1; subst.
+    f_equal...
+    unfold open_cset, cset_references_bvar_dec.
+    destruct_set_mem m (cset_bvars c)...
+    specialize (H4 m mIn); lia.
+  - inversion H1; subst.
+    destruct_if...
+    subst.
+    exfalso; lia.
+  - easy.
+}
+{ intros * H1 H2.
+  induction T; simpl...
+  - inversion H1; subst.
+    f_equal...
+    eapply idempotent_typeN_open_tt...
+    lia.
+  - inversion H1; subst.
+    f_equal...
+    eapply idempotent_typeN_open_tt...
+    lia.
+}
 Qed.
-
-(** Opening a locally closed term is the identity.  This lemma depends
-    on the immediately preceding lemma. *)
 
 Lemma open_tt_rec_type : forall T U k,
   type T ->
@@ -373,11 +481,17 @@ Proof with auto*.
   - Case "typ_arrow".
     unfold open_ct in *.
     pick fresh X.
-    apply (open_tt_rec_capt_aux T2 0 X)...
+    eapply (idempotent_typeN_open_tt 1).
+    2: induction k; auto.
+    eapply into_typeN_capt_aux with (S0 := X)...
+    eapply into_typeN ...
   - Case "typ_all".
     unfold open_tt in *.
     pick fresh X.
-    apply (open_tt_rec_type_aux T2 0 X)...
+    eapply (idempotent_typeN_open_tt 1).
+    2: induction k; auto.
+    eapply into_typeN_type_aux with (S0 := X)...
+    eapply into_typeN ...
 Qed.
 
 (** If a name is fresh for a term, then substituting for it is the
@@ -414,6 +528,32 @@ Qed.
 
 Hint Resolve type_implies_capt_cv : core.
 
+Lemma cv_subst_correspondence : forall x S T,
+  (cv (subst_tt x S T)) =
+  (subst_cset x (cv S) (cv T)).
+Proof with eauto*.
+  intros *.
+  destruct T; simpl... {
+    unfold subst_cset, cset_references_fvar_dec. simpl.
+    destruct_set_mem x {}A...
+    exfalso; fsetdec.
+  }
+  destruct (a == x)...
+  2: {
+    unfold subst_cset, cset_references_fvar_dec. simpl.
+    destruct_set_mem x {a}A...
+    exfalso; csetdec.
+  }
+  unfold subst_cset, cset_references_fvar_dec. simpl.
+  destruct_set_mem x {a}A.
+  2: exfalso; csetdec.
+  subst.
+  destruct S; csetdec. {
+    unfold empty_cset. csetdec.
+  }
+  unfold cset_fvar. csetdec.
+Qed.
+
 Lemma subst_tt_open_tt_rec : forall T1 T2 X P k,
   type P ->
   subst_tt X P (open_tt_rec k T2 T1) =
@@ -426,7 +566,10 @@ Proof with auto*.
 ------
   intros T1 T2 X P k WP. revert k.
   induction T1; intros k; simpl; f_equal...
-  - eapply subst_cset_open_cset_rec...
+  - replace (cv (subst_tt X P T2))
+      with (subst_cset X (cv P) (cv T2)).
+    eapply subst_cset_open_cset_rec...
+    symmetry; apply cv_subst_correspondence.
   - Case "typ_bvar".
     destruct (k === n); subst...
   - Case "typ_fvar".
@@ -480,12 +623,11 @@ with subst_tpt_intro_rec : forall X T2 U k,
 Proof with auto*.
 ------
   induction T2; intros U k Fr; simpl in *; f_equal...
-  Case "typ_capt".
-    apply subst_cset_fresh...
-    rewrite <- idempotent_open_cset_self...
-  Case "typ_bvar".
+  - Case "typ_capt".
+    apply subst_cc_intro_rec...
+  - Case "typ_bvar".
     destruct (k === n)... simpl. destruct (X == X)...
-  Case "typ_fvar".
+  - Case "typ_fvar".
     destruct (a == X)... contradict Fr; fsetdec.
 ------
   induction T2; intros U k Fr; simpl in *; f_equal...
@@ -515,7 +657,7 @@ Qed.
 Lemma open_te_rec_expr_aux : forall e j u i P c ,
   open_ee_rec j u c e = open_te_rec i P (open_ee_rec j u c e) ->
   e = open_te_rec i P e.
-Proof with eauto using open_tt_rec_capt_aux.
+Proof with eauto.
   induction e; intros j u i P c' H; simpl in *; inversion H; f_equal...
 Qed.
 

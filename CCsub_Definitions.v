@@ -101,7 +101,7 @@ Fixpoint open_tt_rec (K : nat) (U : typ) (T : typ)  {struct T} : typ :=
   match T with
   | typ_bvar J => if K === J then U else (typ_bvar J)
   | typ_fvar X => typ_fvar X
-  | typ_capt C P => typ_capt (open_cset K (cv T) C) (open_tpt_rec K U P)
+  | typ_capt C P => typ_capt (open_cset K (cv U) C) (open_tpt_rec K U P)
   end
 with open_tpt_rec (K : nat) (U : typ) (T : pretyp)  {struct T} : pretyp :=
   match T with
