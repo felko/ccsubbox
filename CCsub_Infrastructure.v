@@ -318,10 +318,10 @@ with pretypeN : nat -> pretyp -> Prop :=
     typeN (`succ` n) T2 ->
     pretypeN n (typ_all T1 T2).
 
-Lemma into_typeN_type_aux : forall n S T,
+Lemma open_tt_rec_typeN_aux : forall n S T,
   typeN n (open_tt_rec n S T) ->
   typeN (`succ` n) T
-with into_pretypeN_type_aux : forall n S T,
+with open_tpt_rec_typeN_aux : forall n S T,
   pretypeN n (open_tpt_rec n S T) ->
   pretypeN (`succ` n) T.
 Proof with eauto*.
@@ -329,7 +329,7 @@ Proof with eauto*.
   dependent induction T.
   - inversion H; subst.
     econstructor.
-    2: eapply into_pretypeN_type_aux...
+    2: eapply open_tpt_rec_typeN_aux...
     unfold open_cset, cset_references_bvar_dec in H3.
     destruct_set_mem n (cset_bvars c).
     2: intros i iIn; specialize (H3 i iIn)...
@@ -354,10 +354,10 @@ Proof with eauto*.
 }
 Qed.
 
-Lemma into_typeN_capt_aux : forall n S T,
+Lemma open_ct_rec_typeN_aux : forall n S T,
   typeN n (open_ct_rec n S T) ->
   typeN (`succ` n) T
-with into_pretypeN_capt_aux : forall n S T,
+with open_cpt_rec_typeN_aux : forall n S T,
   pretypeN n (open_cpt_rec n S T) ->
   pretypeN (`succ` n) T.
 Proof with eauto*.
@@ -365,7 +365,7 @@ Proof with eauto*.
   dependent induction T.
   - inversion H; subst.
     econstructor.
-    2: eapply into_pretypeN_capt_aux...
+    2: eapply open_cpt_rec_typeN_aux...
     unfold open_cset, cset_references_bvar_dec in H3.
     destruct_set_mem n (cset_bvars c).
     2: intros i iIn; specialize (H3 i iIn)...
@@ -406,11 +406,11 @@ Proof with eauto.
   - constructor...
     pick fresh X.
     unfold open_ct in H0.
-    eapply (into_typeN_capt_aux 0 X)...
+    eapply (open_ct_rec_typeN_aux 0 X)...
   - constructor...
     pick fresh X.
     unfold open_ct in H0.
-    eapply (into_typeN_type_aux 0 X)...
+    eapply (open_tt_rec_typeN_aux 0 X)...
   }
 Qed.
 
@@ -430,11 +430,11 @@ Proof.
   rewrite H. fsetdec.
 Qed.
 
-Lemma idempotent_typeN_open_tt : forall n m S T,
+Lemma open_tt_rec_typeN : forall n m S T,
   typeN n T ->
   m >= n ->
   T = (open_tt_rec m S T)
-with idempotent_pretypeN_open_tt : forall n m S T,
+with open_tpt_rec_typeN : forall n m S T,
   pretypeN n T ->
   m >= n ->
   T = (open_tpt_rec m S T).
@@ -456,13 +456,43 @@ Proof with eauto*.
   induction T; simpl...
   - inversion H1; subst.
     f_equal...
-    eapply idempotent_typeN_open_tt...
+    eapply open_tt_rec_typeN...
     lia.
   - inversion H1; subst.
     f_equal...
-    eapply idempotent_typeN_open_tt...
+    eapply open_tt_rec_typeN...
     lia.
 }
+Qed.
+
+Lemma open_ct_rec_typeN : forall n m C T,
+  typeN n T ->
+  m >= n ->
+  T = (open_ct_rec m C T)
+with open_cpt_rec_typeN : forall n m C T,
+  pretypeN n T ->
+  m >= n ->
+  T = (open_cpt_rec m C T).
+Proof with eauto*.
+------
+  intros * H1 H2.
+  induction T; simpl...
+  - inversion H1; subst...
+    f_equal...
+    unfold open_cset, cset_references_bvar_dec.
+    destruct_set_mem m (cset_bvars c)...
+    specialize (H4 m mIn); lia.
+------
+  intros * H1 H2.
+  induction T; simpl...
+  - inversion H1; subst.
+    f_equal...
+    eapply open_ct_rec_typeN...
+    lia.
+  - inversion H1; subst.
+    f_equal...
+    eapply open_ct_rec_typeN...
+    lia.
 Qed.
 
 Lemma open_tt_rec_type : forall T U k,
@@ -481,16 +511,16 @@ Proof with auto*.
   - Case "typ_arrow".
     unfold open_ct in *.
     pick fresh X.
-    eapply (idempotent_typeN_open_tt 1).
+    eapply (open_tt_rec_typeN 1).
     2: induction k; auto.
-    eapply into_typeN_capt_aux with (S0 := X)...
+    eapply open_ct_rec_typeN_aux with (S0 := X)...
     eapply into_typeN ...
   - Case "typ_all".
     unfold open_tt in *.
     pick fresh X.
-    eapply (idempotent_typeN_open_tt 1).
+    eapply (open_tt_rec_typeN 1).
     2: induction k; auto.
-    eapply into_typeN_type_aux with (S0 := X)...
+    eapply open_tt_rec_typeN_aux with (S0 := X)...
     eapply into_typeN ...
 Qed.
 
@@ -654,21 +684,137 @@ Qed.
     show that substituting a type in a locally-closed expression is
     the identity. *)
 
-Lemma open_te_rec_expr_aux : forall e j u i P c ,
-  open_ee_rec j u c e = open_te_rec i P (open_ee_rec j u c e) ->
-  e = open_te_rec i P e.
-Proof with eauto.
-  induction e; intros j u i P c' H; simpl in *; inversion H; f_equal...
+Inductive exprN : nat -> exp -> Prop :=
+  | exprN_bvar : forall n m,
+      m < n ->
+      exprN n m
+  | exprN_fvar : forall n x,
+      exprN n (exp_fvar x)
+  | exprN_abs : forall n T e1,
+      typeN n T ->
+      exprN (S n) e1 ->
+      exprN n (exp_abs T e1)
+  | exprN_app : forall n e1 e2,
+      exprN n e1 ->
+      exprN n e2 ->
+      exprN n (exp_app e1 e2)
+  | exprN_tabs : forall n T e1,
+      typeN n T ->
+      exprN (S n) e1 ->
+      exprN n (exp_tabs T e1)
+  | exprN_tapp : forall n e1 V,
+      exprN n e1 ->
+      typeN n V ->
+      exprN n (exp_tapp e1 V).
+
+Lemma typeN_weakening_aux : forall n T,
+  typeN n T ->
+  typeN (S n) T
+with pretypeN_weakening_aux : forall n T,
+  pretypeN n T ->
+  pretypeN (S n) T.
+Proof with eauto*.
+------
+  dependent induction T; intros H; inversion H; constructor; try solve [lia]...
+  intros m mIn. specialize (H3 m mIn)...
+------
+  dependent induction T; intros H; inversion H; constructor; try solve [lia]...
 Qed.
 
-Lemma open_te_rec_type_aux : forall e j Q i P,
-  i <> j ->
-  open_te_rec j Q e = open_te_rec i P (open_te_rec j Q e) ->
-  e = open_te_rec i P e.
-Proof with eauto using open_tt_rec_type_aux.
-  induction e; intros j Q i P Neq Heq; simpl in *; inversion Heq; f_equal...
+
+Lemma exprN_weakening_aux : forall n e,
+  exprN n e ->
+  exprN (S n) e.
+Proof with eauto using typeN_weakening_aux; eauto*.
+  intros n e. generalize dependent n.
+  dependent induction e; intros n' H; inversion H; constructor; try solve [lia]...
 Qed.
 
+Lemma typeN_weakening : forall n m T,
+  typeN n T ->
+  n <= m ->
+  typeN m T.
+Proof with eauto using typeN_weakening_aux; try lia.
+  intros. dependent induction m...
+  assert (n = 0) by lia; subst...
+  destruct (n === `succ` m); subst...
+  assert (n <= m) by lia...
+Qed.
+
+Lemma exprN_weakening : forall n m T,
+  exprN n T ->
+  n <= m ->
+  exprN m T.
+Proof with eauto using exprN_weakening_aux; try lia.
+  intros. dependent induction m...
+  assert (n = 0) by lia; subst...
+  destruct (n === `succ` m); subst...
+  assert (n <= m) by lia...
+Qed.
+
+
+Hint Resolve exprN_weakening typeN_weakening : core.
+
+Lemma open_ee_rec_exprN_aux : forall n s c e,
+  exprN n (open_ee_rec n s c e) ->
+  exprN (`succ` n) e.
+Proof with eauto*.
+  intros n s c e. generalize dependent n.
+  dependent induction e; intros n' H; simpl; try solve [constructor; lia]...
+  * constructor...
+    inversion H; subst; destruct (n' === n); subst...
+    inversion H0... lia.
+  * constructor; inversion H; subst...
+    eapply open_ct_rec_typeN_aux...
+  * constructor; inversion H...
+  * constructor; inversion H; subst...
+    eapply open_ct_rec_typeN_aux...
+  * constructor; inversion H...
+    eapply open_ct_rec_typeN_aux...
+Qed.
+
+Lemma open_te_rec_exprN_aux : forall n S e,
+  exprN n (open_te_rec n S e) ->
+  exprN (`succ` n) e.
+Proof with eauto*.
+  intros n S e. generalize dependent n.
+  dependent induction e; intros n' H; simpl; try solve [constructor; lia]...
+  * constructor; inversion H; subst...
+    eapply open_tt_rec_typeN_aux...
+  * constructor; inversion H; subst...
+  * constructor; inversion H; subst...
+    eapply open_tt_rec_typeN_aux...
+  * constructor; inversion H; subst...
+    eapply open_tt_rec_typeN_aux...
+Qed.
+
+Lemma expr_to_expr0 : forall e,
+  expr e -> exprN 0 e.
+Proof with eauto using into_typeN, open_ee_rec_exprN_aux, open_te_rec_exprN_aux.
+  intros.
+  induction H; constructor...
+  * pick fresh x.
+    eapply (open_ee_rec_exprN_aux 0 x x)...
+  * pick fresh X.
+    eapply (open_te_rec_exprN_aux 0 X)...
+Qed.
+
+Lemma open_ee_rec_exprN : forall n s c e,
+  exprN n e ->
+  e = open_ee_rec n s c e.
+Proof with eauto using open_tt_rec_typeN, open_ct_rec_typeN.
+  intros.
+  induction H; simpl; f_equal...
+  + destruct (n === m)... lia.
+Qed.
+
+Lemma open_te_rec_exprN : forall n S e,
+  exprN n e ->
+  e = open_te_rec n S e.
+Proof with eauto using open_tt_rec_typeN, open_ct_rec_typeN.
+  intros.
+  induction H; simpl; f_equal...
+Qed.
 
 Lemma open_te_rec_expr : forall e U k,
   expr e ->
@@ -676,8 +822,17 @@ Lemma open_te_rec_expr : forall e U k,
 Proof with auto using open_tt_rec_type.
   intros e U k WF; revert k;
   induction WF; intros k; simpl; f_equal; auto using open_tt_rec_type.
-  - pick fresh x. eapply open_te_rec_expr_aux. apply H1 with (x := x)...
-  - pick fresh x. eapply open_te_rec_type_aux with (j := 0)... apply H1 with (X := x)...
+  - pick fresh x. eapply open_te_rec_exprN...
+    eapply exprN_weakening with (n := 1); try lia...
+    eapply open_ee_rec_exprN_aux with (s := x) (c := x)...
+    eapply expr_to_expr0...
+    eapply H0...
+  - pick fresh X.
+    eapply open_te_rec_exprN...
+    eapply exprN_weakening with (n := 1); try lia...
+    eapply open_te_rec_exprN_aux with (S0 := X)...
+    eapply expr_to_expr0...
+    eapply H0...
 Qed.
 
 Lemma open_te_expr : forall e U,
@@ -990,7 +1145,7 @@ with open_cpt_rec_type_aux : forall T j S i C,
 Proof with eauto*.
 ------
   induction T; intros j C i S H; simpl in *; inversion H; f_equal...
-  replace c with (open_cset j c c)...
+  replace c with (open_cset j (cv C) c)...
 ------
   induction T; intros j C i S H; simpl in *; inversion H; f_equal...
 Qed.
