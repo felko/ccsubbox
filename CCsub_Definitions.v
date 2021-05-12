@@ -373,6 +373,7 @@ Definition wf_cset_in (E : env) (C : cap) : Prop :=
 Inductive wf_typ : env -> atoms -> atoms -> typ -> Prop :=
   | wf_typ_var : forall U E Ap Am (X : atom),
       binds X (bind_sub U) E ->
+      X `in`A Ap ->
       wf_typ E Ap Am (typ_fvar X)
   | wf_typ_capt : forall E Ap Am C P,
       wf_cset E Ap C ->
