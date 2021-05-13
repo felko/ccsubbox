@@ -55,8 +55,9 @@ Coercion typ_bvar : nat >-> typ.
 Coercion typ_fvar : atom >-> typ.
 Coercion exp_bvar : nat >-> exp.
 Coercion exp_fvar : atom >-> exp.
-Coercion cset_bvar : nat >-> cap.
-Coercion cset_fvar : atom >-> cap.
+
+(* Coercion cset_bvar : nat >-> cap. *)
+(* Coercion cset_fvar : atom >-> cap. *)
 
 (* ********************************************************************** *)
 (** * #<a name="open"></a># Opening terms *)
@@ -93,7 +94,7 @@ Coercion cset_fvar : atom >-> cap.
 Definition cv (T : typ) : cap :=
   match T with
   | typ_bvar n => {}      (* TODO is there a better way to do this? *)
-  | typ_fvar x => (cset_fvar x)
+  | typ_fvar x => `cset_fvar` x
   | typ_capt C _ => C
   end.
 
@@ -108,8 +109,7 @@ with open_tpt_rec (K : nat) (U : typ) (T : pretyp)  {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
   | typ_all T1 T2 => typ_all (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
-  end
-.
+  end.
 
 Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   match e with
@@ -223,7 +223,7 @@ with pretype : pretyp -> Prop :=
   | type_top : pretype typ_top
   | type_arrow : forall L T1 T2,
     type T1 ->
-    (forall X : atom, X `notin` L -> type (open_ct T2 (cset_fvar X))) ->
+    (forall X : atom, X `notin` L -> type (open_ct T2 (`cset_fvar` X))) ->
     pretype (typ_arrow T1 T2)
   | type_all : forall L T1 T2,
     type T1 ->
@@ -236,7 +236,7 @@ Inductive expr : exp -> Prop :=
       expr (exp_fvar x)
   | expr_abs : forall L T e1,
       type T ->
-      (forall x : atom, x `notin` L -> expr (open_ee e1 x x)) ->
+      (forall x : atom, x `notin` L -> expr (open_ee e1 x (`cset_fvar` x))) ->
       expr (exp_abs T e1)
   | expr_app : forall e1 e2,
       expr e1 ->
@@ -249,8 +249,7 @@ Inductive expr : exp -> Prop :=
   | expr_tapp : forall e1 V,
       expr e1 ->
       type V ->
-      expr (exp_tapp e1 V)
-.
+      expr (exp_tapp e1 V).
 
 
 (* ********************************************************************** *)
@@ -385,14 +384,16 @@ with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
   | wf_typ_arrow : forall L E Ap Am T1 T2,
       wf_typ E Am Ap T1 ->
       (forall X : atom, X `notin` L ->
-        wf_typ ([(X, bind_typ T1)] ++ E) (Ap `union` singleton X) Am (open_ct T2 X)) ->
+                   wf_typ ([(X, bind_typ T1)] ++ E)
+                          (Ap `union` singleton X)
+                          Am
+                          (open_ct T2 (`cset_fvar` X))) ->
       wf_pretyp E Ap Am (typ_arrow T1 T2)
   | wf_typ_all : forall L E Ap Am T1 T2,
       wf_typ E Am Ap T1 ->
       (forall X : atom, X `notin` L ->
       wf_typ ([(X, bind_sub T1)] ++ E) Ap Am (open_tt T2 X)) ->
-      wf_pretyp E Ap Am (typ_all T1 T2)
-.
+      wf_pretyp E Ap Am (typ_all T1 T2).
 
 Definition wf_typ_in (E : env) (T : typ) : Prop :=
   wf_typ E (dom E) (dom E) T.
@@ -430,27 +431,32 @@ Inductive wf_env : env -> Prop :=
 (** * #<a name="sub"></a># Subtyping *)
 
 Inductive subcapt : env -> cap -> cap -> Prop :=
-  | subcapt_universal : forall E x xs,
-      wf_cset_in E (cset_fvar x) ->
+  | subcapt_universal : forall E C xs,
       wf_cset_in E (cset_set xs {}N true) ->
-      subcapt E (cset_fvar x) (cset_set xs {}N true)
-  | subcapt_in : forall E x xs,
-      wf_cset_in E (cset_fvar x) ->
-      wf_cset_in E (cset_set xs {}N false) ->
+      wf_cset_in E C ->
+      subcapt E C (cset_set xs {}N true)
+  | subcapt_in : forall E x xs b,
+      wf_cset_in E (`cset_fvar` x) ->
+      wf_cset_in E (cset_set xs {}N b) ->
       x `in` xs ->
-      subcapt E (cset_fvar x) (cset_set xs {}N false)
+      subcapt E (`cset_fvar` x) (cset_set xs {}N b)
+  | subcapt_in_univ : forall E D,
+      wf_cset_in E D ->
+      `* in` D ->
+      subcapt E {*} D
   | subcapt_var : forall E x T C,
       binds x (bind_typ T) E ->
       subcapt E (cv T) C ->
-      subcapt E (cset_fvar x) C
-  | subcapt_set : forall E xs D,
+      subcapt E (`cset_fvar` x) C
+  | subcapt_tvar : forall E x T C,
+      binds x (bind_sub T) E ->
+      subcapt E (cv T) C ->
+      subcapt E (`cset_fvar` x) C
+  | subcapt_set : forall E xs b D,
       wf_cset_in E D ->
-      AtomSet.F.For_all (fun x => subcapt E (cset_fvar x) D) xs ->
-      subcapt E (cset_set xs {}N false) D
-  | subcapt_set_univ : forall E xs D,
-      wf_cset_in E D ->
-      cset_references_univ D ->
-      subcapt E (cset_set xs {}N true) D.
+      AtomSet.F.For_all (fun x => subcapt E (`cset_fvar` x) D) xs ->
+      implb b (`* mem` D) = true ->
+      subcapt E (cset_set xs {}N b) D.
 
 (** The definition of subtyping is straightforward.  It uses the
     [binds] relation from the [Environment] library (in the
@@ -500,11 +506,11 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
       wf_typ_in E T1 ->
       wf_typ_in E S1 ->
       (forall x : atom, x `notin` L ->
-          wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 x)) ->
+          wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 (`cset_fvar` x))) ->
       (forall x : atom, x `notin` L ->
-          wf_typ ([(x, bind_typ S1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct S2 x)) ->
+          wf_typ ([(x, bind_typ S1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct S2 (`cset_fvar` x))) ->
       (forall x : atom, x `notin` L ->
-          sub ([(x, bind_typ T1)] ++ E) (open_ct S2 x) (open_ct T2 x)) ->
+          sub ([(x, bind_typ T1)] ++ E) (open_ct S2 (`cset_fvar` x)) (open_ct T2 (`cset_fvar` x))) ->
       sub_pre E (typ_arrow S1 S2) (typ_arrow T1 T2)
 
   (*
@@ -522,8 +528,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
           wf_typ ([(X, bind_sub S1)] ++ E) (dom E) (dom E) (open_tt S2 X)) ->
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
-      sub_pre E (typ_all S1 S2) (typ_all T1 T2)
-.
+      sub_pre E (typ_all S1 S2) (typ_all T1 T2).
 
 
 (* ********************************************************************** *)
@@ -533,7 +538,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
 Fixpoint free_for_cv (e : exp) : cap :=
 match e with
   | exp_bvar i => {}
-  | exp_fvar x => (cset_fvar x)
+  | exp_fvar x => (`cset_fvar` x)
   | exp_abs t e1 => (free_for_cv e1)
   | exp_app e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
   | exp_tabs t e1 => (free_for_cv e1)
@@ -548,13 +553,13 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_var : forall E x C P,
       wf_env E ->
       binds x (bind_typ (typ_capt C P)) E ->
-      typing E (exp_fvar x) (typ_capt x P)
+      typing E (exp_fvar x) (typ_capt (`cset_fvar` x) P)
   | typing_abs : forall L E V e1 T1,
       wf_typ_in E V ->
       (forall x : atom, x `notin` L ->
-          wf_typ ([(x, bind_typ V)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T1 x)) ->
+          wf_typ ([(x, bind_typ V)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T1 (`cset_fvar` x))) ->
       (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ V)] ++ E) (open_ee e1 x x) (open_ct T1 x)) ->
+        typing ([(x, bind_typ V)] ++ E) (open_ee e1 x (`cset_fvar` x)) (open_ct T1 (`cset_fvar` x))) ->
       typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
   | typing_app : forall T1 E e1 e2 T2 Cf T1',
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
@@ -575,8 +580,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_sub : forall S E e T,
       typing E e S ->
       sub E S T ->
-      typing E e T
-.
+      typing E e T.
 
 
 (* ********************************************************************** *)

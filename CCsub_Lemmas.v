@@ -3,6 +3,8 @@ Require Import Coq.Program.Equality.
 Require Export CCsub_Infrastructure.
 Require Import Atom.
 
+Require Import TaktikZ.
+
 (* ********************************************************************** *)
 (** * #<a name="wft"></a># Utils *)
 
@@ -318,7 +320,7 @@ Lemma wf_cset_subst_tb : forall F Q E Ap Am Z P C,
 Proof with simpl_env; eauto*.
   intros * HwfC HwfP Hok.
   inversion HwfC; subst.
-  unfold subst_cset, cset_references_fvar_dec, cset_fvars.
+  unfold subst_cset.
   destruct_set_mem Z fvars.
   - destruct HwfP; simpl.
     + unfold cset_union; csetsimpl.
@@ -408,8 +410,6 @@ Proof.
   intros.
   congruence.
 Qed.
-
-Require Import TaktikZ.
 
 Lemma wf_cset_strengthen : forall x E Ap C,
   x `~in`A (dom E) ->
@@ -519,24 +519,6 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
       eapply wf_typ_subst_tb...
 Qed.
 
-Ltac csetdec ::=
-  try (progress (csetsimpl;
-                 (** destroy set membership, if any *)
-                 repeat find_and_destroy_set_mem;
-                 repeat find_and_destroy_cap;
-                 repeat discharge_empty;
-                 (* unfold, if necessary *)
-                 cbv [cset_fvars cset_bvars cset_has_universal cset_union cset_remove_bvar
-                      cset_remove_fvar cset_references_bvar cset_references_fvar cset_references_univ
-                      cset_subset_prop] in *;
-                 (* split, if necessary *)
-                 try f_equal;
-                 try notin_solve; try fsetdec; try solve [exfalso; notin_solve];
-                 try nnotin_solve; try fnsetdec; try solve [exfalso; nnotin_solve];
-                 try solve [destr_bool]
-                 );
-       intuition (csetdec)).
-
 Lemma wf_cset_over_subst : forall F Q E A Z C C',
   ok (map (subst_cb Z C) F ++ E) ->
   wf_cset E A C ->
@@ -580,7 +562,6 @@ Proof with eauto*.
         - exists (subst_ct Z (cset_set fvars {}N univ) T)...
       }
       {
-        unfold cset_references_fvar in ZIn; simpl in ZIn.
         constructor.
         2: fsetdec.
         intros y yIn.
@@ -623,7 +604,6 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
       - simpl_env in *.
         notin_solve.
       - assert (binds X (bind_sub U) (F ++ [(Z, bind_typ Q)] ++ E)) by auto.
-        Require Import TaktikZ.
         forwards: fresh_mid_head HokZ.
         forwards: binds_In H2.
         fsetdec.
@@ -658,7 +638,6 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
       }
       apply wf_typ_subst_cb with (Q := Q)...
       * apply wf_cset_set_weakening with (A := Ap)...
-      * notin_solve.
   - Case "wf_typ_all".
     pick fresh Y and apply wf_typ_all; fold subst_ct...
     + SCase "T2".
@@ -1168,8 +1147,8 @@ Proof with eauto.
 Qed.
 
 Local Lemma notin_cset_fvars_open_cset : forall X k C c,
-  X `~in`A cset_fvars (open_cset k C c) ->
-  X `~in`A cset_fvars c.
+  X `~in`A `cset_fvars` (open_cset k C c) ->
+  X `~in`A `cset_fvars` c.
 Proof.
   intros.
   destruct c.
@@ -1340,7 +1319,7 @@ Proof with eauto.
   - specialize (notin_fv_wf_pretyp _ _ _ _ _ H0 FrE) as Wf.
     inversion H; destruct C; subst; simpl in *; try notin_solve.
     assert (X `notin` fvars). {
-      unfold allbound in *; unfold cset_fvars in *.
+      unfold allbound in *.
       intro Hin; specialize (H1 X Hin) as [T B].
       destruct B as [B|B]; apply binds_In in B; intuition.
     }
@@ -1355,11 +1334,11 @@ Proof with eauto.
     simpl in *.
     specialize (HT2 ltac:(notin_solve)).
     assert (X `notin` fv_tt T2). {
-      apply notin_fv_ct_open_tt with (C := Y).
+      apply notin_fv_ct_open_tt with (C := (`cset_fvar` Y)).
       notin_solve.
     }
     assert (X `notin` fv_ct T2). {
-      apply notin_fv_ct_open_ct with (C := Y); try discriminate.
+      apply notin_fv_ct_open_ct with (C := (`cset_fvar` Y)); try discriminate.
       notin_solve.
     }
     notin_solve.
@@ -1393,7 +1372,7 @@ Proof with eauto.
 Qed.
 
 Local Lemma notin_fv_ee_open_ee_rec : forall k u (y x : atom) t,
-  x `notin` fv_ee (open_ee_rec k u y t) ->
+  x `notin` fv_ee (open_ee_rec k u (`cset_fvar` y) t) ->
   x <> y ->
   x `notin` fv_ee t.
 Proof with eauto.
@@ -1408,7 +1387,7 @@ Proof with eauto.
 Qed.
 
 Lemma notin_fv_ee_open_ee : forall u (y x : atom) t,
-  x `notin` fv_ee (open_ee t u y) ->
+  x `notin` fv_ee (open_ee t u (`cset_fvar` y)) ->
   x <> y ->
   x `notin` fv_ee t.
 Proof with eauto.
@@ -1474,12 +1453,32 @@ Qed.
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)
 
+Lemma empty_cset_wf : forall E A, wf_cset E A {*}.
+Proof.
+  intros.
+  constructor.
+  - intros ? ?. fsetdec.
+  - fsetdec.
+Qed.
+
+Hint Resolve empty_cset_wf.
+
 Lemma subcapt_regular : forall E C D,
   subcapt E C D ->
   wf_cset_in E C /\ wf_cset_in E D.
 Proof with eauto*.
+  (* Useful when copying this lemma to definitions. *)
+  Require Import Program.Equality.
+  Require Import TaktikZ.
   intros* H.
   dependent induction H; subst...
+  - split...
+    constructor.
+    2: {
+      apply binds_In in H...
+    }
+    intros y yInX.
+    rewrite AtomSetFacts.singleton_iff in yInX; subst...
   - split...
     constructor.
     2: {
@@ -1499,8 +1498,6 @@ Proof with eauto*.
       forwards (WfX & _): H1 y yIn.
       inversion WfX; subst.
       fsetdec.
-  - split...
-    constructor.
 Qed.
 
 Hint Unfold wf_typ_in : core.
@@ -1546,32 +1543,33 @@ Proof with simpl_env; eauto*.
 Qed.
 
 Lemma cv_free_never_universal : forall e,
-  free_for_cv e <> cset_universal.
+  ~ `* in` (free_for_cv e).
 Proof with eauto*.
   intros. induction e; unfold free_for_cv; try discriminate...
   fold free_for_cv.
   unfold cset_union...
   destruct (free_for_cv e1) eqn:Hfc1;
     destruct (free_for_cv e2) eqn:Hfc2...
+  csetdec.
+Qed.
+
+Lemma cv_free_has_universal_false : forall e,
+  `* mem` (free_for_cv e) = false.
+Proof.
+  intros.
+  destruct (`* mem` (free_for_cv e)) eqn:EQ; trivial.
+  pose proof (cv_free_never_universal e).
+  intuition.
 Qed.
 
 Lemma cv_free_is_bvar_free : forall e,
-  empty_cset_bvars (free_for_cv e).
-Proof with eauto using cv_free_never_universal.
-  intros. induction e...
-  - simpl; fnsetdec...
-  - simpl; fnsetdec...
-  - unfold empty_cset_bvars in *.
-    unfold cset_all_bvars in *.
-    simpl in *.
-    destruct (free_for_cv e1) eqn:Hc1;
-    destruct (free_for_cv e2) eqn:Hc2...
-    unfold cset_union.
-    fnsetdec...
+  NatSet.F.Empty (`cset_bvars` (free_for_cv e)).
+Proof with eauto.
+  intros. induction e; fnsetdec...
 Qed.
 
 Lemma cv_free_atom : forall (x : atom),
-  free_for_cv x = x.
+  free_for_cv x = (`cset_fvar` x).
 Proof with auto*.
   intros.
   unfold free_for_cv...
@@ -1588,28 +1586,27 @@ Proof.
 Qed.
 
 Lemma free_for_cv_open : forall e k (y : atom),
-  cset_subset_prop (free_for_cv e) (free_for_cv (open_ee_rec k y y e)).
+  cset_subset_prop (free_for_cv e) (free_for_cv (open_ee_rec k y (`cset_fvar` y) e)).
 Proof with eauto*.
   intros e.
   induction e; intros; simpl...
   - destruct (k === n); constructor; fsetdec...
-  - constructor...
   - specialize (IHe1 k y).
     specialize (IHe2 k y).
-    inversion IHe1; inversion IHe2; subst; constructor...
-    fnsetdec.
+    csetdec.
+    pose proof (cv_free_has_universal_false) as HA.
+    repeat rewrite HA...
 Qed.
 
 Lemma free_for_cv_open_type : forall e k (y : atom),
   cset_subset_prop (free_for_cv e) (free_for_cv (open_te_rec k y e)).
 Proof with eauto*.
   intros e; induction e; intros; simpl...
-  - constructor; fsetdec...
-  - constructor; fsetdec...
   - specialize (IHe1 k y).
     specialize (IHe2 k y).
-    inversion IHe1; inversion IHe2; subst; constructor...
-    fnsetdec.
+    csetdec.
+    pose proof (cv_free_has_universal_false) as HA.
+    repeat rewrite HA...
 Qed.
 
 Lemma empty_over_union : forall N1 N2,
@@ -1622,47 +1619,41 @@ Proof.
 Qed.
 
 Lemma allbound_over_union : forall E T1 T2,
-  allbound_typ E (AtomSet.F.union T1 T2) ->
-  allbound_typ E T1 /\ allbound_typ E T2.
+  allbound E (AtomSet.F.union T1 T2) ->
+  allbound E T1 /\ allbound E T2.
 Proof with eauto*.
   intros.
-  unfold allbound_typ in *.
-  split; intros; assert (x `in` (T1 `union` T2)) by fsetdec...
+  split; intros ? ?; assert (x `in` (T1 `union` T2)) by fsetdec...
 Qed.
 
 Lemma wf_cset_over_union : forall E A C1 C2,
-  C1 <> cset_universal ->
-  C2 <> cset_universal ->
   wf_cset E A (cset_union C1 C2) <->
   wf_cset E A C1 /\ wf_cset E A C2.
 Proof with eauto*.
   intros; split; intros; destruct C1 eqn:HC1;
                          destruct C2 eqn:HC2;
                          unfold cset_union in *...
-  + inversion H1; subst...
-    apply empty_over_union in H3; inversion H3.
-    apply allbound_over_union in H6; inversion H6.
+  - inversion H; subst...
+    apply empty_over_union in H1; inversion H1.
+    apply allbound_over_union in H4; inversion H4.
     subst.
     split; constructor...
-    all : fsetdec.
-  + destruct H1 as [Hwf1 Hwf2].
+  - destruct H as [Hwf1 Hwf2].
     inversion Hwf1; inversion Hwf2; subst...
+    csetsimpl.
     (** this should really be a lemma... *)
-    assert (NatSet.F.union {}N {}N = {}N) by fnsetdec; rewrite H1.
+    (* assert (NatSet.F.union {}N {}N = {}N) by fnsetdec; rewrite H1. *)
     constructor.
-    unfold allbound_typ in *...
-    intros.
-    apply AtomSetFacts.union_iff in H2...
-    fsetdec.
+    + intros ? ?.
+      apply AtomSetFacts.union_iff in H...
+    + fsetdec.
 Qed.
 
 Lemma cset_references_fvar_over_union : forall C1 C2 x,
-  cset_references_fvar x (cset_union C1 C2) ->
-  cset_references_fvar x C1 \/ cset_references_fvar x C2.
+  x A`in` (cset_union C1 C2) ->
+  x A`in` C1 \/ x A`in` C2.
 Proof with eauto*.
-  intros C1 C2 x H.
-  unfold cset_references_fvar in H.
-  unfold cset_all_fvars in H.
+  intros * H.
   destruct (cset_union C1 C2) eqn:Hunion...
   unfold cset_union in *.
   destruct C1 eqn:HC1; destruct C2 eqn:HC2; subst...
@@ -1673,8 +1664,8 @@ Qed.
 
 Lemma free_for_cv_bound : forall E e (x : atom),
   wf_cset_in E (free_for_cv e) ->
-  cset_references_fvar x (free_for_cv e) ->
-  exists T, binds x (bind_typ T) E.
+  x A`in` (free_for_cv e) ->
+  exists T, bound x T E.
 Proof with eauto using wf_cset_over_union, cv_free_never_universal.
   intros E e.
   induction e; intros; simpl in *; try fsetdec...
@@ -1688,19 +1679,15 @@ Proof with eauto using wf_cset_over_union, cv_free_never_universal.
 Qed.
 
 Lemma free_for_cv_is_free_ee : forall e,
-  cset_subset_prop (free_for_cv e) (cset_set (fv_ee e) {}N).
+  cset_subset_prop (free_for_cv e) (cset_set (fv_ee e) {}N false).
 Proof with eauto using cv_free_never_universal; eauto*.
   intros e.
   (** gah why doesn't eauto pick this up. *)
-  pose proof (cv_free_never_universal).
   induction e; try destruct (free_for_cv e) eqn:Hcve;
     subst; simpl; try rewrite Hcve; try constructor; try inversion IHe;
-    try fsetdec; try fnsetdec.
-  - unfold cset_union in *;
-    destruct (free_for_cv e1) eqn:Hcve1;
-    destruct (free_for_cv e2) eqn:Hcve2...
-    inversion IHe1; inversion IHe2; subst...
-    constructor; try fsetdec; try fnsetdec...
+      csetdec.
+  pose proof cv_free_has_universal_false as HA.
+  repeat rewrite HA...
 Qed.
 
 (** This should be easily true: free variables
@@ -1709,79 +1696,86 @@ Lemma typing_cv : forall E e T,
   typing E e T ->
   wf_cset_in E (free_for_cv e).
 Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
-  intros E e T Htyp.
+  intros * Htyp.
   induction Htyp; simpl...
   (** TODO: merge the abs/t-abs case somehow (maybe a match to decide what
       gets posed? )*)
-  - pose proof (binds_In _ _ _ _ H0).
+  - forwards: binds_In H0.
     simpl. constructor...
-    unfold allbound_typ. intros.
-    assert (x = x0) by fsetdec.
+    intros y ?.
+    assert (x = y) by fsetdec.
     subst. exists X...
-  - pose proof (binds_In _ _ _ _ H0).
+  - forwards: binds_In H0.
     simpl. constructor...
-    unfold allbound_typ. intros.
-    assert (x = x0) by fsetdec.
+    intros y ?.
+    assert (x = y) by fsetdec.
     subst. exists (typ_capt C P)...
   - pick fresh y.
     assert (y `notin` L) by fsetdec.
-    assert (~ cset_references_fvar y (free_for_cv e1)).
-    {
+    assert (~ y A`in` (free_for_cv e1)). {
       pose proof (free_for_cv_is_free_ee e1) as P...
-      inversion P; subst...
-      simpl...
+      inversion P; subst.
+      simpl in *.
+      csetdec.
     }
-    unshelve epose proof (H2 y _) as SpH0...
+    forwards SpH0: H2 y...
     pose proof (free_for_cv_open e1 0 y)...
     pose proof (cv_free_never_universal).
     pose proof (cv_free_is_bvar_free e1).
-    csethyp.
     destruct (free_for_cv e1) eqn:Hfcv1; subst...
     unfold open_ee in *.
     inversion SpH0; subst...
-    match goal with H : (cset_subset_prop _ _) |- _ =>
-      inversion H; subst
-    end...
-    rewrite <- H8 in H13. inversion H13; subst...
+    rename select (_ = _) into EQ.
+    rename select (cset_subset_prop _ _) into HH.
+    destruct HH as (HA1 & HA2 & HA3).
+    rewrite <- EQ in *.
+    simpl in *.
     assert (t0 = {}N) by fnsetdec; subst...
-    constructor...
-    unfold allbound_typ in *.
-    intros.
-    destruct (x == y)...
-    unshelve epose proof (H9 x _) as [T Hbinds]...
-    exists T.
-    binds_cases Hbinds...
-  - simpl...
-    apply wf_cset_over_union...
-  (* typing_app_poly *)
-  - pick fresh y.
-    assert (y `notin` L) by fsetdec.
-    assert (~ cset_references_fvar y (free_for_cv e1)).
-    {
-      pose proof (free_for_cv_is_free_ee e1) as P...
-      inversion P; subst; simpl...
+    constructor.
+    2: clear Fr; fsetdec.
+    intros x ?.
+    destruct (x == y). {
+      csetdec.
     }
-    simpl.
-    unshelve epose proof (H2 y _) as SpH0...
-    pose proof (free_for_cv_open_type e1 0 y).
+    forwards (T & B): H9 x. {
+      fsetdec.
+    }
+    simpl_env in *.
+    exists T. destruct B as [B|B]; binds_cases B...
+  - apply wf_cset_over_union...
+  - (* typing_app_poly *)
+    pick fresh y.
+    assert (y `notin` L) by fsetdec.
+    assert (~ y A`in` (free_for_cv e1)). {
+      pose proof (free_for_cv_is_free_ee e1) as P...
+      inversion P; subst.
+      simpl in *.
+      csetdec.
+    }
+    forwards SpH0: H2 y...
+    pose proof (free_for_cv_open_type e1 0 y)...
     pose proof (cv_free_never_universal).
     pose proof (cv_free_is_bvar_free e1).
-    csethyp.
-    destruct (free_for_cv e1) eqn:Hfcv1...
+    destruct (free_for_cv e1) eqn:Hfcv1; subst...
     unfold open_te in *.
     inversion SpH0; subst...
-    match goal with H : (cset_subset_prop _ _) |- _ =>
-      inversion H; subst
-    end...
-    rewrite <- H8 in H13. inversion H13; subst...
+    rename select (_ = _) into EQ.
+    rewrite <- EQ in *.
+    rename select (cset_subset_prop _ _) into HH.
+    destruct HH as (HA1 & HA2 & HA3).
+    simpl in *.
     assert (t0 = {}N) by fnsetdec; subst...
-    constructor...
-    unfold allbound_typ in *.
-    intros.
-    destruct (x == y)...
-    unshelve epose proof (H9 x _) as [T Hbinds]...
-    exists T.
-    binds_cases Hbinds...
+    constructor.
+    2: clear Fr; fsetdec.
+    intros x ?.
+    destruct (x == y). {
+      csetdec.
+    }
+    forwards (T & B): H9 x. {
+      fsetdec.
+    }
+    simpl_env in *.
+    exists T. destruct B as [B|B]; binds_cases B...
 Qed.
 
 Lemma wf_typ_open : forall E U T1 T2,
@@ -1790,25 +1784,31 @@ Lemma wf_typ_open : forall E U T1 T2,
   wf_typ_in E U ->
   wf_typ_in E (open_tt T2 U).
 Proof with simpl_env; eauto.
-  intros E U T1 T2 Hok HwfA HwfU.
+  intros * Hok HwfA HwfU.
   inversion HwfA; subst...
   pick fresh X.
   rewrite (subst_tt_intro X)...
-  rewrite_env (map (subst_tb X U) empty ++ E).
-  assert (({} `union` dom E) = dom E) by fsetdec.
+  assert (({}A `union` dom E) = dom E) by (clear Fr;fsetdec).
+  assert (X `~in`A dom E) by notin_solve.
+  unfold wf_typ_in.
+  replace (dom E) with (dom E `\`A X) by (clear Fr;fsetdec).
   rewrite_env (map (subst_tb X U) empty ++ E).
   apply wf_typ_subst_tb with (Q := T1)...
-  all : rewrite H...
+  rewrite H...
 Qed.
 
 (** The things that the cv relation returns are all well-formed,
     assuming the type is well formed... *)
-Lemma cv_wf : forall E T C,
-  cv E T C ->
-  wf_cset_in E C.
+Lemma cv_wf : forall E T,
+  wf_typ_in E T ->
+  wf_cset_in E (cv T).
 Proof with simpl_env; eauto*.
-  intros E T C HC.
-  induction HC; intros; subst; try apply IHHC; try apply H1.
+  intros * HC.
+  inversion HC; subst...
+  constructor.
+  2: fsetdec.
+  intros y yIn.
+  rewrite AtomSetFacts.singleton_iff in yIn; symmetry in yIn; subst...
 Qed.
 
 Lemma typing_regular : forall E e T,
@@ -1828,8 +1828,12 @@ Proof with simpl_env; auto*.
     inversion H1; subst...
     constructor...
     constructor...
-    unfold allbound_typ; intros. assert (x0 = x) by fsetdec; subst; eauto.
-    assert (x `in` dom E). eapply binds_In. apply H0. fsetdec.
+    + intros y ?.
+      assert (y = x) by fsetdec; subst; eauto.
+    + assert (x `in` dom E).
+      eapply binds_In.
+      apply H0.
+      fsetdec.
   (* typing rule: (\x e) has type fv((\x e)) T1 -> T2 *)
   - pick fresh y; assert (y `notin` L) by fsetdec...
     unshelve epose proof (H2 y _) as H4...
@@ -1850,7 +1854,6 @@ Proof with simpl_env; auto*.
   - repeat split...
     destruct IHtyping1 as [_ [_ Hwf]].
     inversion Hwf; subst...
-    inversion H9; subst...
     apply wf_typ_set_weakening with (Ap := dom E) (Am := dom E)...
     (** needs substitution lemma here. *)
     apply wf_typ_open_capt with (T1 := T1)...
@@ -1874,16 +1877,16 @@ Proof with simpl_env; auto*.
   (* typing rule: type application *)
   - destruct IHtyping as [HwfE [Hexpr Hwf]]...
     repeat split...
-    constructor...
-    pose proof (sub_regular E T T1 H0) as [_ [HwfT HwfT1]].
-    eapply type_from_wf_typ with (E := E); apply HwfT.
-    inversion Hwf; subst...
-    apply wf_typ_open with (T1 := T1)...
-    destruct (sub_regular _ _ _ H0) as [R1 [R2 R3]]...
+    1,2: admit.                 (* from regularity @ H0 *)
+    (* pose proof (sub_regular E T T1 H0) as [_ [HwfT HwfT1]]. *)
+    (* eapply type_from_wf_typ with (E := E); apply HwfT. *)
+    (* inversion Hwf; subst... *)
+    (* apply wf_typ_open with (T1 := T1)... *)
+    (* destruct (sub_regular _ _ _ H0) as [R1 [R2 R3]]... *)
   - repeat split...
-    pose proof (sub_regular E S T H0)...
-Qed.
-
+    admit.                      (* regularity @ H0 *)
+    (* pose proof (sub_regular E S T H0)... *)
+Admitted.
 
 Lemma value_regular : forall e,
   value e ->
@@ -1903,22 +1906,10 @@ Proof with auto*.
     rewrite (subst_ee_intro y)...
     eapply subst_ee_expr...
     pose proof (cv_free_is_bvar_free v2).
-    unfold empty_cset_bvars in H5. unfold cset_all_bvars in H5.
     destruct (free_for_cv v2); subst...
-    assert (t0 = {}N) by fnsetdec; subst...
   - Case "red_tabs".
     inversion H. pick fresh Y. rewrite (subst_te_intro Y)...
 Qed.
-
-Lemma cv_regular : forall E T C,
-  cv E T C ->
-  wf_env E /\ wf_typ_in E T /\ wf_cset_in E C.
-Proof with eauto*.
-  intros. induction H...
-Qed.
-
-(** Moved from Soundness *)
-
 
 (* *********************************************************************** *)
 (** * Auxilliary lemmas for Soundness *)
@@ -1929,40 +1920,17 @@ Lemma subst_cset_distributive_across_union : forall z C D1 D2,
 Proof with eauto.
   intros.
   destruct D1; destruct D2.
-  all :
-    try solve [
-          unfold cset_union, subst_cset, cset_references_fvar_dec;
-          (try destruct_match);
-          reflexivity].
-
-  unfold cset_union, subst_cset, cset_references_fvar_dec.
-  destruct (AtomSet.F.mem z t) eqn:EQ1.
-  - rewrite <- AtomSetFacts.mem_iff in EQ1.
-    assert (AtomSet.F.mem z (t `union` t1) = true) as HA by fset_mem_dec.
+  unfold cset_union, subst_cset.
+  destruct_set_mem z t.
+  - assert (AtomSet.F.mem z (t `union` t1) = true) as HA by fset_mem_dec.
     rewrite HA.
-    destruct C.
-    + unfold cset_union.
-      all : repeat destruct_match.
-      all : easy.
-    + unfold cset_union, cset_remove_fvar.
-      destruct (AtomSet.F.mem z t1) eqn:EQ2.
-      * rewrite <- AtomSetFacts.mem_iff in EQ2.
-        cset_eq_dec.
-      * rewrite <- AtomSetFacts.not_mem_iff in EQ2.
-        cset_eq_dec.
-  - rewrite <- AtomSetFacts.not_mem_iff in EQ1.
-    destruct (AtomSet.F.mem z t1) eqn:EQ2.
-    + rewrite <- AtomSetFacts.mem_iff in EQ2.
-      assert (AtomSet.F.mem z (t `union` t1) = true) as HA by fset_mem_dec.
+    unfold cset_union.
+    destruct_set_mem z t1; csetdec.
+  - destruct_set_mem z t1.
+    + assert (AtomSet.F.mem z (t `union` t1) = true) as HA by fset_mem_dec.
       rewrite HA.
-      destruct C.
-      * unfold cset_union.
-        all : repeat destruct_match.
-        all : easy.
-      * unfold cset_remove_fvar, cset_union.
-        cset_eq_dec.
-    + rewrite <- AtomSetFacts.not_mem_iff in EQ2.
-      assert (AtomSet.F.mem z (t `union` t1) = false) as HA by fset_mem_dec.
+      unfold cset_union; csetdec.
+    + assert (AtomSet.F.mem z (t `union` t1) = false) as HA by fset_mem_dec.
       rewrite HA.
       reflexivity.
 Qed.
@@ -1974,11 +1942,11 @@ Proof.
   intros.
   induction t; simpl in H |- *.
   - cbv.
-    replace (AtomSet.F.mem z {}) with false by fset_mem_dec.
-    cset_eq_dec.
+    replace (AtomSet.F.mem z {}A) with false by fset_mem_dec.
+    reflexivity.
   - cbv.
     replace (AtomSet.F.mem z (singleton a)) with false by fset_mem_dec.
-    cset_eq_dec.
+    reflexivity.
   - apply IHt. fsetdec.
   - rewrite subst_cset_distributive_across_union.
     rewrite IHt1 by notin_solve.
@@ -2018,7 +1986,6 @@ Hint Extern 1 (wf_cset ?E _ ?C) =>
   match goal with
   | H: subcapt _ C _ |- _ => apply (proj1 (subcapt_regular _ _ _ H))
   | H: subcapt _ _ C |- _ => apply (proj2 (subcapt_regular _ _ _ H))
-  | H: cv E _ C |- _ => apply (proj2 (proj2 (cv_regular _ _ _ H)))
   end
 : core.
 
@@ -2027,7 +1994,6 @@ Hint Extern 1 (wf_env ?E) =>
   | H: sub _ _ _ |- _ => apply (proj1 (sub_regular _ _ _ H))
   | H: sub_pre _ _ _ |- _ => apply (proj1 (sub_pre_regular _ _ _ H))
   | H: typing _ _ _ |- _ => apply (proj1 (typing_regular _ _ _ H))
-  | H: cv E _ _ |- _ => apply (proj1 (cv_regular _ _ _ H))
   end
 : core.
 
@@ -2036,7 +2002,6 @@ Hint Extern 1 (wf_typ ?E _ _ ?T) =>
   | H: typing E _ T |- _ => apply (proj2 (proj2 (typing_regular _ _ _ H)))
   | H: sub E T _ |- _ => apply (proj1 (proj2 (sub_regular _ _ _ H)))
   | H: sub E _ T |- _ => apply (proj2 (proj2 (sub_regular _ _ _ H)))
-  | H: cv E T _ |- _ => apply (proj1 (proj2 (cv_regular _ _ _ H)))
   end
 : core.
 
@@ -2083,15 +2048,6 @@ Hint Extern 1 (expr ?e) =>
   end
 : core.
 
-(** More automation *)
-Lemma capt_from_cv : forall E T C,
-    cv E T C -> capt C.
-Proof with eauto.
-  intros.
-  assert (wf_cset_in E C) as HA by auto.
-  eapply capt_from_wf_cset...
-Qed.
-
 Lemma binding_uniq_from_wf_env : forall F E x b,
   wf_env (F ++ ([(x, b)]) ++ E) ->
   x `notin` (dom F `union` dom E).
@@ -2101,18 +2057,7 @@ Proof.
   eapply binding_uniq_from_ok; eauto.
 Qed.
 
-Hint Resolve capt_from_cv : core.
-
 (** * #<a name="auto"></a># Automation Tests *)
-
-Local Lemma test_cv_regular : forall E T C,
-    cv E T C ->
-    wf_env E /\ wf_typ_in E T /\ wf_cset_in E C.
-Proof.
-  intros.
-  repeat split.
-  all: auto.
-Qed.
 
 Local Lemma test_subcapt_regular : forall E C1 C2,
   subcapt E C1 C2 ->

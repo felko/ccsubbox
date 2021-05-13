@@ -24,43 +24,33 @@ Create HintDb csets.
 Inductive cap : Type :=
   | cset_set : atoms -> nats -> bool -> cap.
 
-
 (** ************************************************** *)
 (** Constructors *)
 (** ************************************************** *)
 
-Definition empty_cset := (cset_set {}A {}N false).
+Declare Scope cset_shorthand.
 
-(** Singletons *)
-Definition cset_fvar (a : atom) :=
-  (cset_set (AtomSet.F.singleton a) NatSet.F.empty false).
+Notation "`cset_fvar` a" := (cset_set {a}A {}N false)
+                              (at level 10, a at level 9) : cset_shorthand.
 
-Definition cset_bvar (k : nat) :=
-  (cset_set AtomSet.F.empty (NatSet.F.singleton k) false).
+Notation "`cset_bvar` k" := (cset_set {}A {k}N false)
+                              (at level 10, k at level 9) : cset_shorthand.
 
-Definition cset_universal :=
-  (cset_set AtomSet.F.empty NatSet.F.empty true).
+Notation "{}" := (cset_set {}A {}N false) : cset_shorthand.
+Notation "{*}" := (cset_set {}A {}N true) : cset_shorthand.
 
 (** ************************************************** *)
 (** Selectors *)
 (** ************************************************** *)
 
-Definition cset_fvars (c : cap) : atoms :=
-  match c with
-  | cset_set A _ _ => A
-  end.
+Notation "`cset_fvars` C" := (match C with cset_set xs _ _ => xs end)
+                               (at level 10, C at level 9) : cset_shorthand.
 
-Definition cset_bvars (c : cap) : nats :=
-  match c with
-  | cset_set _ N _ => N
-  end.
+Notation "`cset_bvars` C" := (match C with cset_set _ ks _ => ks end)
+                               (at level 10, C at level 9) : cset_shorthand.
 
-Definition cset_has_universal (c : cap) : bool :=
-  match c with
-  | cset_set _ _ R => R
-  end.
-
-
+Notation "`cset_uvar` C" := (match C with cset_set _ _ u => u end)
+                               (at level 10, C at level 9) : cset_shorthand.
 
 (** ************************************************** *)
 (** Operations *)
@@ -73,74 +63,89 @@ Definition cset_has_universal (c : cap) : bool :=
     a variable -- used for determining if a capture set is well formed.
     Don't use these predicates for determining if a capture set
     captures a variable, as one needs to also test cset_universal. *)
-Definition cset_references_bvar (k : nat) (c : cap) :=
-  NatSet.F.In k (cset_bvars c).
 
-Definition cset_references_fvar (a : atom) (c : cap) :=
-  AtomSet.F.In a (cset_fvars c).
-
-Definition cset_references_bvar_dec (k : nat) (c : cap) :=
-  NatSet.F.mem k (cset_bvars c).
-
-Definition cset_references_fvar_dec (a : atom) (c : cap) :=
-  AtomSet.F.mem a (cset_fvars c).
-
-Definition cset_remove_bvar (k : nat) (c : cap) : cap :=
-  cset_set (cset_fvars c) (NatSet.F.remove k (cset_bvars c)) (cset_has_universal c).
-
-Definition cset_remove_fvar (a : atom) (c : cap) : cap :=
-  cset_set (AtomSet.F.remove a (cset_fvars c)) (cset_bvars c) (cset_has_universal c).
-
-Definition cset_references_univ_dec := cset_has_universal.
-Definition cset_references_univ (c : cap) :=
-    cset_references_univ_dec c = true.
-
+Open Scope cset_shorthand.
 
 (** Capture set unions are what you'd expect. *)
 Definition cset_union (c1 c2 : cap) : cap :=
   cset_set
-    (AtomSet.F.union (cset_fvars c1) (cset_fvars c2))
-    (NatSet.F.union (cset_bvars c1) (cset_bvars c2))
-    ((cset_has_universal c1) || (cset_has_universal c2)).
+    (AtomSet.F.union (`cset_fvars` c1) (`cset_fvars` c2))
+    (NatSet.F.union (`cset_bvars` c1) (`cset_bvars` c2))
+    ((`cset_uvar` c1) || (`cset_uvar` c2)).
 
 Definition cset_subset_dec (C D : cap) :=
-  AtomSet.F.subset (cset_fvars C) (cset_fvars D)
-    && NatSet.F.subset (cset_bvars C) (cset_bvars D)
-    && (implb (cset_has_universal C) (cset_has_universal D)).
+  AtomSet.F.subset (`cset_fvars` C) (`cset_fvars` D)
+    && NatSet.F.subset (`cset_bvars` C) (`cset_bvars` D)
+    && (implb (`cset_uvar` C) (`cset_uvar` D)).
 
-Notation "{}" := empty_cset : metatheory_scope.
-Notation "{*}" := cset_universal : metatheory_scope.
+Notation "C `u` D" := (cset_union C D) (at level 69) : cset_shorthand.
+Notation "C A`\` x" := (cset_set ((`cset_fvars` C) `\`A x) (`cset_bvars` C) (`cset_uvar` C))
+                         (at level 69) : cset_shorthand.
+Notation "x A`in` C" := (AtomSet.F.In x (`cset_fvars` C))
+                          (at level 69) : cset_shorthand.
+Notation "x A`mem` C" := (AtomSet.F.mem x (`cset_fvars` C)) (at level 69) : cset_shorthand.
 
-Notation "C `u` D" := (cset_union C D) (at level 69) : metatheory_scope.
+Notation "C N`\` k" := (cset_set ((`cset_fvars` C) ) ((`cset_bvars` C) `\`N k) (`cset_uvar` C))
+                         (at level 69) : cset_shorthand.
+Notation "k N`in` C" := (NatSet.F.In k (`cset_bvars` C))
+                          (at level 69) : cset_shorthand.
+Notation "k N`mem` C" := (NatSet.F.mem k (`cset_bvars` C))
+                           (at level 69) : cset_shorthand.
 
-Notation "C A`\` x" := (cset_remove_fvar x C) (at level 69) : metatheory_scope.
-Notation "x A`in` C" := (cset_references_fvar x C) (at level 69) : metatheory_scope.
-Notation "x A`mem` C" := (cset_references_fvar_dec x C) (at level 69) : metatheory_scope.
+Notation "`* mem` C" := (`cset_uvar` C)
+                           (at level 10, only parsing) : cset_shorthand.
+Notation "`* in` C" := (`cset_uvar` C = true)
+                           (at level 10) : cset_shorthand.
 
-Notation "C N`\` x" := (cset_remove_bvar x C) (at level 69) : metatheory_scope.
-Notation "x N`in` C" := (cset_references_bvar x C) (at level 69) : metatheory_scope.
-Notation "x N`mem` C" := (cset_references_bvar_dec x C) (at level 69) : metatheory_scope.
+
+Notation "`cset_references_bvar` k c" :=
+  (k N`in` c)
+    (at level 10, k at level 9, c at level 9, only parsing) : cset_shorthand.
+Notation "`cset_references_bvar_dec` k c" :=
+  (k N`mem` c)
+    (at level 10, k at level 9, c at level 9, only parsing) : cset_shorthand.
+Notation "`cset_remove_bvar` k c" :=
+  (c N`\` k)
+    (at level 10, k at level 9, c at level 9, only parsing) : cset_shorthand.
+
+Notation "`cset_references_fvar` a c" :=
+  (a A`in` c)
+    (at level 10, a at level 9, c at level 9, only parsing) : cset_shorthand.
+Notation "`cset_references_fvar_dec` a c" :=
+  (a A`mem` c)
+    (at level 10, a at level 9, c at level 9, only parsing) : cset_shorthand.
+Notation "`cset_remove_fvar` a c" :=
+  (c A`\` a)
+    (at level 10, a at level 9, c at level 9, only parsing) : cset_shorthand.
+
+Notation "`cset_references_univ_dec` c" :=
+  (`cset_uvar` c)
+    (at level 10, c at level 9, only parsing) : cset_shorthand.
+Notation "`cset_references_univ` c" :=
+  (`* in` c)
+    (at level 10, only parsing) : cset_shorthand.
+
 
 (* Check (fun x =>  fun N => x N`in` N). *)
 (* Check (fun C D x => (cset_union D (cset_remove_fvar x C))). *)
 
 Declare Scope experimental_set_scope.
 
-Notation "{ x 'as' A}" := (cset_fvar x) : experimental_set_scope.
-Notation "{ x 'as' N}" := (cset_bvar x) : experimental_set_scope.
+Notation "{ x 'as' A}" := (`cset_fvar` x) : experimental_set_scope.
+Notation "{ x 'as' N}" := (`cset_bvar` x) : experimental_set_scope.
 
 (** ************************************************** *)
 (** Logical Predicates *)
 (** ************************************************** *)
 
 Definition cset_empty (c : cap) : Prop :=
-  AtomSet.F.Empty (cset_fvars c) /\ NatSet.F.Empty (cset_bvars c) /\
-    ((cset_has_universal c) = false).
+  AtomSet.F.Empty (`cset_fvars` c) /\ NatSet.F.Empty (`cset_bvars` c) /\
+    ((`cset_uvar` c) = false).
 
 Definition cset_subset_prop (c : cap) (d : cap) : Prop :=
-  AtomSet.F.Subset (cset_fvars c) (cset_fvars d)
-    /\ NatSet.F.Subset (cset_bvars c) (cset_bvars d)
-    /\  (leb (cset_has_universal c) (cset_has_universal d)).
+  AtomSet.F.Subset (`cset_fvars` c) (`cset_fvars` d)
+    /\ NatSet.F.Subset (`cset_bvars` c) (`cset_bvars` d)
+    /\  (leb (`cset_uvar` c) (`cset_uvar` d)).
 
 
 (** ************************************************** *)
@@ -148,7 +153,6 @@ Definition cset_subset_prop (c : cap) (d : cap) : Prop :=
 (** ************************************************** *)
 
 Section Props.
-
   Variable x y a f : atom.
   Variable l m R : bool.
   Variable A A1 A2 : atoms.
@@ -157,141 +161,136 @@ Section Props.
   Variable C D C1 C2 C3 : cap.
 
   Lemma cset_bvar_mem_iff :
-    cset_references_bvar k C <-> cset_references_bvar_dec k C = true.
+    `cset_references_bvar` k C <-> `cset_references_bvar_dec` k C = true.
   Proof.
     destruct C ;
-      unfold cset_references_bvar, cset_references_bvar_dec in *;
       simpl in *; intuition.
   Qed.
 
   Lemma cset_fvar_mem_iff :
-    cset_references_fvar a C <-> cset_references_fvar_dec a C = true.
+    `cset_references_fvar` a C <-> `cset_references_fvar_dec` a C = true.
   Proof.
     destruct C ;
-      unfold cset_references_fvar, cset_references_fvar_dec in *;
       simpl in *; intuition.
   Qed.
 
   Lemma cset_univ_mem_iff :
-    cset_references_univ C <-> cset_references_univ_dec C = true.
+    `cset_references_univ` C <-> `cset_references_univ_dec` C = true.
   Proof.
-    destruct C; unfold cset_references_univ, cset_references_univ_dec in *.
+    destruct C;
     reflexivity.
   Qed.
 
   Lemma cset_bvar_not_mem_iff :
-    ~ cset_references_bvar k C <-> cset_references_bvar_dec k C = false.
+    ~ `cset_references_bvar` k C <-> `cset_references_bvar_dec` k C = false.
   Proof.
-    destruct C ;
-      unfold cset_references_bvar, cset_references_bvar_dec in *; split; intros; simpl in *; intuition.
-      rewrite <- NatSetFacts.not_mem_iff; fnsetdec.
-      rewrite <- NatSetFacts.not_mem_iff in H; fnsetdec.
+    destruct C ; rewrite <- NatSetFacts.not_mem_iff; fnsetdec.
   Qed.
 
   Lemma cset_fvar_not_mem_iff :
-    ~ cset_references_fvar a C <-> cset_references_fvar_dec a C = false.
+    ~ `cset_references_fvar` a C <-> `cset_references_fvar_dec` a C = false.
   Proof.
     destruct C ;
-      unfold cset_references_fvar, cset_references_fvar_dec in *; split; intros; simpl in *; intuition.
+      split; intros; simpl in *; intuition.
       rewrite <- AtomSetFacts.not_mem_iff; fsetdec.
       rewrite <- AtomSetFacts.not_mem_iff in H; fsetdec.
   Qed.
 
   Lemma cset_univ_not_mem_iff :
-    ~ cset_references_univ C <-> cset_references_univ_dec C = false.
+    ~ `cset_references_univ` C <-> `cset_references_univ_dec` C = false.
   Proof.
-    destruct C; unfold cset_references_univ, cset_references_univ_dec, cset_has_universal in *;
+    destruct C;
       split.
     intro; destruct b; auto*.
     intro; subst; auto.
   Qed.
 
-  Lemma fvars_1 : cset_fvars (cset_set A N R) = A.
-  Proof. unfold cset_fvars. trivial. Qed.
+  Lemma fvars_1 : `cset_fvars` (cset_set A N R) = A.
+  Proof. trivial. Qed.
 
-  Lemma bvars_1 : cset_bvars (cset_set A N R) = N.
-  Proof. unfold cset_bvars. trivial. Qed.
+  Lemma bvars_1 : `cset_bvars` (cset_set A N R) = N.
+  Proof. trivial. Qed.
 
-  Lemma lvars_1 : cset_has_universal (cset_set A N R) = R.
-  Proof. unfold cset_has_universal. trivial. Qed.
+  Lemma lvars_1 : `cset_uvar` (cset_set A N R) = R.
+  Proof. trivial. Qed.
 
-  Lemma fvars_union_1 : cset_fvars (cset_union C D) = AtomSet.F.union (cset_fvars C) (cset_fvars D).
-  Proof. unfold cset_fvars. trivial. Qed.
+  Lemma fvars_union_1 : `cset_fvars` (cset_union C D) = AtomSet.F.union (`cset_fvars` C) (`cset_fvars` D).
+  Proof. trivial. Qed.
 
-  Lemma bvars_union_1 : cset_bvars (cset_union C D) = NatSet.F.union (cset_bvars C) (cset_bvars D).
-  Proof. unfold cset_bvars. trivial. Qed.
+  Lemma bvars_union_1 : `cset_bvars` (cset_union C D) = NatSet.F.union (`cset_bvars` C) (`cset_bvars` D).
+  Proof. trivial. Qed.
 
-  Lemma lvars_union_1 : cset_has_universal (cset_union C D) = orb (cset_has_universal C) (cset_has_universal D).
-  Proof. unfold cset_has_universal. trivial. Qed.
+  Lemma lvars_union_1 : `cset_uvar` (cset_union C D) = orb (`cset_uvar` C) (`cset_uvar` D).
+  Proof. trivial. Qed.
 
-  Lemma remove_fvar_1 : cset_remove_fvar x (cset_set A N R) = (cset_set (AtomSet.F.remove x A) N R).
-  Proof. intros. unfold cset_remove_fvar in *; simpl in *. trivial. Qed.
+  Lemma remove_fvar_1 : `cset_remove_fvar` x (cset_set A N R) = (cset_set (AtomSet.F.remove x A) N R).
+  Proof. intros. simpl in *. trivial. Qed.
 
-  Lemma remove_bvar_1 : cset_remove_bvar k (cset_set A N R) = (cset_set A (NatSet.F.remove k N) R).
-  Proof. intros. unfold cset_remove_bvar in *; simpl in *. trivial. Qed.
+  Lemma remove_bvar_1 : `cset_remove_bvar` k (cset_set A N R) = (cset_set A (NatSet.F.remove k N) R).
+  Proof. intros. simpl in *. trivial. Qed.
 
-  Lemma mem_bvar_1 : cset_references_bvar k C -> cset_references_bvar_dec k C = true.
+  Lemma mem_bvar_1 : `cset_references_bvar` k C -> `cset_references_bvar_dec` k C = true.
   Proof. rewrite cset_bvar_mem_iff; trivial. Qed.
 
-  Lemma mem_bvar_2 : cset_references_bvar_dec k C = true -> cset_references_bvar k C.
+  Lemma mem_bvar_2 : `cset_references_bvar_dec` k C = true -> `cset_references_bvar` k C.
   Proof. rewrite <- cset_bvar_mem_iff; trivial. Qed.
 
-  Lemma mem_fvar_1 : cset_references_fvar a C -> cset_references_fvar_dec a C = true.
+  Lemma mem_fvar_1 : `cset_references_fvar` a C -> `cset_references_fvar_dec` a C = true.
   Proof. rewrite cset_fvar_mem_iff; trivial. Qed.
 
-  Lemma mem_fvar_2 : cset_references_fvar_dec a C = true -> cset_references_fvar a C.
+  Lemma mem_fvar_2 : `cset_references_fvar_dec` a C = true -> `cset_references_fvar` a C.
   Proof. rewrite <- cset_fvar_mem_iff; trivial. Qed.
 
-  Lemma mem_lvar_1 : cset_references_univ C -> cset_references_univ_dec C = true.
-  Proof. rewrite cset_univ_mem_iff; trivial. Qed.
+  Lemma mem_lvar_1 : `cset_references_univ` C -> `cset_references_univ_dec` C = true.
+  Proof. trivial. Qed.
 
-  Lemma mem_lvar_2 : cset_references_univ_dec C = true -> cset_references_univ C.
-  Proof. rewrite <- cset_univ_mem_iff; trivial. Qed.
+  Lemma mem_lvar_2 : `cset_references_univ_dec` C = true -> `cset_references_univ` C.
+  Proof. trivial. Qed.
 
-  Lemma In_bvar_1 : k = n -> cset_references_bvar k C -> cset_references_bvar n C.
+  Lemma In_bvar_1 : k = n -> `cset_references_bvar` k C -> `cset_references_bvar` n C.
   Proof. intros; subst; trivial. Qed.
 
-  Lemma In_fvar_1 : a = f -> cset_references_fvar a C -> cset_references_fvar f C.
+  Lemma In_fvar_1 : a = f -> `cset_references_fvar` a C -> `cset_references_fvar` f C.
   Proof. intros; subst; trivial. Qed.
 
-  Lemma Is_empty : cset_empty empty_cset.
+  Lemma Is_empty : cset_empty {}.
   Proof. repeat split. fsetdec. fnsetdec. Qed.
 
-  Lemma union_fvar_1 : cset_references_fvar x (cset_union C D) -> cset_references_fvar x C \/ cset_references_fvar x D.
-  Proof. intros. unfold cset_union, cset_references_fvar in *; simpl in *. fsetdec. Qed.
+  Lemma union_fvar_1 : `cset_references_fvar` x (cset_union C D) -> `cset_references_fvar` x C \/ `cset_references_fvar` x D.
+  Proof. intros. unfold cset_union in *; simpl in *. fsetdec. Qed.
 
-  Lemma union_fvar_2 : cset_references_fvar x C -> cset_references_fvar x (cset_union C D).
-  Proof. unfold cset_union, cset_references_fvar in *; simpl in *. fsetdec. Qed.
+  Lemma union_fvar_2 : `cset_references_fvar` x C -> `cset_references_fvar` x (cset_union C D).
+  Proof. unfold cset_union in *; simpl in *. fsetdec. Qed.
 
-  Lemma union_fvar_3 : cset_references_fvar x D -> cset_references_fvar x (cset_union C D).
-  Proof. unfold cset_union, cset_references_fvar in *; simpl in *. fsetdec. Qed.
+  Lemma union_fvar_3 : `cset_references_fvar` x D -> `cset_references_fvar` x (cset_union C D).
+  Proof. unfold cset_union in *; simpl in *. fsetdec. Qed.
 
-  Lemma union_bvar_1 : cset_references_bvar k (cset_union C D) -> cset_references_bvar k C \/ cset_references_bvar k D.
-  Proof. intros. unfold cset_union, cset_references_bvar in *; simpl in *. fnsetdec. Qed.
+  Lemma union_bvar_1 : `cset_references_bvar` k (cset_union C D) -> `cset_references_bvar` k C \/ `cset_references_bvar` k D.
+  Proof. intros. unfold cset_union in *; simpl in *. fnsetdec. Qed.
 
-  Lemma union_bvar_2 : cset_references_bvar k C -> cset_references_bvar k (cset_union C D).
-  Proof. unfold cset_union, cset_references_bvar in *; simpl in *. fnsetdec. Qed.
+  Lemma union_bvar_2 : `cset_references_bvar` k C -> `cset_references_bvar` k (cset_union C D).
+  Proof. unfold cset_union in *; simpl in *. fnsetdec. Qed.
 
-  Lemma union_bvar_3 : cset_references_bvar k D -> cset_references_bvar k (cset_union C D).
-  Proof. unfold cset_union, cset_references_bvar in *; simpl in *. fnsetdec. Qed.
+  Lemma union_bvar_3 : `cset_references_bvar` k D -> `cset_references_bvar` k (cset_union C D).
+  Proof. unfold cset_union in *; simpl in *. fnsetdec. Qed.
 
-  Lemma union_lvar_1 : cset_references_univ (cset_union C D) ->
-    cset_references_univ C \/ cset_references_univ D.
-  Proof. intros. unfold cset_union, cset_references_univ in *; simpl in *.
+  Lemma union_lvar_1 : `cset_references_univ` (cset_union C D) ->
+    `cset_references_univ` C \/ `cset_references_univ` D.
+  Proof. intros. unfold cset_union in *; simpl in *.
     rewrite orb_true_iff in H; auto*.
   Qed.
 
-  Lemma union_lvar_2 : cset_references_univ C -> cset_references_univ (cset_union C D).
-  Proof. unfold cset_union, cset_references_univ in *; simpl in *. intro.
+  Lemma union_lvar_2 : `cset_references_univ` C -> `cset_references_univ` (cset_union C D).
+  Proof. unfold cset_union in *; simpl in *. intro.
     rewrite orb_true_iff. auto. Qed.
 
-  Lemma union_lvar_3 : cset_references_univ D -> cset_references_univ (cset_union C D).
-  Proof. unfold cset_union, cset_references_univ in *; simpl in *. intro.
+  Lemma union_lvar_3 : `cset_references_univ` D -> `cset_references_univ` (cset_union C D).
+  Proof. unfold cset_union in *; simpl in *. intro.
     rewrite orb_true_iff. auto. Qed.
 
   Lemma union_sub_1 : cset_subset_prop C D -> cset_union D C = D.
   Proof.
-    unfold cset_union, cset_subset_prop, cset_fvars, cset_bvars, cset_has_universal.
+    unfold cset_union, cset_subset_prop.
     intros. destruct C; destruct D; simpl; f_equal.
     fsetdec. fnsetdec.
       destruct b; destruct b0; auto*.
@@ -299,7 +298,7 @@ Section Props.
 
   Lemma union_sub_2 : cset_subset_prop C D -> D = cset_union D C.
   Proof.
-    unfold cset_union, cset_subset_prop, cset_fvars, cset_bvars, cset_has_universal.
+    unfold cset_union, cset_subset_prop.
     intros. destruct C; destruct D; simpl; f_equal.
     fsetdec. fnsetdec.
       destruct b; destruct b0; auto*.
@@ -308,7 +307,7 @@ Section Props.
   Lemma union_subset_distribute_1 : cset_subset_prop C1 C2 -> cset_subset_prop (cset_union C1 D) (cset_union C2 D).
   Proof.
     intros. unfold cset_subset_prop in *; inversion H as [Sub_F [Sub_B Sub_A]];
-    unfold cset_union, cset_fvars, cset_bvars, cset_has_universal, cset_fvar in *; destruct C1; destruct C2.
+    unfold cset_union in *; destruct C1; destruct C2.
     repeat split; try fsetdec; try fnsetdec.
       destruct b; destruct b0; unfold leb in *; simpl in *; destruct D; destruct b; auto*.
   Qed.
@@ -317,10 +316,10 @@ End Props.
 
 (* TODO defined here to avoid all the implicit arguments *)
 Lemma subset_univ_1 : forall R C,
-  cset_subset_prop R C -> cset_references_univ R -> cset_references_univ C.
-Proof. unfold cset_references_univ, cset_subset_prop; intros.
-  destruct H as [_ [_ H]]. unfold cset_has_universal, cset_references_univ_dec in *; destruct R;
-    destruct C; unfold cset_has_universal, leb in *; destruct b; destruct b0; auto*. Qed.
+  cset_subset_prop R C -> `cset_references_univ` R -> `cset_references_univ` C.
+Proof. intros.
+  destruct H as [_ [_ H]]. destruct R;
+    destruct C; unfold leb in *; destruct b; destruct b0; auto*. Qed.
 
 Hint Rewrite
   fvars_1 bvars_1 lvars_1
@@ -345,22 +344,22 @@ Lemma subset_refl : forall C,
   cset_subset_prop C C.
 Proof.
   intros. unfold cset_subset_prop. repeat split. fsetdec. fnsetdec.
-    unfold leb; destruct C; unfold cset_has_universal; destruct b; auto*.
+    unfold leb; destruct C; destruct b; auto*.
 Qed.
 
 Lemma subset_union_left : forall C1 C2,
   cset_subset_prop C1 (cset_union C1 C2).
 Proof.
-  intros. destruct C1. destruct C2. unfold cset_subset_prop, cset_union, cset_fvars,
-    cset_bvars, cset_has_universal. repeat split. fsetdec. fnsetdec.
+  intros. destruct C1. destruct C2. unfold cset_subset_prop, cset_union.
+  repeat split. fsetdec. fnsetdec.
     destr_bool.
 Qed.
 
 Lemma subset_union_right : forall C1 C2,
   cset_subset_prop C2 (cset_union C1 C2).
 Proof.
-  intros. destruct C1. destruct C2. unfold cset_subset_prop, cset_union, cset_fvars,
-    cset_bvars, cset_has_universal. repeat split. fsetdec. fnsetdec.
+  intros. destruct C1. destruct C2. unfold cset_subset_prop, cset_union.
+  repeat split. fsetdec. fnsetdec.
     destr_bool.
 Qed.
 
@@ -370,7 +369,7 @@ Proof.
   intros * AB BC.
   inversion AB as [ABF [ABN ABL]]; subst; inversion BC as [BCF [BCN BCL]]; subst...
   repeat (econstructor; try fsetdec; try fnsetdec)...
-  destruct A; destruct B; destruct C; unfold cset_has_universal in *; destr_bool.
+  destruct A; destruct B; destruct C; destr_bool.
 Qed.
 
 Hint Immediate subset_union_left subset_union_right  subset_refl: core.
@@ -391,15 +390,15 @@ Ltac rewrite_set_facts_in H :=
   | NatSet.F.mem _ _ = false => rewrite <- NatSetFacts.not_mem_iff in H
   | AtomSet.F.mem _ _ = true => rewrite <- AtomSetFacts.mem_iff in H
   | AtomSet.F.mem _ _ = false => rewrite <- AtomSetFacts.not_mem_iff in H
-  | cset_references_bvar_dec _ _ = true => rewrite <- cset_bvar_mem_iff in H
-  | cset_references_fvar_dec _ _ = true => rewrite <- cset_fvar_mem_iff in H
-  | cset_references_univ_dec _ _ = true => rewrite <- cset_univ_mem_iff in H
-  | cset_references_bvar_dec _ _ = false => rewrite <- cset_bvar_not_mem_iff in H
-  | cset_references_fvar_dec _ _ = false => rewrite <- cset_fvar_not_mem_iff in H
-  | cset_references_univ_dec _ _ = false => rewrite <- cset_univ_not_mem_iff in H
+  | `cset_references_bvar_dec` _ _ = true => rewrite <- cset_bvar_mem_iff in H
+  | `cset_references_fvar_dec` _ _ = true => rewrite <- cset_fvar_mem_iff in H
+  | `cset_references_univ_dec` _ _ = true => rewrite <- cset_univ_mem_iff in H
+  | `cset_references_bvar_dec` _ _ = false => rewrite <- cset_bvar_not_mem_iff in H
+  | `cset_references_fvar_dec` _ _ = false => rewrite <- cset_fvar_not_mem_iff in H
+  | `cset_references_univ_dec` _ _ = false => rewrite <- cset_univ_not_mem_iff in H
   end;
   (** argh, unused arguments need to be discharged *)
-  try apply NatSet.F.empty; try apply AtomSet.F.empty; try apply empty_cset.
+  try apply NatSet.F.empty; try apply AtomSet.F.empty; try apply {}.
 
 Ltac rewrite_set_facts_back_in H :=
   match type of H with
@@ -412,32 +411,31 @@ Ltac rewrite_set_facts_back_in H :=
   | (~ NatSet.F.In _ _)      => rewrite -> NatSetFacts.not_mem_iff in H
   | AtomSet.F.In _ _         => rewrite -> AtomSetFacts.mem_iff in H
   | (~ AtomSet.F.In _ _)     => rewrite -> AtomSetFacts.not_mem_iff in H
-  | cset_references_bvar _ _ => rewrite -> cset_bvar_mem_iff in H
-  | cset_references_fvar _ _ => rewrite -> cset_fvar_mem_iff in H
-  | cset_references_univ _ _ => rewrite -> cset_univ_mem_iff in H
-  | (~ cset_references_bvar _ _) => rewrite -> cset_bvar_not_mem_iff in H
-  | (~ cset_references_fvar _ _) => rewrite -> cset_fvar_not_mem_iff in H
-  | (~ cset_references_univ _ _) => rewrite -> cset_univ_not_mem_iff in H
+  | `cset_references_bvar` _ _ => rewrite -> cset_bvar_mem_iff in H
+  | `cset_references_fvar` _ _ => rewrite -> cset_fvar_mem_iff in H
+  | `cset_references_univ` _ _ => rewrite -> cset_univ_mem_iff in H
+  | (~ `cset_references_bvar` _ _) => rewrite -> cset_bvar_not_mem_iff in H
+  | (~ `cset_references_fvar` _ _) => rewrite -> cset_fvar_not_mem_iff in H
+  | (~ `cset_references_univ` _ _) => rewrite -> cset_univ_not_mem_iff in H
   end;
   (** argh, unused arguments need to be discharged *)
-  try apply NatSet.F.empty; try apply AtomSet.F.empty; try apply empty_cset.
-
-
+  try apply NatSet.F.empty; try apply AtomSet.F.empty; try apply {}.
 
 Ltac simpl_in_cset :=
   let go H := rewrite_set_facts_back_in H; try rewrite H in *; rewrite_set_facts_in H in
   match goal with
-  | H: cset_references_bvar_dec ?I ?C = ?B |- _ => try rewrite H in *
-  | H: ~ (cset_references_bvar _ _) |- _ => go H
-  | H: (cset_references_bvar _ _)   |- _ => go H
-  | H: ~ (cset_references_fvar _ _) |- _ => go H
-  | H: (cset_references_fvar _ _)   |- _ => go H
-  | H: ~ (cset_references_univ _ _) |- _ => go H
-  | H: (cset_references_univ _ _)   |- _ => go H
+  | H: `cset_references_bvar_dec` ?I ?C = ?B |- _ => try rewrite H in *
+  | H: ~ (`cset_references_bvar` _ _) |- _ => go H
+  | H: (`cset_references_bvar` _ _)   |- _ => go H
+  | H: ~ (`cset_references_fvar` _ _) |- _ => go H
+  | H: (`cset_references_fvar` _ _)   |- _ => go H
+  | H: ~ (`cset_references_univ` _ _) |- _ => go H
+  | H: (`cset_references_univ` _ _)   |- _ => go H
   end.
 
 Ltac destruct_set_mem_univ bs :=
-  destruct (cset_references_univ_dec bs) eqn:H; rewrite_set_facts_in H; trivial.
+  destruct (`cset_references_univ_dec` bs) eqn:H; rewrite_set_facts_in H; trivial.
+
 Ltac destruct_set_mem a bs :=
   match type of bs with
   | AtomSet.F.t =>
@@ -450,34 +448,33 @@ Ltac destruct_set_mem a bs :=
     match type of a with
     | atom =>
       let H := fresh a "In" in
-      destruct (cset_references_fvar_dec a bs) eqn:H; rewrite_set_facts_in H; trivial
+      destruct (`cset_references_fvar_dec` a bs) eqn:H; rewrite_set_facts_in H; trivial
     (** why argh *)
     | AtomSet.F.elt =>
       let H := fresh a "In" in
-      destruct (cset_references_fvar_dec a bs) eqn:H; rewrite_set_facts_in H; trivial
+      destruct (`cset_references_fvar_dec` a bs) eqn:H; rewrite_set_facts_in H; trivial
     | nat =>
       let H := fresh a "In" in
-      destruct (cset_references_bvar_dec a bs) eqn:H; rewrite_set_facts_in H; trivial
+      destruct (`cset_references_bvar_dec` a bs) eqn:H; rewrite_set_facts_in H; trivial
     | NatSet.F.elt =>
       let H := fresh a "In" in
-      destruct (cset_references_bvar_dec a bs) eqn:H; rewrite_set_facts_in H; trivial
+      destruct (`cset_references_bvar_dec` a bs) eqn:H; rewrite_set_facts_in H; trivial
     end
   end.
 
 Ltac find_and_destroy_set_mem :=
   try match goal with
-  | H : _ |- context G [cset_references_fvar_dec ?X ?S] => destruct_set_mem X S
-  | H : _ |- context G [cset_references_bvar_dec ?B ?S] => destruct_set_mem B S
-  | H : _ |- context G [cset_references_univ_dec ?S] => destruct_set_mem_univ S
+  | H : _ |- context G [`cset_references_fvar_dec` ?X ?S] => destruct_set_mem X S
+  | H : _ |- context G [`cset_references_bvar_dec` ?B ?S] => destruct_set_mem B S
+  | H : _ |- context G [`cset_references_univ_dec` ?S] => destruct_set_mem_univ S
   | H : _ |- context G [AtomSet.F.mem ?X ?S] => destruct_set_mem X S
   | H : _ |- context G [NatSet.F.mem ?N ?S] => destruct_set_mem N S
-  | H : context G [cset_references_fvar_dec ?X ?S] |- _ => destruct_set_mem X S
-  | H : context G [cset_references_bvar_dec ?B ?S] |- _ => destruct_set_mem B S
-  | H : context G [cset_references_univ_dec ?S] |- _ => destruct_set_mem_univ S
+  | H : context G [`cset_references_fvar_dec` ?X ?S] |- _ => destruct_set_mem X S
+  | H : context G [`cset_references_bvar_dec` ?B ?S] |- _ => destruct_set_mem B S
+  | H : context G [`cset_references_univ_dec` ?S] |- _ => destruct_set_mem_univ S
   | H : context G [AtomSet.F.mem ?X ?S] |- _ => destruct_set_mem X S
   | H : context G [NatSet.F.mem ?N ?S] |- _ => destruct_set_mem N S
   end.
-  
 
 Lemma funion_empty_idempotent : forall xs, xs `u`N {}N = xs.
 Proof. intros. fnsetdec. Qed.
@@ -538,21 +535,20 @@ Ltac discharge_empty :=
     | H : NatSet.F.Empty ?S |- _ =>
       assert (S = {}N) by fnsetdec; subst; clear H; subst
   end.
-Ltac csetdec := 
+
+Ltac csetdec :=
   try (progress (csetsimpl;
                  (** destroy set membership, if any *)
-                 repeat find_and_destroy_set_mem; 
+                 repeat find_and_destroy_set_mem;
                  repeat find_and_destroy_cap;
                  repeat discharge_empty;
                  (* unfold, if necessary *)
-                 cbv [cset_fvars cset_bvars cset_has_universal cset_union cset_remove_bvar
-                      cset_remove_fvar cset_references_bvar cset_references_fvar cset_references_univ
-                      cset_subset_prop] in *;
+                 cbv [cset_union cset_subset_prop] in *;
                  (* split, if necessary *)
                  try f_equal;
                  try notin_solve; try fsetdec; try solve [exfalso; notin_solve];
                  try nnotin_solve; try fnsetdec; try solve [exfalso; nnotin_solve];
-                 try destr_bool
+                 try solve [destr_bool]
                  );
        intuition (csetdec)).
 
@@ -584,40 +580,41 @@ Hint Resolve leb_reflexive leb_true false_leb andb_false_false false_andb_false 
 (** ************************************************** *)
 
 
-Definition capt (c : cap) : Prop := NatSet.F.Empty (cset_bvars c).
+Definition capt (c : cap) : Prop := NatSet.F.Empty (`cset_bvars` c).
 
 Lemma singleton_closed : forall f,
-  capt (cset_fvar f).
+  capt (`cset_fvar` f).
 Proof.
-  unfold capt, cset_fvar; fnsetdec.
+  unfold capt; fnsetdec.
 Qed.
 
 Lemma capt_empty_bvar : forall A N R,
   capt (cset_set A N R) ->
   N = {}N.
 Proof.
-  intros. unfold capt, cset_fvar in *. fnsetdec.
+  intros. unfold capt in *. fnsetdec.
 Qed.
 
 Lemma capt_concrete_cset : forall xs b,
   capt (cset_set xs {}N b).
 Proof.
-  intros. unfold capt, cset_bvars. fnsetdec.
+  intros. unfold capt. fnsetdec.
 Qed.
+
 Hint Unfold capt : core.
 Hint Resolve capt_empty_bvar capt_concrete_cset : core.
 
 (** Opening a capture set with a bound variable d[k -> c] *)
 Definition open_cset (k : nat) (c : cap) (d : cap) : cap :=
-  if cset_references_bvar_dec k d then
-    cset_union c (cset_remove_bvar k d)
+  if `cset_references_bvar_dec` k d then
+    cset_union c (`cset_remove_bvar` k d)
   else
     d.
 
 (** Substituting a capture set with a free variable d[a -> c] *)
 Definition subst_cset (a : atom) (c : cap) (d: cap) : cap :=
-  if cset_references_fvar_dec a d then
-    cset_union c (cset_remove_fvar a d)
+  if `cset_references_fvar_dec` a d then
+    cset_union c (`cset_remove_fvar` a d)
   else
     d.
 
@@ -635,13 +632,13 @@ Qed.
 Lemma subst_subset_intro : forall C1 C2 x,
   (* C1 is closed *)
   capt C1 ->
-  cset_subset_prop (cset_fvar x) C2 ->
+  cset_subset_prop (`cset_fvar` x) C2 ->
   cset_subset_prop C1 (subst_cset x C1 C2).
 Proof.
   intros.
   cbv [subst_cset].
   unfold capt in H.
-  csetdec. try solve [exfalso; specialize (H x ltac:(fsetdec)); fsetdec].
+  csetdec.
 Qed.
 
 Lemma subst_cset_union : forall x D C1 C2,
@@ -653,14 +650,14 @@ Proof with eauto.
 Qed.
 
 Lemma subst_cset_singleton : forall x C,
-  subst_cset x C (cset_fvar x) = C.
+  subst_cset x C (`cset_fvar` x) = C.
 Proof.
   intros; cbv [subst_cset].
   csetdec.
 Qed.
 
 Lemma subst_cset_fresh : forall x C1 C2,
-  x `notin` (cset_fvars C1) ->
+  x `notin` (`cset_fvars` C1) ->
   C1 = subst_cset x C2 C1.
 Proof with eauto.
   intros.
@@ -669,14 +666,14 @@ Proof with eauto.
 Qed.
 
 Lemma singleton_univ :
-  cset_references_univ (cset_universal).
+  `cset_references_univ` {*}.
 Proof with eauto.
-  autorewrite with csets...
+  trivial.
 Qed.
 
 Lemma subst_cset_fresh_id : forall x X C,
   x <> X ->
-  (subst_cset X C (cset_fvar x)) = (cset_fvar x).
+  (subst_cset X C (`cset_fvar` x)) = (`cset_fvar` x).
 Proof.
   intros.
   cbv [subst_cset].
@@ -685,7 +682,7 @@ Qed.
 
 Lemma subst_cset_union_id : forall x y D C1,
   x <> y ->
-  subst_cset x D (cset_union C1 (cset_fvar y)) = (cset_union (subst_cset x D C1) (cset_fvar y)).
+  subst_cset x D (cset_union C1 (`cset_fvar` y)) = (cset_union (subst_cset x D C1) (`cset_fvar` y)).
 Proof with eauto.
   intros.
   rewrite <- (subst_cset_fresh_id y x D) at 2...
@@ -693,8 +690,8 @@ Proof with eauto.
 Qed.
 
 Lemma subst_cset_univ : forall x C R,
-  cset_references_univ R ->
-  cset_references_univ (subst_cset x C R).
+  `cset_references_univ` R ->
+  `cset_references_univ` (subst_cset x C R).
 Proof with eauto.
   intros. cbv [subst_cset]. csetdec.
 Qed.
@@ -707,12 +704,11 @@ Proof with eauto*.
   unfold open_cset in *.
   unfold capt in H.
   csetdec.
-  exfalso; fnsetdec.
 Qed.
 
 Lemma subst_cc_intro_rec : forall X (C : cap) U k,
-  X `notin` (cset_fvars C) ->
-  open_cset k U C = subst_cset X U (open_cset k (cset_fvar X) C).
+  X `notin` (`cset_fvars` C) ->
+  open_cset k U C = subst_cset X U (open_cset k (`cset_fvar` X) C).
 Proof with auto*.
   intros * NotIn.
   cbv [open_cset subst_cset].
@@ -732,8 +728,7 @@ Qed.
 Hint Resolve singleton_closed open_cset_capt subst_cset_capt : core.
 Hint Rewrite subst_cset_singleton subst_cset_union : csets.
 
-
-(* unfold subst_cb, subst_cset, cset_references_fvar_dec, cset_fvar, cset_remove_fvar, cset_union.
+(* unfold subst_cb, subst_cset, `cset_references_fvar_dec`, cset_fvar, `cset_remove_fvar`, cset_union.
   destruct C1; destruct_set_mem X (singleton x)... fsetdec. *)
 
 Lemma open_cset_rec_capt_aux : forall c j V i U,
@@ -741,15 +736,14 @@ Lemma open_cset_rec_capt_aux : forall c j V i U,
   capt V ->
   (* TODO probably, we also want disjointness of labels here?, and that V
       and U do not both contain universal*)
-  (andb (cset_has_universal V) (cset_has_universal U)) = false ->
-  AtomSet.F.Empty (AtomSet.F.inter (cset_fvars V) (cset_fvars U)) ->
+  (andb (`cset_uvar` V) (`cset_uvar` U)) = false ->
+  AtomSet.F.Empty (AtomSet.F.inter (`cset_fvars` V) (`cset_fvars` U)) ->
   open_cset j V c = open_cset i U (open_cset j V c) ->
   c = open_cset i U c.
 Proof with eauto.
   intros * Hfresh Hempty HdisjointUniv HdisjointV HdisjointL.
-  unfold cset_fvars, capt, open_cset, cset_remove_bvar, cset_references_bvar_dec, cset_union,
-    cset_bvars in *.
-  destruct c eqn:Hc; destruct U eqn:HU; destruct V eqn:HV; destruct_set_mem j t0; unfold cset_fvars in *;
+  unfold capt, open_cset, cset_union in *.
+  destruct c eqn:Hc; destruct U eqn:HU; destruct V eqn:HV; destruct_set_mem j t0;
     destruct_set_mem i t0;
     destruct (NatSet.F.mem i (NatSet.F.union t4 (NatSet.F.remove j t0))) eqn:iInUnion;
     rewrite_set_facts_in iInUnion; f_equal; autorewrite with csets in *;
@@ -795,7 +789,7 @@ Proof with eauto*.
 Qed.
 
 Lemma subst_cset_useless_repetition : forall x C1 C2 D,
-  x `notin` cset_fvars C2 ->
+  x `notin` `cset_fvars` C2 ->
   subst_cset x C1 (subst_cset x C2 D) = (subst_cset x C2 D).
 Proof.
   intros.
