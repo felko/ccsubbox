@@ -4,6 +4,8 @@
 
 Require Import Metatheory.
 Require Import Tactics.
+Require Import TaktikZ.
+
 Require Import OrderedTypeEx.
 Require Import OrderedType.
 Require Import FSetFacts.
@@ -12,7 +14,6 @@ Require Import Nat.
 Require Export Bool.
 
 Create HintDb csets.
-
 
 (** ************************************************** *)
 (** Definition of Capture Sets *)
@@ -515,16 +516,26 @@ Proof. intros. destruct xs. unfold cset_union. autorewrite with csets; trivial. 
 
 Hint Rewrite cunion_empty_idempotent empty_cunion_idempotent : csets.
 
+Lemma cset_concrete_union : forall xs ns us xs' ns' us',
+  (cset_set xs ns us) `u` (cset_set xs' ns' us') =
+  (cset_set (xs `u`A xs') (ns `u`N ns') (us || us')).
+Proof. intros. cbv [cset_union]. reflexivity. Qed.
+
+Hint Rewrite cset_concrete_union : csets.
+
+(* To be redefined later. *)
+Ltac _csetsimpl_hook := idtac.
+
 Ltac csetsimpl :=
-  try (progress (subst; simpl; autorewrite with csets in *); intuition csetsimpl).
+  repeat (_csetsimpl_hook; subst; simpl; autorewrite with csets in *).
 
 Ltac csetsimplIn H :=
-  try (progress (subst; simpl in H; autorewrite with csets in H); intuition (csetsimplIn H)).
+  repeat (subst; simpl in H; autorewrite with csets in H).
 
 Tactic Notation "csetsimpl" "in" hyp(H) := csetsimplIn H.
 
 Ltac find_and_destroy_cap :=
-  try match goal with 
+  try match goal with
     | C : cap |- _ => destruct C
   end.
 

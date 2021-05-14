@@ -1,3 +1,4 @@
+Require Export TaktikZ.
 Require Export Metatheory.
 Require Export CaptureSets.
 Require Import Coq.Program.Wf.
@@ -641,3 +642,36 @@ Hint Constructors type pretype expr bound wf_cset wf_typ wf_pretyp wf_env value 
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
 Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound : core.
+
+Local Ltac cset_unfold_union0 :=
+  match goal with
+  | _ : _ |- context G [?C `u` (cset_set ?xs ?ns ?us)] =>
+    match C with
+    | cset_set _ _ _ => fail
+    | C =>
+      let HA := match goal with
+                | H : wf_cset_in _ C |- _ => H
+                | H : wf_cset _ _ C |- _ => H
+                | _ =>
+                  let H := fresh "WF" in
+                  (* NOTE: avoid asserting (wf_cset _ _ C), it takes long to solve. *)
+                  assert (wf_cset_in _ C) as HA by eauto; H
+                end
+      in
+      (* Invert, subst and clean up unnecessary hypothesis. *)
+      pose proof ltac_mark; inversion HA; subst; clear_until_mark;
+      (* Rewrite to avoid matching the same union twice, not sure if necessary. *)
+      rewrite cset_concrete_union
+    end
+  end.
+
+(* We can only define this tactic here, since in CaptureSets we don't have wf_cset. *)
+Ltac cset_unfold_union := repeat cset_unfold_union0.
+
+Ltac _csetsimpl_hook ::= cset_unfold_union.
+
+Local Lemma __test_cset_concrete_unfold : forall C xs us,
+  wf_cset_in nil C ->
+  wf_cset_in nil (C `u` (cset_set xs {}N us)) ->
+  exists xs' us', wf_cset_in nil (cset_set (xs' `u`A xs) {}N (us' || us)).
+Proof. intros * H; csetsimpl; eauto. Qed.

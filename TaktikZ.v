@@ -2,16 +2,31 @@
 (* ====================================================================== *)
 (** * Bespoke *)
 
-Ltac note0 T id :=
-  assert (T) as id by auto;
+Ltac note0 T id tac :=
+  assert (T) as id by tac;
   inversion id;
   subst.
 
 Tactic Notation "note" constr(T) :=
-  let H := fresh "Note" in note0 T H.
+  let H := fresh "Note" in note0 T H ltac:(auto).
+
+Tactic Notation "note" constr(T) "by" tactic1(tac) :=
+  let H := fresh "Note" in note0 T H tac.
 
 Tactic Notation "note" constr(T) "as" ident(id) :=
-  note0 T id.
+  note0 T id ltac:(auto).
+
+Tactic Notation "note" constr(T) "as" ident(id) "by" tactic1(tac) :=
+  note0 T id tac.
+
+Local Lemma _test_note :
+  True -> True.
+Proof. intro.
+  (* This should parse as (note True by fail)||(idtac). The other parse fails to
+  progress. *)
+  note True by fail || idtac.
+  auto.
+Qed.
 
 (* ====================================================================== *)
 (* ====================================================================== *)
@@ -102,6 +117,16 @@ Ltac gen_until_mark :=
   | ltac_Mark => clear H
   | _ => generalize H; clear H; gen_until_mark
   end end.
+
+(* [clear_until_mark] is like [gen_until_mark], but clears the hypothesis
+   instead. It can be used to clear unwanted hypothesis from inversion, for example. *)
+Ltac clear_until_mark :=
+  match goal with H: ?T |- _ =>
+  match T with
+  | ltac_Mark => clear H
+  | _ => clear H; clear_until_mark
+  end end.
+
 
 (** [gen_until_mark_with_processing F] is similar to [gen_until_mark]
     except that it calls [F] on each hypothesis immediately before

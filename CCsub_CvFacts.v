@@ -424,11 +424,6 @@ Proof.
   congruence.
 Qed.
 
-Ltac note00 T id tac :=
-  assert (T) as id by tac;
-  inversion id;
-  subst.
-
 Lemma wf_typ_in_weakening : forall T E F G,
   wf_typ_in (G ++ E) T ->
   ok (G ++ F ++ E) ->
@@ -474,7 +469,7 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
     cbv [subst_cset] in *.
     destruct_set_mem x xs.
     + assert (wf_typ_in (F ++ [(x, bind_typ U)] ++ E) U) as HA. {
-        note00 (wf_env ([(x, bind_typ U)] ++ E)) ident:(id) ltac:(eauto)...
+        note (wf_env ([(x, bind_typ U)] ++ E)) by eauto...
         rewrite_env (empty ++ (F ++ [(x, bind_typ U)]) ++ E).
         apply wf_typ_in_weakening; simpl_env...
       }
@@ -499,7 +494,7 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
     + destruct_set_mem x xs.
       2: exfalso; fsetdec.
       assert (wf_cset_in (F ++ [(x, bind_typ U)] ++ E) (cv U)) as HA. {
-        note00 (wf_env ([(x, bind_typ U)] ++ E)) ident:(id) ltac:(eauto)...
+        note (wf_env ([(x, bind_typ U)] ++ E)) by eauto...
         rewrite_env (empty ++ (F ++ [(x, bind_typ U)]) ++ E).
         apply wf_cset_in_weakening; simpl_env...
       }
@@ -518,7 +513,7 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
         1,2: admit.             (* wf_cset *)
       }
       assert (wf_cset_in (F ++ [(x, bind_typ U)] ++ E) (cv U)) as HA. {
-        note00 (wf_env ([(x, bind_typ U)] ++ E)) ident:(id) ltac:(eauto)...
+        note (wf_env ([(x, bind_typ U)] ++ E)) by eauto...
         rewrite_env (empty ++ (F ++ [(x, bind_typ U)]) ++ E).
         apply wf_cset_in_weakening; simpl_env...
       }
@@ -635,7 +630,7 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
 
     inversion H; subst.
     assert (wf_cset_in (F ++ [(x, bind_typ U)] ++ E) (cv U)) as HA. {
-      note00 (wf_env ([(x, bind_typ U)] ++ E)) ident:(id) ltac:(eauto)...
+      note (wf_env ([(x, bind_typ U)] ++ E)) by eauto...
       rewrite_env (empty ++ (F ++ [(x, bind_typ U)]) ++ E).
       apply wf_cset_in_weakening; simpl_env...
     }
@@ -688,7 +683,7 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
           unfold subst_cset; simpl.
           destruct_set_mem x cs'; [|exfalso;fsetdec].
           rewrite <- EQ.
-          unfold cset_union; csetsimpl.
+          unfold cset_union; csetsimpl...
         }
         rewrite EQ.
         eapply H1...
@@ -705,7 +700,7 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
           unfold subst_cset; simpl.
           destruct_set_mem x cs'; [|exfalso;fsetdec].
           rewrite <- EQ.
-          unfold cset_union; csetsimpl.
+          unfold cset_union; csetsimpl...
         }
         rewrite EQ.
         eapply H1...
@@ -721,7 +716,7 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
           unfold subst_cset; simpl.
           destruct_set_mem x cs'; [|exfalso;fsetdec].
           rewrite <- EQ.
-          unfold cset_union; csetsimpl.
+          unfold cset_union; csetsimpl...
         }
         rewrite EQ.
         eapply H1...
@@ -730,8 +725,15 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
       apply subcapt_set.
       1: admit.                (* wf_cset *)
       2: {
-        all: destr_bool.
-        admit.                  (* undoable as-is, we must know more about the set relationship *)
+        specialize (H1 x ltac:(fsetdec) _ _ _ _ ltac:(reflexivity) ltac:(trivial)).
+        rewrite <- EQ in H1.
+        unfold subst_cset in H1.
+        find_and_destroy_set_mem; [|exfalso;fsetdec].
+        find_and_destroy_set_mem; [exfalso;fsetdec|].
+        unfold cset_union in H1.
+        csetsimpl in H1.
+        destr_bool.
+        inversion H1; subst; easy.
       }
       intros y yIn.
       destruct_set_mem y (xs `remove` x).

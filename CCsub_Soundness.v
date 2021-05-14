@@ -1329,56 +1329,6 @@ Proof with eauto using wf_env_subst_cb, wf_typ_in_subst_cb_cv, subcapt_through_s
 }
 Qed.
 
-Require Import TaktikZ.
-Ltac clear_until_mark :=
-  match goal with H: ?T |- _ =>
-  match T with
-  | ltac_Mark => clear H
-  | _ => clear H; clear_until_mark
-  end end.
-
-Lemma cset_concrete_union : forall xs ns us xs' ns' us',
-  (cset_set xs ns us) `u` (cset_set xs' ns' us') =
-  (cset_set (xs `u`A xs') (ns `u`N ns') (us || us')).
-Proof. intros. cbv [cset_union]. reflexivity. Qed.
-
-Ltac cset_unfold_union0 :=
-  match goal with
-  | _ : _ |- context G [?C `u` (cset_set ?xs ?ns ?us)] =>
-    match C with
-    | cset_set _ _ _ => fail
-    | C =>
-      let HA := match goal with
-                | H : wf_cset_in _ C |- _ => H
-                | H : wf_cset _ _ C |- _ => H
-                | _ =>
-                  let H := fresh "WF" in
-                  (* NOTE: avoid asserting (wf_cset _ _ C), it takes long to solve *)
-                  assert (wf_cset_in _ C) as HA by eauto; H
-                end
-      in
-      (* invert, subst and clean up unnecessary crap *)
-      pose proof ltac_mark; inversion HA; subst; clear_until_mark;
-      rewrite cset_concrete_union
-    end
-  end.
-
-Ltac cset_unfold_union := repeat cset_unfold_union0.
-
-Ltac csetsimpl' :=
-  repeat (cset_unfold_union; subst; simpl; autorewrite with csets in *).
-
-Ltac csetsimplIn' H :=
-  repeat (subst; simpl in H; autorewrite with csets in H).
-
-Tactic Notation "csetsimpl'" "in" hyp(H) := csetsimplIn H.
-
-Local Lemma __test_cset_concrete_unfold : forall C xs us,
-  wf_cset_in nil C ->
-  wf_cset_in nil (C `u` (cset_set xs {}N us)) ->
-  exists xs' us', wf_cset_in nil (cset_set (xs' `u`A xs) {}N (us' || us)).
-Proof. intros * H; csetsimpl'; eauto. Qed.
-
 Lemma wf_typ_preserved_by_subst_wf_cset : forall x C E Ap Am T,
   wf_env E ->
   Ap `c`A dom E ->
@@ -2582,20 +2532,12 @@ Proof with simpl_env;
       rewrite subst_tt_open_ct_var...
       unshelve eapply (H2 y _ ([(y, bind_typ V)] ++ F) _)...
   - Case "typing_app".
-    forwards: IHTyp2 F...
-    forwards SpIHTyp1: IHTyp1 F...
-    admit.                      (* this looks like another heavy subst wrangling *)
-    (* forwards (D & HcvD): cv_exists_in (map (subst_tb Z P) F ++ E) (subst_tt Z P T1')... *)
-    (* assert (wf_typ_in (map (subst_tb Z P) F ++ E) *)
-    (*                   (subst_tt Z P (typ_capt Cf (typ_arrow T1 T2))))... *)
-    (* forwards (? & ?): cv_exists_in (map (subst_tb Z P) F ++ E) (subst_tt Z P T1)... *)
-    (* + apply (wf_typ_in_subst_tb Q)... *)
-    (* + rewrite <- open_ct_subst_tt... *)
-    (*   apply (typing_sub (open_ct (subst_tt Z P T2) D))... *)
-
-    (*   eapply applied_subst_monotonicity. *)
-    (*   * apply cv_through_subst_tt with (Q := Q) (T := T1')... *)
-    (*   * apply SpIHTyp1. *)
+    replace (subst_tt Z P (open_ct T2 (cv T1')))
+      with (open_ct (subst_tt Z P T2) (cv (subst_tt Z P T1'))) by admit. (* needs lemma *)
+    eapply typing_app.
+    + apply IHTyp1...
+    + apply IHTyp2...
+    + eapply sub_through_subst_tt...
   - Case "typing_tabs".
     assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
       pick fresh z for L.
