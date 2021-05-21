@@ -24,16 +24,41 @@ Create HintDb fsetdec.
 
 Hint Extern 1 (_ `in` _) => fsetdec: fsetdec.
 
-Lemma wf_cset_singleton_by_mem : forall E A x xs b,
-  wf_cset E A (cset_set xs {}N b) ->
+Lemma wf_cset_singleton_by_mem : forall xs b1 E A x b2,
+  wf_cset E A (cset_set xs {}N b1) ->
   x `in` xs ->
-  wf_cset E A (cset_set (singleton x) {}N b).
+  wf_cset E A (cset_set (singleton x) {}N b2).
 Proof with eauto with fsetdec.
   intros * Wfxs xIn.
   inversion Wfxs; subst...
 Qed.
 
-Hint Resolve wf_cset_singleton_by_mem : core.
+(* NOTE: wf_cset precondition in wf_cset_singleton_by_mem0 can be proven by
+         constructor, which leaves an uninstantiated evar. This approach avoids the
+         problem. *)
+Hint Extern 1 (wf_cset_in ?E (cset_set (singleton ?x) {}N _)) =>
+match goal with
+| H1 : x `in` ?xs , H2 : (wf_cset_in ?E (cset_set ?xs {}N ?b)) |- _ =>
+  apply (wf_cset_singleton_by_mem xs b)
+end : core.
+
+Hint Extern 1 (wf_cset ?E ?A (cset_set (singleton ?x) {}N _)) =>
+match goal with
+| H1 : x `in` ?xs , H2 : (wf_cset ?E A (cset_set ?xs {}N ?b)) |- _ =>
+  apply (wf_cset_singleton_by_mem xs b)
+end : core.
+
+Local Lemma __test_wf_cset_singleton1 : forall xs b1 E x b2,
+  wf_cset_in E (cset_set xs {}N b1) ->
+  x `in` xs ->
+  wf_cset_in E (cset_set (singleton x) {}N b2).
+Proof. eauto. Qed.
+
+Local Lemma __test_wf_cset_singleton2 : forall xs b1 E A x b2,
+  wf_cset E A (cset_set xs {}N b1) ->
+  x `in` xs ->
+  wf_cset E A (cset_set (singleton x) {}N b2).
+Proof. eauto. Qed.
 
 Lemma subcapt_reflexivity : forall E A C,
   wf_cset E A C ->
@@ -45,6 +70,7 @@ Proof with eauto.
   constructor...
   - intros y yIn.
     apply subcapt_in...
+    apply (wf_cset_singleton_by_mem fvars univ)...
   - csetdec.
 Qed.
 
@@ -521,7 +547,20 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
       unfold cset_union; csetsimpl.
       apply subcapt_in...
       1,2: admit.               (* wf_cset *)
-  - admit.                      (* annoying case analysis followed by subcapt_in_univ *)
+  - assert (wf_cset_in (map (subst_cb x (cv U)) F ++ E) (subst_cset x (cv U) D)). {
+      eapply wf_cset_in_subst_cb...
+    }
+    inversion select (wf_cset_in _ D); repeat subst. (* so apparently subst isn't idempotent *)
+    unfold subst_cset in *.
+    find_and_destroy_set_mem; [exfalso;fsetdec|].
+    find_and_destroy_set_mem.
+    + note (wf_cset_in E (cv U)) by eauto; subst.
+      rename select (_ = cv U) into EQ.
+      rewrite <- EQ in H1.
+      csetsimpl.
+      csetsimpl in H1.
+      apply subcapt_universal...
+    + apply subcapt_universal...
   - unfold subst_cset at 1.
     destruct_set_mem x (singleton x0).
     + assert (x0 = x) by fsetdec; subst.
@@ -788,24 +827,27 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
            eapply H1...
       * destruct_union_mem yIn.
         2: exfalso...
-        specialize (H1 x xIn _ _ _ _ ltac:(reflexivity) ltac:(trivial)).
-        admit.
-        (* unfold subst_cset at 1 in H1. *)
-        (* destruct_set_mem x (singleton x); [|exfalso;fsetdec]. *)
+        rename H1 into H1'.
+        forwards H1: (>> H1' x xIn x U F E)...
+        move H1 before H1'; clear H1'.
+        unfold subst_cset at 1 in H1.
+        destruct_set_mem x {x}A; [|exfalso;fsetdec].
 
-        (* unfold subst_cset at 1 in H1. *)
-        (* destruct_set_mem x cs'; [exfalso;fsetdec|]. *)
+        unfold subst_cset at 1 in H1.
+        destruct_set_mem x cs'; [exfalso;fsetdec|].
 
-        (* unfold cset_union in H1 *)
-        (* simpl in H1; csetsimpl in H1. *)
+        rewrite <- EQ in H1 at 2.
+        csetsimpl.
 
-        (* replace (ds `union` singleton x `remove` x) with ds in H1 by fsetdec. *)
+        replace (ds `u`A {x}A `\`A x) with ds in H1 by fsetdec.
 
-        (* enough (subcapt (map (subst_cb x (cset_set ds {}N)) F ++ E) *)
-        (*                  (cset_set (singleton y) {}N) *)
-        (*                  (cset_set ds {}N)) as HA. { *)
-        (*   eapply subcapt_transitivity... *)
-        (* } *)
-        (* eapply subcapt_in... *)
-        (* admit.             (* wf_cset *) *)
+        enough (subcapt (map (subst_cb x (cv U)) F ++ E)
+                         (`cset_fvar` y)
+                         (cset_set ds {}N b__d)) as HAA. {
+          rewrite EQ.
+          eapply subcapt_transitivity...
+        }
+        eapply subcapt_in...
+        forwards (? & ?): subcapt_regular H1.
+        inversion select (wf_cset_in _ (cset_set ds _ _)); subst...
 Admitted.

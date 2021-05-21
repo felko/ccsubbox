@@ -647,7 +647,8 @@ Local Ltac cset_unfold_union0 :=
   match goal with
   | _ : _ |- context G [?C `u` (cset_set ?xs ?ns ?us)] =>
     match C with
-    | cset_set _ _ _ => fail
+    | cset_set _ _ _ =>
+      rewrite cset_concrete_union
     | C =>
       let HA := match goal with
                 | H : wf_cset_in _ C |- _ => H
