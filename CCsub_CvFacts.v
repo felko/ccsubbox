@@ -505,17 +505,20 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
         apply subcapt_universal...
         replace (cset_set ({X}A `u`A xs `\`A x) {}N true)
           with ((`cset_fvar` X) `u` (cset_set (xs `\`A x) {}N true)) by csetdec.
-        apply wf_cset_union.
-        (* -- enough (wf_cset_in (map (subst_cb x (`cset_fvar` X)) F ++ E) (cv X))... *)
-        (*    apply wf_cset_in_subst_cb. *)
-        (* unfold wf_cset_in in H2. *)
-        (* 1: apply H2. *)
-        1,2: admit.             (* wf_cset *)
+        simpl in WF0...
       * inversion H2; subst.
         apply subcapt_universal...
-        admit.                  (* wf_cset *)
+        csetsimpl in WF0...
     + apply subcapt_universal...
-  - unfold subst_cset.
+  - assert (wf_cset_in (map (subst_cb x (cv U)) F ++ E)
+                       (subst_cset x (cv U) (cset_set xs {}N b))) as ?WF. {
+      eapply wf_cset_in_subst_cb...
+    }
+    assert (wf_cset_in (map (subst_cb x (cv U)) F ++ E)
+                       (subst_cset x (cv U) (`cset_fvar` x0))) as ?WF. {
+      eapply wf_cset_in_subst_cb...
+    }
+    unfold subst_cset in *.
     destruct_set_mem x {x0}A.
     + destruct_set_mem x xs.
       2: exfalso; fsetdec.
@@ -525,18 +528,18 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
         apply wf_cset_in_weakening; simpl_env...
       }
       inversion HA; subst.
-      unfold cset_union; csetsimpl.
+      csetsimpl.
       replace (fvars `union` singleton x0 `remove` x) with fvars by fsetdec.
+      rename select (_ = cv U) into EQ.
+      rewrite <- EQ in WF; csetsimpl in WF.
       apply subcapt_set...
-      * admit.                  (* wf_cset *)
       * intros y yIn.
         apply subcapt_in...
-        1,2: admit.             (* wf_cset *)
+        eapply wf_cset_singleton_by_mem...
       * csetdec.
     + destruct_set_mem x xs.
       2: {
         apply subcapt_in...
-        1,2: admit.             (* wf_cset *)
       }
       assert (wf_cset_in (F ++ [(x, bind_typ U)] ++ E) (cv U)) as HA. {
         note (wf_env ([(x, bind_typ U)] ++ E)) by eauto...
@@ -544,9 +547,11 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
         apply wf_cset_in_weakening; simpl_env...
       }
       inversion HA; subst.
-      unfold cset_union; csetsimpl.
+      csetsimpl.
+      rename select (_ = cv U) into EQ.
+      rewrite <- EQ in WF; csetsimpl in WF.
+      rewrite <- EQ in WF0; csetsimpl in WF0.
       apply subcapt_in...
-      1,2: admit.               (* wf_cset *)
   - assert (wf_cset_in (map (subst_cb x (cv U)) F ++ E) (subst_cset x (cv U) D)). {
       eapply wf_cset_in_subst_cb...
     }
