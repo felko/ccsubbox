@@ -927,11 +927,31 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
       * assert (binds x (bind_sub (subst_tt X P T)) (map (subst_tb X P) F ++ E)) as HBnd by auto.
         eapply subcapt_tvar...
         admit.
-  - unfold subst_cset at 1.
+  - assert (wf_cset_in (map (subst_tb X P) F ++ E)
+                       (subst_cset X (cv P) (cset_set xs {}N b))) as ?WF. {
+      eapply wf_cset_in_subst_tb...
+      constructor.
+      - intros y yIn.
+        enough (wf_cset_in (F ++ [(X, bind_sub Q)] ++ E) (`cset_fvar` y)) as HA. {
+          inversion HA...
+        }
+        specialize (H0 y yIn); simpl in H0...
+      - intros y yIn.
+        enough (wf_cset_in (F ++ [(X, bind_sub Q)] ++ E) (`cset_fvar` y)) as HA. {
+          inversion HA...
+        }
+        specialize (H0 y yIn); simpl in H0...
+    }
+    assert (wf_cset_in (map (subst_tb X P) F ++ E)
+                       (subst_cset X (cv P) D)) as ?WF. {
+      eapply wf_cset_in_subst_tb...
+    }
+
+    unfold subst_cset at 1.
+    unfold subst_cset in WF.
     destruct_set_mem X xs.
     2: {
-      apply subcapt_set.
-      1: admit.               (* wf_cset *)
+      apply subcapt_set...
       2: {
         (* Should we have a lemma that `cset_uvar` is not affected by subst? *)
         (* Looking at that chain, we probably should. *)
@@ -956,16 +976,17 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
     inversion HA; subst.
 
     rename fvars into cs', univ into b__c', fvars0 into ds, univ0 into b__d.
-    unfold subst_cset.
+    unfold subst_cset in WF0 |- *.
     destruct_set_mem X cs'.
-    + csetsimpl.
-      apply subcapt_set.
-      1: admit.               (* wf_cset *)
+    + rename select (_ = cv P) into EQ.
+      rewrite <- EQ in WF, WF0.
+      csetsimpl.
+      apply subcapt_set...
       2: csetdec.
       intros y yIn.
       destruct_union_mem yIn. {
         apply subcapt_in...
-        1,2: admit.             (* wf_cset *)
+        eapply wf_cset_singleton_by_mem...
       }
 
       specialize (H0 y ltac:(fsetdec)); simpl in H0.
@@ -981,11 +1002,11 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
 
       dependent induction H0.
       * csetsimpl.
-        apply subcapt_universal.
-        1,2: admit.             (* wf_cset *)
+        apply subcapt_universal...
+        applys wf_cset_singleton_by_mem (ds `u`A xs `\`A X)...
       * cleanup_singleton_eq x y x0.
         apply subcapt_in...
-        1,2: admit.             (* wf_cset *)
+        applys wf_cset_singleton_by_mem (ds `u`A xs `\`A X)...
       * cleanup_singleton_eq x y x0.
         rename select (_ = cv P) into EQ.
         replace (`cset_fvar` y) with (subst_cset X (cv P) (`cset_fvar` y)).
@@ -1037,7 +1058,7 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
     + csetsimpl.
       rename select (_ = cv P) into EQ.
       apply subcapt_set.
-      1: admit.                (* wf_cset *)
+      1: trivial...
       2: {
         specialize (H1 X ltac:(fsetdec) X F Q E ltac:(trivial) ltac:(reflexivity) ltac:(trivial)).
         rewrite <- EQ in H1.
@@ -1052,11 +1073,10 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
       destruct_set_mem y (xs `remove` X).
       * specialize (H0 y ltac:(fsetdec)); simpl in H0.
         dependent induction H0.
-        -- apply subcapt_universal.
-           1,2: admit.             (* wf_cset *)
+        -- apply subcapt_universal...
+           rewrite <- EQ in WF; csetsimpl; applys wf_cset_singleton_by_mem yIn...
         -- cleanup_singleton_eq x y x0.
            apply subcapt_in...
-           1,2: admit.             (* wf_cset *)
         -- cleanup_singleton_eq x y x0.
            replace (`cset_fvar` y)
              with (subst_cset X (cv P) (`cset_fvar` y)).

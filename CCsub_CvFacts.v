@@ -653,11 +653,31 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
             admit.
         }
         apply IHHsc...
-  - unfold subst_cset at 1.
+  - assert (wf_cset_in (map (subst_cb x (cv U)) F ++ E)
+                       (subst_cset x (cv U) (cset_set xs {}N b))) as ?WF. {
+      eapply wf_cset_in_subst_cb...
+      constructor.
+      - intros y yIn.
+        enough (wf_cset_in (F ++ [(x, bind_typ U)] ++ E) (`cset_fvar` y)) as HA. {
+          inversion HA...
+        }
+        specialize (H0 y yIn); simpl in H0...
+      - intros y yIn.
+        enough (wf_cset_in (F ++ [(x, bind_typ U)] ++ E) (`cset_fvar` y)) as HA. {
+          inversion HA...
+        }
+        specialize (H0 y yIn); simpl in H0...
+    }
+    assert (wf_cset_in (map (subst_cb x (cv U)) F ++ E)
+                       (subst_cset x (cv U) D)) as ?WF. {
+      eapply wf_cset_in_subst_cb...
+    }
+
+    unfold subst_cset at 1.
+    unfold subst_cset in WF.
     destruct_set_mem x xs.
     2: {
-      apply subcapt_set.
-      1: admit.               (* wf_cset *)
+      apply subcapt_set...
       2: {
         (* Should we have a lemma that `cset_uvar` is not affected by subst? *)
         (* Looking at that chain, we probably should. *)
@@ -681,18 +701,19 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
     inversion HA; subst.
 
     rename fvars into cs', univ into b__c', fvars0 into ds, univ0 into b__d.
-    unfold subst_cset.
+    unfold subst_cset in WF0 |- *.
     destruct_set_mem x cs'.
-    + unfold cset_union; csetsimpl.
-      apply subcapt_set.
-      1: admit.               (* wf_cset *)
+    + rename select (_ = cv U) into EQ.
+      rewrite <- EQ in WF, WF0.
+      csetsimpl.
+      apply subcapt_set...
       2: csetdec.
       intros y yIn.
       Ltac destruct_union_mem H :=
         rewrite AtomSetFacts.union_iff in H; destruct H.
       destruct_union_mem yIn. {
         apply subcapt_in...
-        1,2: admit.             (* wf_cset *)
+        eapply wf_cset_singleton_by_mem...
       }
 
       specialize (H0 y ltac:(fsetdec)); simpl in H0.
@@ -709,11 +730,11 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
 
       dependent induction H0.
       * csetsimpl.
-        apply subcapt_universal.
-        1,2: admit.             (* wf_cset *)
+        apply subcapt_universal...
+        applys wf_cset_singleton_by_mem (ds `u`A xs `\`A x)...
       * cleanup_singleton_eq x y x0 x1.
         apply subcapt_in...
-        1,2: admit.             (* wf_cset *)
+        applys wf_cset_singleton_by_mem (ds `u`A xs `\`A x)...
       * cleanup_singleton_eq x y x0 x1.
         rename select (_ = cv U) into EQ.
         replace (`cset_fvar` y) with (subst_cset x (cv U) (`cset_fvar` y)).
@@ -764,10 +785,10 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
         }
         rewrite EQ.
         eapply H1...
-    + unfold cset_union; csetsimpl.
+    + csetsimpl.
       rename select (_ = cv U) into EQ.
       apply subcapt_set.
-      1: admit.                (* wf_cset *)
+      1: rewrite EQ in *...
       2: {
         specialize (H1 x ltac:(fsetdec) _ _ _ _ ltac:(reflexivity) ltac:(trivial)).
         rewrite <- EQ in H1.
@@ -783,11 +804,13 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
       destruct_set_mem y (xs `remove` x).
       * specialize (H0 y ltac:(fsetdec)); simpl in H0.
         dependent induction H0.
-        -- apply subcapt_universal.
-           1,2: admit.             (* wf_cset *)
+        -- apply subcapt_universal...
+           1: rewrite EQ in *...
+           1: rewrite <- EQ in WF; csetsimpl; applys wf_cset_singleton_by_mem yIn...
         -- cleanup_singleton_eq x y x0 x1.
            apply subcapt_in...
-           1,2: admit.             (* wf_cset *)
+           1: rewrite <- EQ in WF; csetsimpl; applys wf_cset_singleton_by_mem yIn...
+           1: rewrite EQ in *...
         -- cleanup_singleton_eq x y x0 x1.
            replace (`cset_fvar` y)
              with (subst_cset x (cv U) (`cset_fvar` y)).
