@@ -613,8 +613,15 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
           - unfold subst_cset.
             destruct_if...
             exfalso;csetdec.
-          - (* x is bound as a term var, therefore `x <> a`. Needs a lemma. *)
-            admit.
+          - assert (x <> a). {
+              forwards WfA: wf_typ_from_binds_typ x0 a...
+              assert (binds x _ (F ++ [(x, bind_typ U)] ++ E)) by auto.
+              inversion WfA; subst.
+              forwards: binds_unique a...
+            }
+            unfold subst_cset.
+            destruct_set_mem x {a}A; [exfalso;fsetdec|].
+            easy.
         }
         apply IHHsc...
   - unfold subst_cset at 1.
@@ -649,8 +656,15 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
           - unfold subst_cset.
             destruct_if...
             exfalso;csetdec.
-          - (* x is bound as a term var, therefore `x <> a`. Needs a lemma. *)
-            admit.
+          - assert (x <> a). {
+              forwards WfA: wf_typ_from_binds_sub x0 a...
+              assert (binds x _ (F ++ [(x, bind_typ U)] ++ E)) by auto.
+              inversion WfA; subst.
+              forwards: binds_unique a...
+            }
+            unfold subst_cset.
+            destruct_set_mem x {a}A; [exfalso;fsetdec|].
+            easy.
         }
         apply IHHsc...
   - assert (wf_cset_in (map (subst_cb x (cv U)) F ++ E)
@@ -878,4 +892,4 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
         eapply subcapt_in...
         forwards (? & ?): subcapt_regular H1.
         inversion select (wf_cset_in _ (cset_set ds _ _)); subst...
-Admitted.
+Qed.
