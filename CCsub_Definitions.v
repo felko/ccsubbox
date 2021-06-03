@@ -625,6 +625,8 @@ Inductive red : exp -> exp -> Prop :=
       red (exp_tapp (exp_tabs T1 e1) T2) (open_te e1 T2)
 .
 
+(** Special atom used for abort *)
+Parameter abort : atom.
 
 (* ********************************************************************** *)
 (** * #<a name="auto"></a># Automation *)

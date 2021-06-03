@@ -237,7 +237,7 @@ Ltac gather_atoms :=
   let G := gather_atoms_with (fun x : cap => `cset_fvars` x) in
   let H := gather_atoms_with (fun x : typ => fv_ct x) in
   let I := gather_atoms_with (fun x : exp => fv_ce x) in
-  constr:(A `union` B `union` C `union` D `union` E `union` F `union` G `union` H `union` I).
+  constr:(A `union` B `union` C `union` D `union` E `union` F `union` G `union` H `union` I `union` singleton abort).
 
 (** The second step in defining "[pick fresh]" is to define the tactic
     itself.  It is based on the [(pick fresh ... for ...)] tactic
