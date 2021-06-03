@@ -628,6 +628,69 @@ Inductive red : exp -> exp -> Prop :=
 (** Special atom used for abort *)
 Parameter abort : atom.
 
+Lemma decidable_abort : forall (e : exp),
+  e = abort \/ e <> abort.
+Proof with eauto*. 
+  intro.
+  induction e; try solve [right; discriminate].
+  * destruct (a == abort); subst.
+    - left...
+    - right...
+Qed.
+
+(** Special reduction rules *)
+Inductive redexp : Type :=
+  | expression : exp -> redexp
+  | aborted : redexp.
+
+Coercion expression : exp >-> redexp.
+
+(** Reduction rules in the presence of abort,
+    a special atom which occurs in function position
+    having type Top -> ??? *)
+Inductive red_abort : exp -> redexp -> Prop :=
+  | redA_app_1 : forall (e1 e1' e2 : exp),
+      expr e2 ->
+      red_abort e1 e1' ->
+      red_abort (exp_app e1 e2) (exp_app e1' e2)
+  | redA_app_aborted_1 : forall (e1 e2 : exp),
+      expr e2 ->
+      red_abort e1 aborted ->
+      red_abort (exp_app e1 e2) aborted
+  | redA_app_2 : forall (e1 e2 e2' : exp),
+      value e1 ->
+      e1 <> abort ->
+      red_abort e2 e2 ->
+      red_abort (exp_app e1 e2) (exp_app e1 e2')
+  | redA_app_aborted_2 : forall (e1 e2 : exp),
+      value e1 ->
+      e1 <> abort ->
+      red_abort e2 aborted ->
+      red_abort (exp_app e1 e2) aborted
+  | redA_app_abort_2 : forall (e1 e2 : exp),
+      value e1 ->
+      e1 = abort ->
+      red_abort (exp_app e1 e2) aborted
+  | redA_tapp : forall (e1 e1' : exp) V,
+      type V ->
+      red_abort e1 e1' ->
+      red_abort (exp_tapp e1 V) (exp_tapp e1' V)
+  | redA_tapp_aborted : forall (e1 : exp) V,
+      type V ->
+      red_abort e1 aborted ->
+      red_abort (exp_tapp e1 V) aborted
+  | redA_abs : forall T (e1 v2 : exp),
+      expr (exp_abs T e1) ->
+      value v2 ->
+      red_abort (exp_app (exp_abs T e1) v2)
+        (** is this the right reduction semantics? *)
+        (open_ee e1 v2 (free_for_cv v2))
+  | redA_tabs : forall T1 (e1 : exp) T2,
+      expr (exp_tabs T1 e1) ->
+      type T2 ->
+      red_abort (exp_tapp (exp_tabs T1 e1) T2) (open_te e1 T2)
+.
+
 (* ********************************************************************** *)
 (** * #<a name="auto"></a># Automation *)
 
