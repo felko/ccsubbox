@@ -745,7 +745,7 @@ Proof with eauto using wf_cset_union, wf_cset_atom_union with fsetdec.
 Qed.
 
 Ltac destruct_union_mem H :=
-  rewrite AtomSetFacts.union_iff in H; destruct H.
+  rewrite AtomSetFacts.union_iff in H; destruct H as [H|H].
 
 Tactic Notation "subst_mem_singleton" hyp(H) :=
   rewrite AtomSetFacts.singleton_iff in H; subst.
@@ -753,63 +753,109 @@ Tactic Notation "subst_mem_singleton" hyp(H) :=
 Tactic Notation "subst_mem_singleton" "<-" hyp(H) :=
   rewrite AtomSetFacts.singleton_iff in H; symmetry in H; subst.
 
+Lemma subcapt_singleton_mem: forall x E C D,
+  wf_env E ->
+  subcapt E C D ->
+  x A`in` C ->
+  subcapt E (`cset_fvar` x) D.
+Proof with eauto with fsetdec.
+  intros * WfE Hsc xIn.
+  dependent induction Hsc...
+  - apply subcapt_universal...
+    note (wf_cset_in E C).
+    eapply wf_cset_singleton_by_mem...
+  - exfalso;fsetdec.
+  - subst_mem_singleton xIn.
+    apply subcapt_transitivity with (C2 := cv T)...
+    eapply subcapt_var...
+    eapply subcapt_reflexivity...
+  - subst_mem_singleton xIn.
+    apply subcapt_transitivity with (C2 := cv T)...
+    eapply subcapt_tvar...
+    eapply subcapt_reflexivity...
+Qed.
+
+Lemma subcapt_universal_mem: forall E C D,
+  wf_env E ->
+  subcapt E C D ->
+  implb (`cset_uvar` C) (`cset_uvar` D) = true.
+Proof with eauto with fsetdec.
+  intros * WfE Hsc.
+  dependent induction Hsc...
+  csetdec.
+Qed.
+
 Lemma subcapt_union_distributivity : forall E C1 C2 D,
+  wf_env E ->
   subcapt E C1 D ->
   subcapt E C2 D ->
   subcapt E (cset_union C1 C2) D.
 Proof with eauto using wf_cset_union with fsetdec.
-  intros * HscC1 HscC2.
+  intros * WfE HscC1 HscC2.
   assert (wf_cset_in E (cset_union C1 C2)) by auto using wf_cset_union.
   generalize dependent C2.
-  admit.
-  (* dependent induction HscC1; intros C2 HscC2 Wf__union... *)
-  (* - note (wf_cset_in E C2)... *)
-  (*   simpl in *; replace (NatSet.F.union _ _) with {}N by fnsetdec. *)
-  (*   rename fvars into cs. *)
-  (*   apply subcapt_set... *)
-  (*   intros y yIn. *)
-  (*   destruct_union_mem yIn. { *)
-  (*     subst_mem_singleton H4. *)
-  (*     apply subcapt_in... *)
-  (*   } *)
-  (*   inversion HscC2; subst. *)
-  (*   + apply subcapt_in... *)
-  (*   + subst_mem_singleton H4. *)
-  (*     eapply subcapt_var... *)
-  (*   + trivial... *)
-  (* - note (wf_cset_in E D)... *)
-  (*   note (wf_cset_in E C2)... *)
-  (*   simpl in *; replace (NatSet.F.union _ _) with {}N in * by fnsetdec. *)
-  (*   rename fvars into ds. *)
-  (*   rename fvars0 into cs. *)
-  (*   apply subcapt_set... *)
-  (*   intros y yIn. *)
-  (*   destruct_union_mem yIn. { *)
-  (*     subst_mem_singleton H5. *)
-  (*     eapply subcapt_var... *)
-  (*   } *)
-  (*   inversion HscC2; subst. *)
-  (*   * apply subcapt_in... *)
-  (*   * subst_mem_singleton <- H5. *)
-  (*     eapply subcapt_var... *)
-  (*   * trivial... *)
-  (* - note (wf_cset_in E D)... *)
-  (*   note (wf_cset_in E C2)... *)
-  (*   simpl in *; replace (NatSet.F.union _ _) with {}N in * by fnsetdec. *)
-  (*   rename fvars into ds. *)
-  (*   rename fvars0 into cs. *)
-  (*   apply subcapt_set... *)
-  (*   intros y yIn. *)
-  (*   destruct_union_mem yIn. { *)
-  (*     trivial... *)
-  (*   } *)
-
-  (*   inversion HscC2; subst. *)
-  (*   * apply subcapt_in... *)
-  (*   * subst_mem_singleton H6. *)
-  (*     eapply subcapt_var... *)
-  (*   * trivial... *)
-Admitted.
+  dependent induction HscC1; intros C2 HscC2 WF__union...
+  - note (wf_cset_in E C2); csetsimpl.
+    apply subcapt_set.
+    1: trivial...
+    2: forwards: subcapt_universal_mem HscC2...
+    intros y yIn.
+    destruct_union_mem yIn.
+    + subst_mem_singleton yIn.
+      apply subcapt_in...
+    + eapply subcapt_transitivity.
+      3: apply HscC2.
+      * trivial...
+      * apply subcapt_in...
+  - note (wf_cset_in E D); subst.
+    apply subcapt_universal...
+  - apply subcapt_transitivity with (C2 := cv T `u` C2)...
+    assert (wf_cset_in E (cv T `u` C2)) as WfU by auto using wf_cset_union.
+    note (wf_cset_in E C2).
+    note (wf_cset_in E (cv T)).
+    rewrite <- H2 in WfU.
+    csetsimpl.
+    apply subcapt_set...
+    2: csetdec.
+    intros y yIn.
+    destruct_union_mem yIn.
+    + subst_mem_singleton yIn.
+      apply subcapt_transitivity with (C2 := cv T)...
+      * eapply subcapt_var...
+        eapply subcapt_reflexivity...
+      * rewrite <- H2.
+        apply subcapt_set...
+        2: csetdec.
+        intros z zIn.
+        apply subcapt_in...
+    + apply subcapt_in...
+  - apply subcapt_transitivity with (C2 := cv T `u` C2)...
+    assert (wf_cset_in E (cv T `u` C2)) as WfU by auto using wf_cset_union.
+    note (wf_cset_in E C2).
+    note (wf_cset_in E (cv T)).
+    rewrite <- H2 in WfU.
+    csetsimpl.
+    apply subcapt_set...
+    2: csetdec.
+    intros y yIn.
+    destruct_union_mem yIn.
+    + subst_mem_singleton yIn.
+      apply subcapt_transitivity with (C2 := cv T)...
+      * eapply subcapt_tvar...
+        eapply subcapt_reflexivity...
+      * rewrite <- H2.
+        apply subcapt_set...
+        2: csetdec.
+        intros z zIn.
+        apply subcapt_in...
+    + apply subcapt_in...
+  - note (wf_cset_in E C2); csetsimpl.
+    apply subcapt_set...
+    2: forwards: subcapt_universal_mem HscC2; csetdec...
+    intros y yIn.
+    destruct_union_mem yIn...
+    apply subcapt_transitivity with (C2 := (cset_set fvars {}N univ))...
+Qed.
 
 Lemma cset_union_symmetrical : forall C D,
   cset_union C D = cset_union D C.
@@ -820,13 +866,13 @@ Proof with eauto.
 Qed.
 
 Lemma union_under_subcapturing : forall E C1 C2 D1 D2,
+  wf_env E ->
   subcapt E C1 C2 ->
   subcapt E D1 D2 ->
   subcapt E (cset_union C1 D1) (cset_union C2 D2).
 Proof with eauto.
-  intros *.
-  intros Hsc1 Hsc2.
-  apply subcapt_union_distributivity.
+  intros * WfE Hsc1 Hsc2.
+  apply subcapt_union_distributivity...
   - apply subcapt_expansion...
   - rewrite cset_union_symmetrical.
     apply subcapt_expansion...
@@ -839,7 +885,8 @@ Lemma subcapt_through_subst_tt : forall E P Q F X C D,
   subcapt (map (subst_tb X P) F ++ E) (subst_cset X (cv P) C) (subst_cset X (cv P) D).
 Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb with fsetdec.
   intros * Hwf Hsc Hsub.
-  dependent induction Hsc.
+  generalize dependent P.
+  dependent induction Hsc; intros P Hsub.
   - assert (wf_cset_in (map (subst_tb X P) F ++ E) (subst_cset X (cv P) C)) as ?WF...
     assert (wf_cset_in (map (subst_tb X P) F ++ E)
                        (subst_cset X (cv P) (cset_set xs {}N true))) as ?WF...
@@ -948,13 +995,15 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
       assert (binds X (bind_sub Q) (F ++ [(X, bind_sub Q)] ++ E)) as HBnd by auto.
       forwards EQ: binds_unique H HBnd.
       inversion EQ; subst.
-      assert (wf_typ_in E P) by eauto.
+      assert (wf_typ_in E P) as WfP by eauto.
+      assert (wf_typ_in E Q) as WfQ by eauto.
       assert (X `notin` dom E) as HA. {
         assert (ok (F ++ [(X, bind_sub Q)] ++ E)) as HA by auto.
         apply ok_tail in HA.
         inversion HA...
       }
-      forwards: notin_fv_wf_typ H0 HA.
+      forwards: notin_fv_wf_typ WfP HA.
+      forwards: notin_fv_wf_typ WfQ HA.
       replace (cv P `u` cset_set ({X}A `\`A X) {}N false)
         with (cv P) by (destruct P; csetdec).
       replace (cv P) with (subst_cset X (cv P) (cv P)) at 1.
@@ -963,7 +1012,16 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
         apply subst_cset_fresh.
         destruct P; simpl in *; try fsetdec.
       }
-      admit.
+      apply subcapt_transitivity with (C2 := subst_cset X (cv P) (cv Q))...
+      eenough (subcapt E _ _) as HE. {
+        rewrite_env (empty ++ (map (subst_tb X P) F ++ E)).
+        apply subcapt_weakening; simpl_env...
+      }
+      do 2 erewrite <- cv_subst_ct_correspondence by fsetdec.
+      do 2 erewrite <- subst_ct_fresh by fsetdec.
+      apply sub_implies_subcapt.
+      1: trivial.
+      all: apply cv_wf...
     + assert (x <> X) by fsetdec.
       binds_cases H.
       * specialize (IHHsc X F Q E ltac:(trivial) ltac:(trivial) ltac:(trivial)).
@@ -1129,14 +1187,14 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
       apply subcapt_set.
       1: trivial...
       2: {
-        specialize (H1 X ltac:(fsetdec) X F Q E ltac:(trivial) ltac:(reflexivity) ltac:(trivial)).
-        rewrite <- EQ in H1.
-        unfold subst_cset in H1.
+        forwards SpH1: H1 X X F Q E...
+        rewrite <- EQ in SpH1.
+        unfold subst_cset in SpH1.
         find_and_destroy_set_mem; [|exfalso;fsetdec].
         find_and_destroy_set_mem; [exfalso;fsetdec|].
-        csetsimpl in H1.
+        csetsimpl in SpH1.
         destr_bool.
-        inversion H1; subst; easy.
+        inversion SpH1; subst; easy.
       }
       intros y yIn.
       destruct_set_mem y (xs `remove` X).
@@ -1211,7 +1269,7 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
         eapply subcapt_in...
         forwards (? & ?): subcapt_regular H1.
         inversion select (wf_cset_in _ (cset_set ds _ _)); subst...
-Admitted.
+Qed.
 
 Lemma sub_through_subst_tt : forall Q E F Z S T P,
   sub (F ++ [(Z, bind_sub Q)] ++ E) S T ->
