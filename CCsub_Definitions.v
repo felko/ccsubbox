@@ -660,7 +660,7 @@ Inductive red_abort : exp -> redexp -> Prop :=
       red_abort (exp_app e1 e2) aborted
   | redA_app_2 : forall (e1 e2 e2' : exp),
       value e1 ->
-      red_abort e2 e2 ->
+      red_abort e2 e2' ->
       red_abort (exp_app e1 e2) (exp_app e1 e2')
   | redA_app_aborted_2 : forall (e1 e2 : exp),
       value e1 ->
