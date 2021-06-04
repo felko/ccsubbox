@@ -3261,3 +3261,114 @@ Proof with eauto.
       subst.
       exists (open_te e3 T)...
 Qed.
+
+Lemma canonical_form_absA : forall e U1 U2 C,
+  value e ->
+  typing [(abort, bind_typ (typ_capt {} (typ_all 0 0)))] e (typ_capt C (typ_arrow U1 U2)) ->
+  exists V, exists e1, e = exp_abs V e1.
+Proof.
+  intros e U1 U2 C Val Typ.
+  remember empty.
+  remember (typ_arrow U1 U2).
+  revert U1 U2 Heqp Heql.
+  dependent induction Typ; intros U1 U2 EQT EQE; subst;
+    try solve [ inversion Val | inversion EQT | eauto ].
+  Case "typing_sub".
+  inversion H; subst; eauto.
+  + binds_cases H0.
+  + inversion H5; subst.
+    eapply IHTyp; eauto.
+Qed.
+
+Lemma canonical_form_tabsA : forall e U1 U2 C,
+  value e ->
+  typing [(abort, bind_typ (typ_capt {} (typ_all 0 0)))] e (typ_capt C (typ_all U1 U2)) ->
+  exists V, exists e1, e = exp_tabs V e1.
+Proof.
+  intros e U1 U2 C Val Typ.
+  remember empty.
+  remember (typ_all U1 U2).
+  revert U1 U2 Heqp Heql.
+  dependent induction Typ; intros U1 U2 EQT EQE; subst;
+    try solve [ inversion Val | inversion EQT | eauto ].
+  Case "typing_sub".
+  inversion H; subst; eauto.
+  + binds_cases H0.
+  + inversion H5; subst.
+    eapply IHTyp; eauto.
+Qed.
+
+Lemma progress_abort : forall e T,
+  typing [(abort, bind_typ (typ_capt {} (typ_all 0 0)))] e T ->
+  e = abort \/ value e \/ red_abort e aborted \/ (exists (e' : exp), red_abort e e').
+Proof with eauto*.
+  intros e T Typ.
+  remember [(abort, bind_typ (typ_capt {} (typ_all 0 0)))].
+  generalize dependent Heql.
+  assert (Typ' : typing l e T)...
+  induction Typ; intros EQ; subst...
+  - Case "typing_var".
+    inversion H0...
+    destruct (x == abort)...
+  - Case "typing_app_1".
+    inversion H0...
+    destruct (x == abort)...
+    left...
+  - Case "typing_app_2".
+    destruct IHTyp1 as [EqAbort1 | [Val1 | [Aborted1 | [e1' Rede1']]]]; subst...
+    * (** called abort, can't, as it's a type function. *)
+      exfalso.
+      clear IHTyp2 Typ' H Typ2.
+      (* contradiction: abort has the wrong type here, admit for now *)
+      admit.
+    * (** e1 is a value, now we reduce e2 *)
+      destruct IHTyp2 as [EqAbort2 | [Val2 | [Aborted2 | [e2' Rede2']]]]; subst...
+      + (* e2 abort *)
+        right. right. right.
+        lets (S & e3 & EQ): canonical_form_absA Val1 Typ1.
+        subst.
+        exists (open_ee e3 abort (free_for_cv abort))...
+        eapply redA_abs...
+        (* abort is a value, fix this. *)
+        admit.
+      + (** e2 value *)
+        right. right. right.
+        lets (S & e3 & EQ): canonical_form_absA Val1 Typ1.
+        subst.
+        exists (open_ee e3 e2 (free_for_cv e2))...
+        apply redA_abs...
+      + (** e2 congruence *)
+        right. right. left...
+        apply redA_app_aborted_2...
+      + right. right. right.
+        exists (exp_app e1 e2')...
+        apply redA_app_2...
+    * (** e1 aborted *)
+      right. right. left.
+      apply redA_app_aborted_1...
+    * (** e1 congruence *)
+      right. right. right.
+      exists (exp_app e1' e2).
+      apply redA_app_1...
+  - Case "typing_tapp".
+    (** don't care about if the result is abort... *)
+    right.
+    destruct IHTyp as [EqAbort | [Val | [Aborted | [e' Rede']]]]; subst...
+    * (** invoked abort *)  
+      right. left.
+      apply redA_tabs_abort.
+    * (** is a value *)
+      right. right.
+      lets (S & e3 & EQ): canonical_form_tabsA Val Typ.
+      subst.
+      exists (open_te e3 T)...
+      apply redA_tabs...
+    * (** aborted *)
+      right. left.
+      econstructor...
+    * (** e1 congruence *)
+      right. right.
+      exists (exp_tapp e' T).
+      apply redA_tapp...
+Admitted.
+
