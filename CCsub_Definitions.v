@@ -679,7 +679,7 @@ Inductive red_abort : exp -> redexp -> Prop :=
       red_abort (exp_tapp abort T) aborted
   | redA_abs : forall T (e1 v2 : exp),
       expr (exp_abs T e1) ->
-      (value v2 \/ v2 = abort) ->
+      value v2 ->
       red_abort (exp_app (exp_abs T e1) v2)
         (** is this the right reduction semantics? *)
         (open_ee e1 v2 (free_for_cv v2))
