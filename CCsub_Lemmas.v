@@ -123,7 +123,7 @@ Proof.
   apply wf_cset_weakening with (A := A); auto.
 Qed.
 
-Local Lemma atomset_union_right : forall A B C,
+Lemma atomset_union_right : forall A B C,
   AtomSet.F.Subset A B ->
   AtomSet.F.Subset (A `union` C) (B `union` C).
 Proof.
@@ -1117,7 +1117,7 @@ Qed.
 
 (** These proofs are all the same, but Coq isn't smart enough unfortunately... *)
 
-Local Lemma notin_fv_tt_open_tt_rec : forall k (Y X : atom) T,
+Lemma notin_fv_tt_open_tt_rec : forall k (Y X : atom) T,
   X `notin` fv_tt (open_tt_rec k Y T) ->
   X `notin` fv_tt T
 with notin_fv_tpt_open_tpt_rec : forall k (Y X : atom) T,
@@ -1135,7 +1135,7 @@ Proof.
 Qed.
 
 
-Local Lemma notin_fv_tt_open_tt : forall (Y X : atom) T,
+Lemma notin_fv_tt_open_tt : forall (Y X : atom) T,
   X `notin` fv_tt (open_tt T Y) ->
   X `notin` fv_tt T
 with notin_fv_tpt_open_tpt : forall (Y X : atom) T,
@@ -1146,7 +1146,7 @@ Proof with eauto.
   intros. apply notin_fv_tpt_open_tpt_rec with (k := 0) (Y := Y)...
 Qed.
 
-Local Lemma notin_cset_fvars_open_cset : forall X k C c,
+Lemma notin_cset_fvars_open_cset : forall X k C c,
   X `~in`A `cset_fvars` (open_cset k C c) ->
   X `~in`A `cset_fvars` c.
 Proof.
@@ -1157,7 +1157,7 @@ Proof.
   csetdec.
 Qed.
 
-Local Lemma notin_fv_tt_open_ct_rec : forall (Y X : atom) T k,
+Lemma notin_fv_tt_open_ct_rec : forall (Y X : atom) T k,
   X `notin` fv_ct (open_tt_rec k Y T) ->
   X `notin` fv_ct T
 with notin_fv_tt_open_cpt_rec : forall (Y X : atom) T k,
@@ -1172,7 +1172,7 @@ Proof with eauto using notin_cset_fvars_open_cset.
   induction T; simpl; intros k Fr; notin_simpl; try apply notin_union...
 Qed.
 
-Local Lemma notin_fv_tt_open_ct : forall (Y X : atom) T,
+Lemma notin_fv_tt_open_ct : forall (Y X : atom) T,
   X `notin` fv_ct (open_tt T Y) ->
   X `notin` fv_ct T
 with notin_fv_tt_open_cpt : forall (Y X : atom) T,
@@ -1183,7 +1183,7 @@ Proof with eauto.
   intros. apply notin_fv_tt_open_cpt_rec with (k := 0) (Y := Y)...
 Qed.
 
-Local Lemma notin_fv_tt_open : forall (Y X : atom) T,
+Lemma notin_fv_tt_open : forall (Y X : atom) T,
   X `notin` fv_tt (open_tt T Y) ->
   X `notin` fv_ct (open_tt T Y) ->
   X `notin` (fv_tt T `union` fv_ct T).
@@ -1193,7 +1193,7 @@ Proof with auto.
  - apply notin_fv_tt_open_ct with (Y := Y)...
 Qed.
 
-Local Lemma notin_fv_ct_open_tt_rec : forall (X : atom) T C k,
+Lemma notin_fv_ct_open_tt_rec : forall (X : atom) T C k,
   X `notin` fv_tt (open_ct_rec k C T) ->
   X `notin` fv_tt T
 with notin_fv_cpt_open_tpt_rec : forall (X : atom) T C k,
@@ -1212,7 +1212,7 @@ Proof with auto.
   - apply notin_fv_ct_open_tt_rec with (C := C) (k := S k)...
 Qed.
 
-Local Lemma notin_fv_ct_open_tt : forall (X : atom) T C,
+Lemma notin_fv_ct_open_tt : forall (X : atom) T C,
   X `notin` fv_tt (open_ct T C) ->
   X `notin` fv_tt T
 with notin_fv_cpt_open_tpt : forall (X : atom) T C,
@@ -1223,7 +1223,7 @@ Proof with eauto.
   intros. apply notin_fv_cpt_open_tpt_rec with (k := 0) (C := C)...
 Qed.
 
-Local Lemma notin_fv_ct_open_ct_rec : forall (X : atom) T C k,
+Lemma notin_fv_ct_open_ct_rec : forall (X : atom) T C k,
   X `notin` fv_ct (open_ct_rec k C T) ->
   X `notin` fv_ct T
 with notin_fv_ct_open_cpt_rec : forall (X : atom) T C k,
@@ -1244,7 +1244,7 @@ Proof with auto.
     - apply notin_fv_ct_open_ct_rec with (C := C) (k := S k)...
 Qed.
 
-Local Lemma notin_fv_ct_open_ct : forall (X : atom) T C,
+Lemma notin_fv_ct_open_ct : forall (X : atom) T C,
   X `notin` fv_ct (open_ct T C) ->
   X `notin` fv_ct T
 with notin_fv_ct_open_cpt : forall (X : atom) T C,
@@ -1255,7 +1255,7 @@ Proof with auto.
   intros. apply notin_fv_ct_open_cpt_rec with (k := 0) (C := C)...
 Qed.
 
-(* Local Lemma notin_fv_ct_open_ct_rec : forall (Y X : atom) T k, *)
+(* Lemma notin_fv_ct_open_ct_rec : forall (Y X : atom) T k, *)
 (*   X `notin` fv_ct (open_ct_rec k Y T) -> *)
 (*   X <> Y -> *)
 (*   X `notin` fv_ct T *)
@@ -1279,7 +1279,7 @@ Qed.
 (*   - apply notin_fv_ct_open_ct_rec with (Y := Y) (k := S k)... *)
 (* Qed. *)
 
-(* Local Lemma notin_fv_ct_open_ct : forall (Y X : atom) T, *)
+(* Lemma notin_fv_ct_open_ct : forall (Y X : atom) T, *)
 (*   X `notin` fv_ct (open_ct T Y) -> *)
 (*   X <> Y -> *)
 (*   X `notin` fv_ct T *)
@@ -1371,7 +1371,7 @@ Proof with eauto.
   fsetdec.
 Qed.
 
-Local Lemma notin_fv_ee_open_ee_rec : forall k u (y x : atom) t,
+Lemma notin_fv_ee_open_ee_rec : forall k u (y x : atom) t,
   x `notin` fv_ee (open_ee_rec k u (`cset_fvar` y) t) ->
   x <> y ->
   x `notin` fv_ee t.
@@ -1395,7 +1395,7 @@ Proof with eauto.
   apply (notin_fv_ee_open_ee_rec 0 u y)...
 Qed.
 
-(* Local Lemma notin_fv_ct_open_tt_rec : forall k (Y X : atom) T, *)
+(* Lemma notin_fv_ct_open_tt_rec : forall k (Y X : atom) T, *)
 (*   X `notin` fv_ct (open_tt_rec k Y T) -> *)
 (*   X `notin` fv_ct T *)
 (* with notin_fv_cpt_open_tpt_rec : forall k (Y X : atom) T, *)
@@ -1412,7 +1412,7 @@ Qed.
 (*   induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto. *)
 (* Qed. *)
 
-Local Lemma notin_fv_ee_open_te_rec : forall k (y x : atom) t,
+Lemma notin_fv_ee_open_te_rec : forall k (y x : atom) t,
   x `notin` fv_ee (open_te_rec k y t) ->
   x <> y ->
   x `notin` fv_ee t.
