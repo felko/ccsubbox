@@ -647,8 +647,9 @@ Coercion expression : exp >-> redexp.
 
 (** Reduction rules in the presence of abort,
     a special atom which occurs in function position
-    having type Top -> ??? *)
+    having type [forall T <: Top] -> T *)
 Inductive red_abort : exp -> redexp -> Prop :=
+  (** congruence rules / evaluation contexts *)
   | redA_app_1 : forall (e1 e1' e2 : exp),
       expr e2 ->
       red_abort e1 e1' ->
@@ -659,17 +660,11 @@ Inductive red_abort : exp -> redexp -> Prop :=
       red_abort (exp_app e1 e2) aborted
   | redA_app_2 : forall (e1 e2 e2' : exp),
       value e1 ->
-      e1 <> abort ->
       red_abort e2 e2 ->
       red_abort (exp_app e1 e2) (exp_app e1 e2')
   | redA_app_aborted_2 : forall (e1 e2 : exp),
       value e1 ->
-      e1 <> abort ->
       red_abort e2 aborted ->
-      red_abort (exp_app e1 e2) aborted
-  | redA_app_abort_2 : forall (e1 e2 : exp),
-      value e1 ->
-      e1 = abort ->
       red_abort (exp_app e1 e2) aborted
   | redA_tapp : forall (e1 e1' : exp) V,
       type V ->
@@ -679,6 +674,9 @@ Inductive red_abort : exp -> redexp -> Prop :=
       type V ->
       red_abort e1 aborted ->
       red_abort (exp_tapp e1 V) aborted
+  (** reducing function application *)
+  | redA_tabs_abort : forall T,
+      red_abort (exp_tapp abort T) aborted
   | redA_abs : forall T (e1 v2 : exp),
       expr (exp_abs T e1) ->
       value v2 ->
