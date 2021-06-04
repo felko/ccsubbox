@@ -645,6 +645,17 @@ Inductive redexp : Type :=
 
 Coercion expression : exp >-> redexp.
 
+Inductive value_abort : exp -> Prop :=
+  | value_absA : forall T e1,
+      expr (exp_abs T e1) ->
+      value_abort (exp_abs T e1)
+  | value_tabsA : forall T e1,
+      expr (exp_tabs T e1) ->
+      value_abort (exp_tabs T e1)
+  | value_abortA :
+      value_abort abort
+.
+
 (** Reduction rules in the presence of abort,
     a special atom which occurs in function position
     having type [forall T <: Top] -> T *)
@@ -659,11 +670,11 @@ Inductive red_abort : exp -> redexp -> Prop :=
       red_abort e1 aborted ->
       red_abort (exp_app e1 e2) aborted
   | redA_app_2 : forall (e1 e2 e2' : exp),
-      value e1 ->
+      value_abort e1 ->
       red_abort e2 e2' ->
       red_abort (exp_app e1 e2) (exp_app e1 e2')
   | redA_app_aborted_2 : forall (e1 e2 : exp),
-      value e1 ->
+      value_abort e1 ->
       red_abort e2 aborted ->
       red_abort (exp_app e1 e2) aborted
   | redA_tapp : forall (e1 e1' : exp) V,
@@ -679,7 +690,7 @@ Inductive red_abort : exp -> redexp -> Prop :=
       red_abort (exp_tapp abort T) aborted
   | redA_abs : forall T (e1 v2 : exp),
       expr (exp_abs T e1) ->
-      value v2 ->
+      value_abort v2 ->
       red_abort (exp_app (exp_abs T e1) v2)
         (** is this the right reduction semantics? *)
         (open_ee e1 v2 (free_for_cv v2))
