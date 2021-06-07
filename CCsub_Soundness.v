@@ -2615,11 +2615,11 @@ Qed.
 
 Lemma valuesA_have_precise_captures : forall E u T,
   value_abort u ->
-  binds abort (bind_typ (typ_capt {} (typ_all 0 0))) E ->
+  binds abort (bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0))) E ->
   typing E u T ->
   exists U, typing E u (typ_capt (free_for_cv u) U) /\ sub E (typ_capt (free_for_cv u) U) T.
 Local Ltac hint ::=
-  simpl; eauto.
+  simpl; eauto*.
 Proof with hint.
   intros * Hv Ha Htyp.
   assert (wf_cset_in E (free_for_cv u)) by eauto using typing_cv.
@@ -2631,9 +2631,16 @@ Proof with hint.
   - inversion Hv; subst.
     inversion Ha. inversion H2.
     rewrite H4 in *. inversion H5; subst...
-    exists (typ_all 0 0); split...
-    eapply sub_reflexivity with (Ap := singleton abort) (Am := singleton abort)...
-    1, 2, 3: admit.
+    exists (typ_all (typ_capt {*} typ_top) 0); split...
+    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+    econstructor. econstructor...
+    * intros x xAbort. assert (x = abort) by fsetdec; subst.
+      exists (typ_capt {} (typ_all (typ_capt {*} typ_top) 0))...
+    * apply binds_In in Ha...
+    * pick fresh X and apply wf_typ_all...
+      cbv [open_tt open_tt_rec]. destruct (0 === 0)...
+      eapply wf_typ_var.
+      admit. admit.
   - Case "exp_abs".
     exists (typ_arrow V T1).
     split.
@@ -2651,7 +2658,7 @@ Proof with hint.
 Admitted.
 
 Lemma typing_through_subst_eeA : forall P E F x T e u,
-  binds abort (bind_typ (typ_capt {} (typ_all 0 0))) E ->
+  binds abort (bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0))) E ->
   typing (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) e T ->
   value_abort u ->
   typing E u (typ_capt (free_for_cv u) P) ->
@@ -2912,7 +2919,7 @@ Proof with hint.
 Qed.
 
 Lemma valueA_therefore_fv_subcapt_cv : forall E t T,
-  binds abort (bind_typ (typ_capt {} (typ_all 0 0))) E ->
+  binds abort (bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0))) E ->
   value_abort t ->
   typing E t T ->
   subcapt E (free_for_cv t) (cv T).
@@ -2925,7 +2932,10 @@ Proof with subst; simpl; eauto.
   - inversion Hv; inversion BindsA; inversion H0; subst; rewrite H3 in *; inversion H4; subst.
     cbv [cv]. apply subcapt_reflexivity with (A := dom E)...
     (** todo : abort is in E dammit *)
-    admit.
+    econstructor. 
+    * intros x xIsAbort.
+      assert (x = abort) by fsetdec; subst. exists (typ_capt {} (typ_all (typ_capt {*} typ_top) 0))...
+    * apply binds_In in H0...
   - inversion P3; subst.
     apply subcapt_reflexivity with (A := dom E)...
   - inversion P3; subst.
@@ -2933,10 +2943,10 @@ Proof with subst; simpl; eauto.
   - forwards: IHHtyp...
     apply (subcapt_transitivity (cv S))...
     eapply sub_implies_subcapt with (S := S) (T := T)...
-Admitted.
+Qed.
 
 Lemma typing_through_subst_eeA' : forall U E Ap Am x T e u,
-  binds abort (bind_typ (typ_capt {} (typ_all 0 0))) E ->
+  binds abort (bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0))) E ->
   typing ([(x, bind_typ U)] ++ E) e T ->
   wf_typ ([(x, bind_typ U)] ++ E) Ap Am T ->
   x `notin` Am ->
@@ -3004,7 +3014,7 @@ Qed.
 
 Lemma preservation_abort : forall E e (e' : exp) T,
   no_type_bindings E ->
-  binds abort (bind_typ (typ_capt {} (typ_all 0 0))) E ->
+  binds abort (bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0))) E ->
   typing E e T ->
   red_abort e e' ->
   typing E e' T.
@@ -3064,8 +3074,8 @@ Qed.
 
 Lemma canonical_form_absA : forall e U1 U2 C,
   value_abort e ->
-  typing [(abort, bind_typ (typ_capt {} (typ_all 0 0)))] e (typ_capt C (typ_arrow U1 U2)) ->
-  e = abort \/ exists V, exists e1, e = exp_abs V e1.
+  typing [(abort, bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0)))] e (typ_capt C (typ_arrow U1 U2)) ->
+  exists V, exists e1, e = exp_abs V e1.
 Proof with eauto*.
   intros e U1 U2 C Val Typ.
   dependent induction Typ; subst;
@@ -3081,7 +3091,7 @@ Qed.
 
 Lemma canonical_form_tabsA : forall e U1 U2 C,
   value_abort e ->
-  typing [(abort, bind_typ (typ_capt {} (typ_all 0 0)))] e (typ_capt C (typ_all U1 U2)) ->
+  typing [(abort, bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0)))] e (typ_capt C (typ_all U1 U2)) ->
   e = abort \/ exists V, exists e1, e = exp_tabs V e1.
 Proof with eauto*.
   intros e U1 U2 C Val Typ.
@@ -3097,11 +3107,11 @@ Proof with eauto*.
 Qed.
 
 Lemma progress_abort : forall e T,
-  typing [(abort, bind_typ (typ_capt {} (typ_all 0 0)))] e T ->
+  typing [(abort, bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0)))] e T ->
   value_abort e \/ red_abort e aborted \/ (exists (e' : exp), red_abort e e').
 Proof with eauto*.
   intros e T Typ.
-  remember [(abort, bind_typ (typ_capt {} (typ_all 0 0)))].
+  remember [(abort, bind_typ (typ_capt {} (typ_all (typ_capt {*} typ_top) 0)))].
   generalize dependent Heql.
   assert (Typ' : typing l e T)...
   induction Typ; intros EQ; subst...
@@ -3122,9 +3132,7 @@ Proof with eauto*.
       + (* e2 value *)
         right. right.
         unshelve epose proof (canonical_form_absA _ _ _ _ Val1 Typ1) as
-          [abort | [S [e3  EQ]]]; subst...
-        ++ (** contradiction: abort has the wrong type here, admit for now *)
-           admit.
+          [S [e3  EQ]]; subst...
         ++ subst.
            exists (open_ee e3 e2 (free_for_cv e2))...
            eapply redA_abs...
@@ -3161,5 +3169,5 @@ Proof with eauto*.
       right. right.
       exists (exp_tapp e' T).
       apply redA_tapp...
-Admitted.
+Qed.
 
