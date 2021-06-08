@@ -1328,13 +1328,14 @@ Proof with simpl_env; eauto; fold subst_cpt.
       specialize (H0 y NotIn).
       unshelve epose proof (subst_ct_monotonicity
         ([(y, bind_sub (subst_ct x D T1))] ++ E)
-        Ap
-        Am x C D (open_tt T2 y) _ H0 _ _ _).
+        (Ap `u`A {y}A) (Am `u`A {y}A)
+        x C D (open_tt T2 y) _ H0 _ _ _).
       * econstructor...
       (* we need to help fsetdec here a little *)
       * clear Fr; simpl; fsetdec.
       * clear Fr; simpl; fsetdec.
-      * rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
+      * assert (y `notin` L0) by notin_solve.
+        rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
         eapply wf_typ_ignores_sub_bindings with (T1 := T1)...
       * destruct H4.
         -- rewrite_env (empty ++ [(y, bind_sub (subst_ct x D T1))] ++ E).
@@ -1379,8 +1380,8 @@ Proof with simpl_env; eauto; fold subst_cpt.
       specialize (H0 y NotIn).
       unshelve epose proof (subst_ct_monotonicity
                               ([(y, bind_sub (subst_ct x C T1))] ++ E)
-                              Ap
-                              Am x C D (open_tt T2 y) _ H0 _ _ _).
+                              (Ap `u`A {y}A) (Am `u`A {y}A)
+                              x C D (open_tt T2 y) _ H0 _ _ _).
       * econstructor...
       (* we need to help fsetdec here a little *)
       * clear Fr; simpl; fsetdec.

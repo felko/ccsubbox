@@ -393,7 +393,9 @@ with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
   | wf_typ_all : forall L E Ap Am T1 T2,
       wf_typ E Am Ap T1 ->
       (forall X : atom, X `notin` L ->
-      wf_typ ([(X, bind_sub T1)] ++ E) Ap Am (open_tt T2 X)) ->
+                   wf_typ ([(X, bind_sub T1)] ++ E)
+                          (Ap `u`A {X}A)
+                          (Am `u`A {X}A) (open_tt T2 X)) ->
       wf_pretyp E Ap Am (typ_all T1 T2).
 
 Definition wf_typ_in (E : env) (T : typ) : Prop :=
@@ -524,9 +526,9 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
       wf_typ_in E T1 ->
       wf_typ_in E S1 ->
       (forall X : atom, X `notin` L ->
-          wf_typ ([(X, bind_sub T1)] ++ E) (dom E) (dom E) (open_tt T2 X)) ->
+          wf_typ ([(X, bind_sub T1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt T2 X)) ->
       (forall X : atom, X `notin` L ->
-          wf_typ ([(X, bind_sub S1)] ++ E) (dom E) (dom E) (open_tt S2 X)) ->
+          wf_typ ([(X, bind_sub S1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt S2 X)) ->
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
       sub_pre E (typ_all S1 S2) (typ_all T1 T2).
@@ -570,7 +572,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_tabs : forall L E V e1 T1,
       wf_typ_in E V ->
       (forall x : atom, x `notin` L ->
-        wf_typ ([(x, bind_sub V)] ++ E) (dom E) (dom E) (open_tt T1 x)) ->
+        wf_typ ([(x, bind_sub V)] ++ E) (dom E `u`A {x}A) (dom E `u`A {x}A) (open_tt T1 x)) ->
       (forall X : atom, X `notin` L ->
         typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
       typing E (exp_tabs V e1) (typ_capt (free_for_cv e1) (typ_all V T1))
