@@ -2,67 +2,6 @@ Require Export CCsub_Definitions.
 Require Import Program.Equality.
 Require Import Lia.
 
-(** Automation *)
-Lemma cset_eq_injectivity : forall a1 a2 n1 n2,
-    a1 = a2 ->
-    n1 = n2 ->
-    cset_set a1 n1 = cset_set a2 n2.
-Proof.
-  intros. congruence.
-Qed.
-
-Ltac fnset_mem_dec :=
-  match goal with
-  | |- true = _ => symmetry
-  | |- false = _ => symmetry
-  | |- _ => idtac
-  end;
-  match goal with
-  | |- NatSet.F.mem _ _ = true => rewrite <- NatSetFacts.mem_iff; fnsetdec
-  | |- NatSet.F.mem _ _ = false => rewrite <- NatSetFacts.not_mem_iff; fnsetdec
-  end.
-
-Ltac fset_mem_dec :=
-  match goal with
-  | |- true = _ => symmetry
-  | |- false = _ => symmetry
-  | |- _ => idtac
-  end;
-  match goal with
-  | |- AtomSet.F.mem _ _ = true => rewrite <- AtomSetFacts.mem_iff; fsetdec
-  | |- AtomSet.F.mem _ _ = false => rewrite <- AtomSetFacts.not_mem_iff; fsetdec
-  end.
-
-Ltac cset_eq_dec :=
-  apply cset_eq_injectivity; [try fsetdec | try fnsetdec].
-
-Ltac destruct_if :=
-  match goal with
-  | |- context[if ?t then _ else _] =>
-    destruct t eqn:?
-  end.
-
-Ltac destruct_if_in_as t id :=
-  match type of t with
-  | context[if ?t then _ else _] =>
-    destruct t eqn:id
-  end.
-
-Tactic Notation "destruct_if" :=
-  destruct_if.
-
-Tactic Notation "destruct_if" "in" constr(t) "as" simple_intropattern(id) :=
-  destruct_if_in_as t id.
-
-Tactic Notation "destruct_if" "in" constr(t) :=
-  destruct_if in t as ?.
-
-Ltac destruct_match :=
-  match goal with
-  | |- context[match ?t with _ => _ end] =>
-    destruct t eqn:?
-  end.
-
 
 (* ********************************************************************** *)
 (** * #<a name="fv"></a># Free variables *)

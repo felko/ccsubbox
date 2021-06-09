@@ -20,46 +20,6 @@ Proof with eauto using wf_cset_weakening.
     intros ? ?...
 Qed.
 
-Create HintDb fsetdec.
-
-Hint Extern 1 (_ `in` _) => fsetdec: fsetdec.
-
-Lemma wf_cset_singleton_by_mem : forall xs b1 E A x b2,
-  wf_cset E A (cset_set xs {}N b1) ->
-  x `in` xs ->
-  wf_cset E A (cset_set (singleton x) {}N b2).
-Proof with eauto with fsetdec.
-  intros * Wfxs xIn.
-  inversion Wfxs; subst...
-Qed.
-
-(* NOTE: wf_cset precondition in wf_cset_singleton_by_mem0 can be proven by
-         constructor, which leaves an uninstantiated evar. This approach avoids the
-         problem. *)
-Hint Extern 1 (wf_cset_in ?E (cset_set (singleton ?x) {}N _)) =>
-match goal with
-| H1 : x `in` ?xs , H2 : (wf_cset_in ?E (cset_set ?xs {}N ?b)) |- _ =>
-  apply (wf_cset_singleton_by_mem xs b)
-end : core.
-
-Hint Extern 1 (wf_cset ?E ?A (cset_set (singleton ?x) {}N _)) =>
-match goal with
-| H1 : x `in` ?xs , H2 : (wf_cset ?E A (cset_set ?xs {}N ?b)) |- _ =>
-  apply (wf_cset_singleton_by_mem xs b)
-end : core.
-
-Local Lemma __test_wf_cset_singleton1 : forall xs b1 E x b2,
-  wf_cset_in E (cset_set xs {}N b1) ->
-  x `in` xs ->
-  wf_cset_in E (cset_set (singleton x) {}N b2).
-Proof. eauto. Qed.
-
-Local Lemma __test_wf_cset_singleton2 : forall xs b1 E A x b2,
-  wf_cset E A (cset_set xs {}N b1) ->
-  x `in` xs ->
-  wf_cset E A (cset_set (singleton x) {}N b2).
-Proof. eauto. Qed.
-
 Lemma subcapt_reflexivity : forall E A C,
   wf_cset E A C ->
   A `subset` dom E ->
@@ -111,6 +71,29 @@ Proof with eauto with fsetdec.
       subst...
 Qed.
 
+
+Lemma subcapt_from_binds : forall P x C E,
+  wf_env E ->
+  binds x (bind_typ (typ_capt C P)) E ->
+  subcapt E (`cset_fvar` x) C.
+Proof with eauto.
+  intros* ? Binds.
+  eapply wf_cset_from_binds in Binds as WfC...
+  destruct C...
+  eapply wf_typ_from_binds_typ in Binds as WfT...
+  inversion WfT;
+    inversion select (wf_cset _ _ _);
+    subst.
+  apply subcapt_set...
+  unfold AtomSet.F.For_all.
+  intros x0 HIn.
+  rewrite AtomSetFacts.singleton_iff in HIn.
+  symmetry in HIn.
+  subst.
+  eapply subcapt_var...
+  eapply subcapt_reflexivity...
+Qed.
+
 (* Subtyping implies subcapturing *)
 Lemma sub_implies_subcapt : forall E S T,
   sub E S T ->
@@ -130,355 +113,6 @@ Proof with hint.
 Qed.
 
 (** TODO: reorganize the contents of the bottom of this file **)
-Lemma wf_cset_union : forall E A C D,
-  wf_cset E A C ->
-  wf_cset E A D ->
-  wf_cset E A (cset_union C D).
-Proof with eauto.
-  intros *.
-  intros H1 H2.
-  inversion H1; inversion H2; subst; simpl...
-  unfold wf_cset_in in *.
-  unfold cset_union; csetsimpl.
-  constructor...
-  unfold allbound in *...
-  intros.
-  rewrite AtomSetFacts.union_iff in *.
-  auto*.
-Qed.
-
-Lemma wf_cset_extra : forall S2 E C,
-  wf_cset_in E C ->
-  dom E `subset` S2 ->
-  wf_cset E S2 C.
-Proof with eauto*.
-  intros * HwfC.
-  induction HwfC...
-Qed.
-
-Lemma dom_x_subst_away : forall x f b F E,
-  wf_env (F ++ [(x, b)] ++ E) ->
-  dom (map f F ++ E) = dom (F ++ [(x, b)] ++ E) `remove` x.
-Proof with eauto*.
-  intros * Hwf.
-  simpl_env in *.
-  assert (x `notin` (dom F `union` dom E)). {
-    pose proof (binding_uniq_from_ok _ F E x _ ltac:(eauto)).
-    fsetdec.
-  }
-  fsetdec.
-Qed.
-
-Lemma wf_env_subst_cb : forall Q C x E F,
-wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
-wf_cset_in E C ->
-wf_env (map (subst_cb x C) F ++ E).
-Proof with eauto using wf_typ_subst_cb, wf_cset_extra.
-  intros *.
-  induction F; intros Hwf HwfC; simpl_env in *;
-    inversion Hwf; simpl_env in *; simpl subst_tb...
-  + constructor...
-    unfold wf_typ_in.
-    erewrite dom_x_subst_away...
-    eapply wf_typ_subst_cb...
-    all : simpl_env in *; apply wf_cset_extra...
-  + constructor...
-    unfold wf_typ_in.
-    erewrite dom_x_subst_away...
-    eapply wf_typ_subst_cb...
-    all : simpl_env in *; apply wf_cset_extra...
-Qed.
-
-Lemma cset_subst_self : forall C x,
-  subst_cset x C (`cset_fvar` x) = C.
-Proof.
-  intros.
-  unfold subst_cset.
-  csetdec.
-Qed.
-
-Lemma wf_env_strengthening : forall F E, wf_env (F ++ E) -> wf_env E.
-Proof with eauto.
-  induction F...
-  intros.
-  inversion H; subst...
-Qed.
-
-Lemma wf_cset_remove_fvar : forall A E C x, wf_cset E A C -> wf_cset E A (C A`\` x).
-Proof with eauto.
-  intros.
-  unfold wf_cset_in in *.
-  induction H; simpl...
-  constructor...
-  unfold allbound in *.
-  intros.
-  apply H.
-  fsetdec.
-Qed.
-
-Lemma wf_cset_subst_cb : forall Q Ap' Ap F E x C D,
-  wf_cset (F ++ [(x, bind_typ Q)] ++ E) Ap C ->
-  wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
-  wf_cset E Ap' D ->
-  Ap' `subset` Ap ->
-  Ap' `subset` dom E ->
-  ok (map (subst_cb x D) F ++ E) ->
-  wf_cset (map (subst_cb x D) F ++ E) (Ap `remove` x) (subst_cset x D C).
-Proof with simpl_env; eauto*.
-  intros * HwfC HwfEnv HwfD Hsset HApRsnbl Hok.
-  destruct C.
-  unfold subst_cset.
-  forwards: binding_uniq_from_wf_env HwfEnv.
-  destruct_set_mem x t...
-  - apply wf_cset_union.
-    + rewrite_nil_concat.
-      apply wf_cset_weakening with (A := Ap'); simpl_env...
-    + inversion HwfC; subst.
-      constructor...
-      unfold allbound in *.
-      intros y yIn.
-      destruct (y == x).
-      * exfalso; fsetdec.
-      * forwards (T & B): H4 y.
-        1: fsetdec.
-        simpl_env in B.
-        destruct B as [B|B]; binds_cases B...
-        1,2: exists (subst_ct x D T)...
-  - inversion HwfC; subst.
-    constructor...
-    unfold allbound in *.
-    intros y yIn.
-    forwards (T & B): H4 y.
-    1: fsetdec.
-    simpl_env in B.
-    destruct B as [B|B]; binds_cases B...
-    1,2: exists (subst_ct x D T)...
-Qed.
-
-Lemma wf_cset_in_subst_cb : forall Q F E x C D,
-  wf_cset_in (F ++ [(x, bind_typ Q)] ++ E) C ->
-  wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
-  wf_cset_in E D ->
-  ok (map (subst_cb x D) F ++ E) ->
-  wf_cset_in (map (subst_cb x D) F ++ E) (subst_cset x D C).
-Proof with eauto.
-  intros.
-  assert (x `notin` (dom F `union` dom E)). {
-    forwards: binding_uniq_from_wf_env (bind_typ Q)...
-  }
-  unfold wf_cset_in in *.
-  replace (dom (map (subst_cb x D) F ++ E))
-    with ((dom (F ++ [(x, bind_typ Q)] ++ E)) `remove` x) by (simpl_env; fsetdec).
-  apply (wf_cset_subst_cb Q (dom E))...
-Qed.
-
-Lemma not_in_fv_cset_iff : forall x C,
-  x A`mem` C = false -> x `notin` (`cset_fvars` C).
-Proof.
-  intros.
-  csetdec.
-Qed.
-
-Lemma wf_env_weaken_head : forall E F,
-  wf_env (F ++ E) ->
-  wf_env E.
-Proof with eauto*.
-  intros E F Hwf.
-  induction F...
-  inversion Hwf...
-Qed.
-
-Lemma tail_not_in_head : forall (E F : env) x,
-  ok (F ++ E) ->
-  x `in` dom E ->
-  x `notin` dom F.
-Proof.
-  intros * Hok Hx.
-  induction F.
-  + notin_solve.
-  + assert (x `notin` dom F). {
-      apply IHF; inversion Hok; assumption.
-    }
-    destruct a; simpl_env in *...
-    assert (x <> a). {
-      inversion Hok; subst.
-      simpl_env in *.
-      fsetdec.
-    }
-    fsetdec.
-Qed.
-
-Lemma wf_env_tail : forall F E,
-  wf_env (F ++ E) ->
-  wf_env E.
-Proof with eauto.
-  intros * Hwf.
-  induction F; (trivial || inversion Hwf; subst)...
-Qed.
-
-Hint Resolve wf_env_tail : core.
-
-(* Lemma wf_env_tail2 : forall F x b E, *)
-(*   wf_env (F ++ [(x, b)] ++ E) -> *)
-(*   wf_env E. *)
-(* Proof with eauto. *)
-(*   intros * Hwf. *)
-(*   eauto using wf_env_tail. *)
-(* Qed. *)
-
-Hint Extern 1 (ok (map ?f ?F ++ ?E)) =>
-match goal with
-| H : wf_env (F ++ ?b ++ E) |- _ =>
-  enough (ok (F ++ b ++ E))
-end : core.
-
-Lemma wf_cv_env_bind_typ : forall F x U E,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  wf_cset_in E (cv U).
-Proof with eauto.
-  intros * H.
-  apply cv_wf.
-  assert (wf_env ([(x, bind_typ U)] ++ E)) as HA by eauto.
-  inversion HA...
-Qed.
-
-Lemma wf_typ_env_bind_typ : forall F x U E,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  wf_typ_in E U.
-Proof with eauto.
-  intros * H.
-  assert (wf_env ([(x, bind_typ U)] ++ E)) as HA by eauto.
-  inversion HA...
-Qed.
-
-Lemma wf_typ_env_bind_sub : forall F x U E,
-  wf_env (F ++ [(x, bind_sub U)] ++ E) ->
-  wf_typ_in E U.
-Proof with eauto.
-  intros * H.
-  assert (wf_env ([(x, bind_sub U)] ++ E)) as HA by eauto.
-  inversion HA...
-Qed.
-
-Hint Resolve wf_cv_env_bind_typ : core.
-Hint Resolve wf_typ_env_bind_typ : core.
-Hint Resolve wf_typ_env_bind_sub : core.
-
-Lemma wf_typ_in_subst_cb_cv : forall U F E x T,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  wf_typ_in (F ++ [(x, bind_typ U)] ++ E) T ->
-  wf_typ_in (map (subst_cb x (cv U)) F ++ E) (subst_ct x (cv U) T).
-Proof with eauto*.
-  intros * Hwf HwfT.
-  unfold wf_typ_in.
-  erewrite dom_x_subst_away...
-  eapply wf_typ_subst_cb...
-  1, 2: simpl_env in *; apply wf_cset_extra...
-Qed.
-
-Lemma wf_pretyp_in_subst_cb_cv : forall U F E x T,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  wf_pretyp_in (F ++ [(x, bind_typ U)] ++ E) T ->
-  wf_pretyp_in (map (subst_cb x (cv U)) F ++ E) (subst_cpt x (cv U) T).
-Proof with eauto*.
-  intros * Hwf HwfT.
-  unfold wf_pretyp_in.
-  erewrite dom_x_subst_away...
-  eapply wf_pretyp_subst_cb...
-  1, 2: simpl_env in *; apply wf_cset_extra...
-Qed.
-
-Lemma wf_typ_subst_cb_cv : forall U G F E x T Ap Am,
-  wf_env (G ++ F ++ [(x, bind_typ U)] ++ E) ->
-  wf_typ (G ++ F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
-  (dom E `union` dom F) `subset` Ap ->
-  (dom E `union` dom F) `subset` Am ->
-  wf_typ (map (subst_cb x (cv U)) (G ++ F) ++ E) (Ap `remove` x) (Am `remove` x) (subst_ct x (cv U) T).
-Proof with eauto*.
-  intros * Hwf HwfT Hp Hm.
-  eapply wf_typ_subst_cb; simpl_env...
-  1, 2: simpl_env in *; apply wf_cset_extra...
-  rewrite_env (map (subst_cb x (cv U)) (G ++ F) ++ E)...
-  apply ok_from_wf_env...
-  eapply wf_env_subst_cb...
-  simpl_env in *...
-Qed.
-
-Lemma wf_pretyp_subst_cb_cv : forall U G F E x T Ap Am,
-  wf_env (G ++ F ++ [(x, bind_typ U)] ++ E) ->
-  wf_pretyp (G ++ F ++ [(x, bind_typ U)] ++ E) Ap Am T ->
-  (dom E `union` dom F) `subset` Ap ->
-  (dom E `union` dom F) `subset` Am ->
-  wf_pretyp (map (subst_cb x (cv U)) (G ++ F) ++ E)
-            (Ap `remove` x)
-            (Am `remove` x)
-            (subst_cpt x (cv U) T).
-Proof with eauto*.
-  intros * Hwf HwfT Hp Hm.
-  eapply wf_pretyp_subst_cb; simpl_env...
-  1, 2: simpl_env in *; apply wf_cset_extra...
-  rewrite_env (map (subst_cb x (cv U)) (G ++ F) ++ E)...
-  apply ok_from_wf_env...
-  eapply wf_env_subst_cb...
-  simpl_env in *...
-Qed.
-
-Lemma binds_unique : forall b1 b2 x (E : env),
-  binds x b1 E ->
-  binds x b2 E ->
-  b1 = b2.
-Proof.
-  intros* Hb1 Hb2.
-  congruence.
-Qed.
-
-Lemma binds_sub_unique : forall T1 T2 X E,
-  binds X (bind_sub T1) E ->
-  binds X (bind_sub T2) E ->
-  T1 = T2.
-Proof.
-  intros* Hb1 Hb2.
-  congruence.
-Qed.
-
-Lemma binds_typ_unique : forall T1 T2 X E,
-  binds X (bind_typ T1) E ->
-  binds X (bind_typ T2) E ->
-  T1 = T2.
-Proof.
-  intros* Hb1 Hb2.
-  congruence.
-Qed.
-
-Lemma wf_typ_in_weakening : forall T E F G,
-  wf_typ_in (G ++ E) T ->
-  ok (G ++ F ++ E) ->
-  wf_typ_in (G ++ F ++ E) T.
-Proof with eauto.
-  intros * Hwf Hok.
-  eapply wf_typ_weakening...
-Qed.
-
-Lemma wf_pretyp_in_weakening : forall T E F G,
-  wf_pretyp_in (G ++ E) T ->
-  ok (G ++ F ++ E) ->
-  wf_pretyp_in (G ++ F ++ E) T.
-Proof with eauto.
-  intros * Hwf Hok.
-  eapply wf_pretyp_weakening...
-Qed.
-
-Lemma wf_cset_in_weakening : forall E F G C,
-  wf_cset_in (G ++ E) C ->
-  ok (G ++ F ++ E) ->
-  wf_cset_in (G ++ F ++ E) C.
-Proof with eauto.
-  intros * Hwf Hok.
-  eapply wf_cset_weakening...
-Qed.
-
-Ltac destruct_union_mem H :=
-  rewrite AtomSetFacts.union_iff in H; destruct H as [H|H].
 
 (* Substituting the same capture set preserves subcapturing *)
 Lemma subcapt_through_subst_cset : forall x U C F E C1 C2 ,
@@ -1429,43 +1063,6 @@ Qed.
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
 
-Lemma wf_cset_from_binds : forall b x E,
-  wf_env E ->
-  binds x (bind_typ b) E ->
-  wf_cset_in E (`cset_fvar` x).
-Proof.
-  intros.
-  econstructor.
-  - intros x0 HIn.
-    rewrite AtomSetFacts.singleton_iff in HIn.
-    subst.
-    eauto.
-  - apply binds_In in H0.
-    fsetdec.
-Qed.
-
-Lemma subcapt_from_binds : forall P x C E,
-  wf_env E ->
-  binds x (bind_typ (typ_capt C P)) E ->
-  subcapt E (`cset_fvar` x) C.
-Proof with eauto.
-  intros* ? Binds.
-  eapply wf_cset_from_binds in Binds as WfC...
-  destruct C...
-  eapply wf_typ_from_binds_typ in Binds as WfT...
-  inversion WfT;
-    inversion select (wf_cset _ _ _);
-    subst.
-  apply subcapt_set...
-  unfold AtomSet.F.For_all.
-  intros x0 HIn.
-  rewrite AtomSetFacts.singleton_iff in HIn.
-  symmetry in HIn.
-  subst.
-  eapply subcapt_var...
-  eapply subcapt_reflexivity...
-Qed.
-
 Lemma subst_cset_across_subcapt : forall E x C D C0 A,
   wf_env E ->
   wf_cset E A C0 ->
@@ -1577,35 +1174,4 @@ Proof with eauto.
     intros z zIn.
     apply subcapt_in...
     fsetdec.
-Qed.
-
-Lemma capt_from_wf_cset_in : forall E C, wf_cset_in E C -> capt C.
-Proof. eauto using capt_from_wf_cset. Qed.
-
-Hint Resolve capt_from_wf_cset_in : core.
-
-Lemma wf_typ_in_subst_cset : forall x U C F E T,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  wf_typ_in (F ++ [(x, bind_typ U)] ++ E) T ->
-  wf_cset_in E C ->
-  wf_typ_in (map (subst_cb x C) F ++ E) (subst_ct x C T).
-Proof with eauto*.
-  intros * Hwf HwfT HwfC.
-  unfold wf_typ_in.
-  erewrite dom_x_subst_away...
-  eapply wf_typ_subst_cb...
-  1, 2: simpl_env in *; apply wf_cset_extra...
-Qed.
-
-Lemma wf_pretyp_in_subst_cset : forall x U C F E T,
-  wf_env (F ++ [(x, bind_typ U)] ++ E) ->
-  wf_pretyp_in (F ++ [(x, bind_typ U)] ++ E) T ->
-  wf_cset_in E C ->
-  wf_pretyp_in (map (subst_cb x C) F ++ E) (subst_cpt x C T).
-Proof with eauto*.
-  intros * Hwf HwfT HwfC.
-  unfold wf_pretyp_in.
-  erewrite dom_x_subst_away...
-  eapply wf_pretyp_subst_cb...
-  1, 2: simpl_env in *; apply wf_cset_extra...
 Qed.

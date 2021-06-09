@@ -18,6 +18,8 @@ Proof.
     csetdec.
 Qed.
 
+
+(** TODO MOVE TO CAPTURESETS **)
 Lemma notin_cset_fvars_distributive_over_cset_union : forall x C D,
   x `notin` `cset_fvars` (cset_union C D) ->
   x `notin` `cset_fvars` C /\
@@ -98,6 +100,7 @@ Proof with eauto using cv_free_never_universal.
         csetdec.
 Qed.
 
+(** TODO MOVE TO LEMMAS **)
 Lemma notin_dom_is_notin_fv_ee : forall x E e T,
   x `notin` dom E ->
   typing E e T ->
@@ -139,7 +142,7 @@ Proof with eauto.
   - eauto.
 Qed.
 
-
+(** TODO MOVE TO LEMMAS **)
 (*
   opening capture sets in types preserves well-formedness. *)
 Lemma open_ct_wf_typ : forall E Ap Am T C,
@@ -149,22 +152,6 @@ Proof with eauto using type_from_wf_typ.
   intros H.
   closed_type...
 Qed.
-
-(* capture set substitution does not affect subtyping
-
-  depends on opening in the context
-    binds X (bind_sub U) E -> binds X (bind_sub (open_ct U C)) E
- *)
-Lemma open_ct_sub : forall E S T C,
-  wf_env E ->
-  sub E S T ->
-  sub E (open_ct S C) (open_ct T C).
-Proof with auto using open_ct_wf_typ.
-  intros E S T C Eok H.
-  inversion H ; simpl ; closed_type ; subst...
-Qed.
-
-
 
 (* ********************************************************************** *)
 (** ** Type substitution preserves subtyping (10) *)
@@ -357,5 +344,153 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
     + repeat rewrite subst_tt_open_tt_var...
       rewrite_env (map (subst_tb Z P) ([(y, bind_sub T1)] ++ F) ++ E).
       eapply sub_through_subst_tt...
+}
+Qed.
+
+
+Lemma sub_through_subst_ct : forall x U C E F S T,
+  sub (F ++ [(x, bind_typ U)] ++ E) S T ->
+  subcapt E C (cv U) ->
+  sub (map (subst_cb x C) F ++ E) (subst_ct x C S) (subst_ct x C T)
+with sub_pre_through_subst_cpt : forall x U C E F P Q,
+  sub_pre (F ++ [(x, bind_typ U)] ++ E) Q P ->
+  subcapt E C (cv U) ->
+  sub_pre (map (subst_cb x C) F ++ E) (subst_cpt x C Q) (subst_cpt x C P).
+Proof with eauto using wf_env_subst_cb, wf_typ_in_subst_cset, subcapt_through_subst_cset.
+{ intros * Hsub Hsc.
+  remember (F ++ [(x, bind_typ U)] ++ E).
+  generalize dependent F.
+  induction Hsub; intros F ?; subst.
+  - simpl.
+    apply sub_refl_tvar...
+    change (typ_fvar X) with (subst_ct x C X)...
+  - simpl.
+    destruct (x == X). {
+      subst.
+      binds_get H.
+    }
+    assert (wf_env (F ++ [(x, bind_typ U)] ++ E)). {
+      specialize (IHHsub _ ltac:(reflexivity))...
+    }
+    SCase "x <> X".
+    binds_cases H.
+    + assert (x `notin` fv_ct U0). {
+        apply wf_typ_from_binds_sub in H as HA; [|eauto .. ].
+        assert (wf_env (F ++ [(x, bind_typ U)] ++ E)) as HA1. {
+          trivial...
+        }
+        apply binding_uniq_from_wf_env in HA1.
+        forwards: notin_fv_wf_typ x HA; notin_solve.
+      }
+      forwards IHHsub0: IHHsub F...
+      rewrite <- (subst_ct_fresh x C U0) in IHHsub0...
+    + apply sub_trans_tvar with (U := (subst_ct x C U0))...
+  - apply sub_capt...
+}
+{ intros * Hsub Hsc.
+  remember (F ++ [(x, bind_typ U)] ++ E).
+  generalize dependent F.
+  induction Hsub; intros F ?; subst.
+  - simpl.
+    apply sub_top...
+    eapply wf_pretyp_in_subst_cset ...
+  - simpl.
+    pick fresh y and apply sub_arrow...
+    + rewrite subst_ct_open_ct_var...
+      specialize (H2 y ltac:(notin_solve)).
+      simpl_env in H2.
+      simpl_env.
+      assert (wf_env (F ++ [(x, bind_typ U)] ++ E)) as HA by auto.
+      apply binding_uniq_from_wf_env in HA.
+      assert (y <> x) by notin_solve.
+      match type of H2 with
+      | wf_typ _ ?Ap ?Am _ =>
+        match goal with
+        | |- wf_typ _ ?Ap' ?Am' _ =>
+          replace Ap' with (Ap `remove` x); [replace Am' with (Am `remove` x)|]
+        end
+      end.
+      2,3: clear Fr; fsetdec.
+      rewrite_env (map (subst_cb x C) ([(y, bind_typ T1)] ++ F) ++ E).
+      specialize (H4 y ltac:(notin_solve)).
+      assert (wf_cset_in E C) as WfC by auto.
+      applys wf_typ_subst_cb C; simpl_env...
+      * applys wf_cset_set_weakening WfC...
+      * applys wf_cset_set_weakening WfC...
+    + rewrite subst_ct_open_ct_var...
+      specialize (H3 y ltac:(notin_solve)).
+      simpl_env in H3.
+      simpl_env.
+      assert (wf_env (F ++ [(x, bind_typ U)] ++ E)) as HA by auto.
+      apply binding_uniq_from_wf_env in HA.
+      assert (y <> x) by notin_solve.
+      match type of H3 with
+      | wf_typ _ ?Ap ?Am _ =>
+        match goal with
+        | |- wf_typ _ ?Ap' ?Am' _ =>
+          replace Ap' with (Ap `remove` x); [replace Am' with (Am `remove` x)|]
+        end
+      end.
+      2,3: clear Fr; fsetdec.
+      rewrite_env (map (subst_cb x C) ([(y, bind_typ S1)] ++ F) ++ E).
+      specialize (H4 y ltac:(notin_solve)).
+      assert (wf_cset_in E C) as WfC by auto.
+      applys wf_typ_subst_cb C; simpl_env...
+      * applys wf_cset_set_weakening WfC...
+      * applys wf_cset_set_weakening WfC...
+    + specialize (H4 y ltac:(notin_solve)).
+      rewrite subst_ct_open_ct_var...
+      rewrite subst_ct_open_ct_var...
+      rewrite_env (map (subst_cb x C) ([(y, bind_typ T1)] ++ F) ++ E).
+      eapply sub_through_subst_ct; simpl_env...
+  - simpl.
+    pick fresh y and apply sub_all...
+    + rewrite subst_ct_open_tt_var...
+      specialize (H2 y ltac:(notin_solve)).
+      simpl_env in H2.
+      simpl_env.
+      assert (wf_env (F ++ [(x, bind_typ U)] ++ E)) as HA by auto.
+      apply binding_uniq_from_wf_env in HA.
+      assert (y <> x) by notin_solve.
+      match type of H2 with
+      | wf_typ _ ?Ap ?Am _ =>
+        match goal with
+        | |- wf_typ _ ?Ap' ?Am' _ =>
+          replace Ap' with (Ap `remove` x); [replace Am' with (Am `remove` x)|]
+        end
+      end.
+      2,3: clear Fr; fsetdec.
+      rewrite_env (map (subst_cb x C) ([(y, bind_sub T1)] ++ F) ++ E).
+      specialize (H4 y ltac:(notin_solve)).
+      assert (wf_cset_in E C) as WfC by auto.
+      applys wf_typ_subst_cb C; simpl_env...
+      * applys wf_cset_set_weakening WfC...
+      * applys wf_cset_set_weakening WfC...
+    + rewrite subst_ct_open_tt_var...
+      specialize (H3 y ltac:(notin_solve)).
+      simpl_env in H3.
+      simpl_env.
+      assert (wf_env (F ++ [(x, bind_typ U)] ++ E)) as HA by auto.
+      apply binding_uniq_from_wf_env in HA.
+      assert (y <> x) by notin_solve.
+      match type of H3 with
+      | wf_typ _ ?Ap ?Am _ =>
+        match goal with
+        | |- wf_typ _ ?Ap' ?Am' _ =>
+          replace Ap' with (Ap `remove` x); [replace Am' with (Am `remove` x)|]
+        end
+      end.
+      2,3: clear Fr; fsetdec.
+      rewrite_env (map (subst_cb x C) ([(y, bind_sub S1)] ++ F) ++ E).
+      specialize (H4 y ltac:(notin_solve)).
+      assert (wf_cset_in E C) as WfC by auto.
+      applys wf_typ_subst_cb C; simpl_env...
+      * applys wf_cset_set_weakening WfC...
+      * applys wf_cset_set_weakening WfC...
+    + specialize (H4 y ltac:(notin_solve)).
+      rewrite subst_ct_open_tt_var...
+      rewrite subst_ct_open_tt_var...
+      rewrite_env (map (subst_cb x C) ([(y, bind_sub T1)] ++ F) ++ E).
+      eapply sub_through_subst_ct; simpl_env...
 }
 Qed.

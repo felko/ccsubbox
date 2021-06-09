@@ -739,6 +739,73 @@ Qed.
 Hint Resolve singleton_closed open_cset_capt subst_cset_capt : core.
 Hint Rewrite subst_cset_singleton subst_cset_union : csets.
 
+
+
+(** Automation *)
+Lemma cset_eq_injectivity : forall a1 a2 n1 n2,
+    a1 = a2 ->
+    n1 = n2 ->
+    cset_set a1 n1 = cset_set a2 n2.
+Proof.
+  intros. congruence.
+Qed.
+
+Ltac fnset_mem_dec :=
+  match goal with
+  | |- true = _ => symmetry
+  | |- false = _ => symmetry
+  | |- _ => idtac
+  end;
+  match goal with
+  | |- NatSet.F.mem _ _ = true => rewrite <- NatSetFacts.mem_iff; fnsetdec
+  | |- NatSet.F.mem _ _ = false => rewrite <- NatSetFacts.not_mem_iff; fnsetdec
+  end.
+
+Ltac fset_mem_dec :=
+  match goal with
+  | |- true = _ => symmetry
+  | |- false = _ => symmetry
+  | |- _ => idtac
+  end;
+  match goal with
+  | |- AtomSet.F.mem _ _ = true => rewrite <- AtomSetFacts.mem_iff; fsetdec
+  | |- AtomSet.F.mem _ _ = false => rewrite <- AtomSetFacts.not_mem_iff; fsetdec
+  end.
+
+Ltac cset_eq_dec :=
+  apply cset_eq_injectivity; [try fsetdec | try fnsetdec].
+
+Ltac destruct_if :=
+  match goal with
+  | |- context[if ?t then _ else _] =>
+    destruct t eqn:?
+  end.
+
+Ltac destruct_if_in_as t id :=
+  match type of t with
+  | context[if ?t then _ else _] =>
+    destruct t eqn:id
+  end.
+
+Tactic Notation "destruct_if" :=
+  destruct_if.
+
+Tactic Notation "destruct_if" "in" constr(t) "as" simple_intropattern(id) :=
+  destruct_if_in_as t id.
+
+Tactic Notation "destruct_if" "in" constr(t) :=
+  destruct_if in t as ?.
+
+Ltac destruct_match :=
+  match goal with
+  | |- context[match ?t with _ => _ end] =>
+    destruct t eqn:?
+  end.
+
+
+(* ********************************************************************** *)
+(** * #<a name="csetprops"></a># Properties of capture sets *)
+
 (* unfold subst_cb, subst_cset, `cset_references_fvar_dec`, cset_fvar, `cset_remove_fvar`, cset_union.
   destruct C1; destruct_set_mem X (singleton x)... fsetdec. *)
 
@@ -893,4 +960,64 @@ Proof with eauto.
       }
       fnsetdec.
   - csetdec.
+Qed.
+
+
+Lemma cset_subst_self : forall C x,
+  subst_cset x C (`cset_fvar` x) = C.
+Proof.
+  intros.
+  unfold subst_cset.
+  csetdec.
+Qed.
+
+Lemma not_in_fv_cset_iff : forall x C,
+  x A`mem` C = false -> x `notin` (`cset_fvars` C).
+Proof.
+  intros.
+  csetdec.
+Qed.
+
+Lemma empty_over_union : forall N1 N2,
+  {}N = NatSet.F.union N1 N2 ->
+  {}N = N1 /\ {}N = N2.
+Proof.
+  intros.
+  assert (NatSet.F.Empty (NatSet.F.union N1 N2)) by (rewrite <- H; fnsetdec).
+  split; fnsetdec.
+Qed.
+
+Lemma cset_references_fvar_over_union : forall C1 C2 x,
+  x A`in` (cset_union C1 C2) ->
+  x A`in` C1 \/ x A`in` C2.
+Proof with eauto*.
+  intros * H.
+  destruct (cset_union C1 C2) eqn:Hunion...
+  unfold cset_union in *.
+  destruct C1 eqn:HC1; destruct C2 eqn:HC2; subst...
+  inversion Hunion...
+  assert (x `in` (t1 `union` t3)) by (rewrite H1; eauto*)...
+  apply AtomSetFacts.union_iff in H0; inversion H0; subst...
+Qed.
+
+
+Lemma subst_cset_distributive_across_union : forall z C D1 D2,
+  subst_cset z C (cset_union D1 D2) =
+  cset_union (subst_cset z C D1) (subst_cset z C D2).
+Proof with eauto.
+  intros.
+  destruct D1; destruct D2.
+  unfold cset_union, subst_cset.
+  destruct_set_mem z t.
+  - assert (AtomSet.F.mem z (t `union` t1) = true) as HA by fset_mem_dec.
+    rewrite HA.
+    unfold cset_union.
+    destruct_set_mem z t1; csetdec.
+  - destruct_set_mem z t1.
+    + assert (AtomSet.F.mem z (t `union` t1) = true) as HA by fset_mem_dec.
+      rewrite HA.
+      unfold cset_union; csetdec.
+    + assert (AtomSet.F.mem z (t `union` t1) = false) as HA by fset_mem_dec.
+      rewrite HA.
+      reflexivity.
 Qed.
