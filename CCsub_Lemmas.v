@@ -6,7 +6,7 @@ Require Import Atom.
 Require Import TaktikZ.
 
 (* ********************************************************************** *)
-(** * #<a name="utils"></a># Utils *)
+(** * #<a name="utils"></a># Utils -- mostly related to wellformedness of environments *)
 
 Lemma atomset_union_right : forall A B C,
   AtomSet.F.Subset A B ->
@@ -253,9 +253,9 @@ Proof.
   1,2 : split; assumption.
 Qed.
 
+
 (* ********************************************************************** *)
 (** * #<a name="wfset"></a># Properties of [wf_cset] *)
-
 
 Lemma empty_cset_wf : forall E A, wf_cset E A {*}.
 Proof.
