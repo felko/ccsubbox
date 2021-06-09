@@ -6,7 +6,7 @@ Require Import Atom.
 Require Import TaktikZ.
 
 (* ********************************************************************** *)
-(** * #<a name="utils"></a># Utils -- mostly related to wellformedness of environments *)
+(** * #<a name="utils"></a># Utils -- mostly related to wellformedness of environments [ok], [wf_env], [dom], ...*)
 
 Lemma atomset_union_right : forall A B C,
   AtomSet.F.Subset A B ->
@@ -203,54 +203,6 @@ Proof.
   - simpl_env; fsetdec.
   - inversion H; subst;
       specialize (IHF H3); simpl_env in *; fsetdec.
-Qed.
-
-Ltac wf_typ_inversion H :=
-  inversion H;
-  let t := type of H in
-  let has_useful_wf_pretyp :=
-      fun T =>
-        match T with
-        | (typ_arrow _ _) => true
-        | (typ_all _ _) => true
-        | _ => false
-        end
-  in
-  let invert_pretyp :=
-      fun E T =>
-        match goal with
-        | H : wf_pretyp E _ _ T |- _ =>
-          inversion H
-        end
-  in
-  match t with
-  | wf_typ_in ?E (typ_capt _ ?T) =>
-    match has_useful_wf_pretyp T with
-    | true => invert_pretyp E T
-    | false => idtac
-    end
-  | wf_typ ?E _ _ (typ_capt _ ?T) =>
-    match has_useful_wf_pretyp T with
-    | true => invert_pretyp E T
-    | false => idtac
-    end
-  | _ => idtac
-  end; subst.
-
-Local Lemma test_wf_typ_inversion : forall E Ap Am C S T U D P,
-  wf_typ_in E (typ_capt C (typ_arrow S T)) ->
-  wf_typ E Ap Am (typ_capt C (typ_arrow S T)) ->
-  wf_typ_in E (typ_capt D P) ->
-  wf_typ_in E U ->
-  wf_typ_in E S /\ wf_typ E Am Ap S.
-Proof.
-  intros* H1 H2 H3 H4.
-  let t := match goal with |- ?g => g end in idtac t.
-  wf_typ_inversion H1.
-  wf_typ_inversion H2.
-  wf_typ_inversion H3.          (* shouldn't invert pretyp *)
-  wf_typ_inversion H4.          (* shouldn't break, has to duplicate goal *)
-  1,2 : split; assumption.
 Qed.
 
 
@@ -546,6 +498,54 @@ Proof. eauto. Qed.
 
 (* ********************************************************************** *)
 (** * #<a name="wft"></a># Properties of [wf_typ] *)
+
+Ltac wf_typ_inversion H :=
+  inversion H;
+  let t := type of H in
+  let has_useful_wf_pretyp :=
+      fun T =>
+        match T with
+        | (typ_arrow _ _) => true
+        | (typ_all _ _) => true
+        | _ => false
+        end
+  in
+  let invert_pretyp :=
+      fun E T =>
+        match goal with
+        | H : wf_pretyp E _ _ T |- _ =>
+          inversion H
+        end
+  in
+  match t with
+  | wf_typ_in ?E (typ_capt _ ?T) =>
+    match has_useful_wf_pretyp T with
+    | true => invert_pretyp E T
+    | false => idtac
+    end
+  | wf_typ ?E _ _ (typ_capt _ ?T) =>
+    match has_useful_wf_pretyp T with
+    | true => invert_pretyp E T
+    | false => idtac
+    end
+  | _ => idtac
+  end; subst.
+
+Local Lemma test_wf_typ_inversion : forall E Ap Am C S T U D P,
+  wf_typ_in E (typ_capt C (typ_arrow S T)) ->
+  wf_typ E Ap Am (typ_capt C (typ_arrow S T)) ->
+  wf_typ_in E (typ_capt D P) ->
+  wf_typ_in E U ->
+  wf_typ_in E S /\ wf_typ E Am Ap S.
+Proof.
+  intros* H1 H2 H3 H4.
+  let t := match goal with |- ?g => g end in idtac t.
+  wf_typ_inversion H1.
+  wf_typ_inversion H2.
+  wf_typ_inversion H3.          (* shouldn't invert pretyp *)
+  wf_typ_inversion H4.          (* shouldn't break, has to duplicate goal *)
+  1,2 : split; assumption.
+Qed.
 
 (** If a type is well-formed in an environment, then it is locally
     closed. *)
