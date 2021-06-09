@@ -577,7 +577,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
            ++ rewrite_nil_concat.
               eapply wf_cset_ignores_sub_bindings.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
-Admitted.
+Qed.
 
 Lemma plain_subst_ct_monotonicity : forall E Ap Am x C D T,
   wf_env E ->
@@ -614,46 +614,6 @@ Proof with eauto.
   apply (wf_typ_extract_typ_arrow C)...
 Qed.
 
-Lemma applied_subst_monotonicity : forall E C1 C2 e D S T,
-  subcapt E C1 C2 ->
-  typing E e (typ_capt D (typ_arrow S T)) ->
-  sub E (open_ct T C1) (open_ct T C2).
-Proof with eauto.
-  intros * Hsc Htyp.
-  forwards (L & HRT): typing_extract_typ_arrow Htyp.
-  pick fresh y.
-  replace (open_ct T C1) with (subst_ct y C1 (open_ct T (`cset_fvar` y))).
-  replace (open_ct T C2) with (subst_ct y C2 (open_ct T (`cset_fvar` y))).
-  2,3: solve [symmetry; apply subst_ct_intro; fsetdec].
-  forwards (_ & _ & Reg): typing_regular Htyp.
-  wf_typ_inversion Reg.
-  assert (wf_typ ([(y, bind_typ S)] ++ E)
-                  (dom E `union` singleton y) (dom E)
-                  (open_ct T (`cset_fvar` y))) by eauto.
-  enough (sub ([(y, bind_typ S)] ++ E)
-              (subst_ct y C1 (open_ct T (`cset_fvar` y)))
-              (subst_ct y C2 (open_ct T (`cset_fvar` y)))). {
-    rewrite_env (map (subst_cb y (cv S)) empty ++ E).
-    replace (subst_ct y C1 (open_ct T (`cset_fvar` y)))
-      with (subst_ct y (cv S) (subst_ct y C1 (open_ct T (`cset_fvar` y)))).
-    replace (subst_ct y C2 (open_ct T (`cset_fvar` y)))
-      with (subst_ct y (cv S) (subst_ct y C2 (open_ct T (`cset_fvar` y)))).
-    2,3: solve [apply subst_ct_useless_repetition; notin_solve].
-    apply sub_through_subst_ct with (U := S); simpl_env; auto.
-    eapply subcapt_reflexivity.
-    + apply cv_wf...
-    + fsetdec.
-  }
-  eapply plain_subst_ct_monotonicity with (Ap := dom E `union` singleton y) (Am := dom E); eauto.
-  - rewrite_nil_concat.
-    apply subcapt_weakening; simpl_env; eauto.
-  - forwards (WfC1 & _): subcapt_regular Hsc.
-    rewrite_nil_concat.
-    eapply wf_cset_weakening ; [ apply WfC1 | simpl_env; auto .. ].
-  - forwards (_ & WfC2): subcapt_regular Hsc.
-    rewrite_nil_concat.
-    eapply wf_cset_weakening ; [ apply WfC2 | simpl_env; auto .. ].
-Qed.
 
 Lemma typing_narrowing : forall Q E F X P e T,
   sub E P Q ->
