@@ -809,3 +809,88 @@ Proof.
   cbv [subst_cset].
   csetdec...
 Qed.
+
+
+Lemma empty_cset_union : forall C1 C2,
+  cset_union C1 C2 = {} ->
+  C1 = {} /\ C2 = {}.
+Proof with eauto.
+  intros.
+  destruct C1; destruct C2; simpl in H; try discriminate.
+  inversion H.
+  split; f_equal.
+  - destruct (AtomSet.F.choose (t `union` t1)) eqn:Eq.
+    + assert (AtomSet.F.Equal (t `union` t1) {}A) as HA. {
+        rewrite H1.
+        fsetdec.
+      }
+      apply AtomSet.F.choose_1 in Eq.
+      rewrite HA in Eq.
+      exfalso.
+      fsetdec.
+    + apply AtomSet.F.choose_2 in Eq.
+      assert (AtomSet.F.Empty t). {
+        unfold AtomSet.F.Empty in *.
+        unfold not in *.
+        intros.
+        apply (Eq a).
+        fsetdec.
+      }
+      fsetdec.
+  - destruct (NatSet.F.choose (NatSet.F.union t0 t2)) eqn:Eq.
+    + assert (NatSet.F.Equal (NatSet.F.union t0 t2) {}N) as HA. {
+        rewrite H2.
+        fnsetdec.
+      }
+      apply NatSet.F.choose_1 in Eq.
+      rewrite HA in Eq.
+      exfalso.
+      fnsetdec.
+    + apply NatSet.F.choose_2 in Eq.
+      assert (NatSet.F.Empty t0). {
+        unfold NatSet.F.Empty in *.
+        unfold not in *.
+        intros.
+        apply (Eq a).
+        fnsetdec.
+      }
+      fnsetdec.
+  - csetdec.
+  - destruct (AtomSet.F.choose (t `union` t1)) eqn:Eq.
+    + assert (AtomSet.F.Equal (t `union` t1) {}A) as HA. {
+        rewrite H1.
+        fsetdec.
+      }
+      apply AtomSet.F.choose_1 in Eq.
+      rewrite HA in Eq.
+      exfalso.
+      fsetdec.
+    + apply AtomSet.F.choose_2 in Eq.
+      assert (AtomSet.F.Empty t1). {
+        unfold AtomSet.F.Empty in *.
+        unfold not in *.
+        intros.
+        apply (Eq a).
+        fsetdec.
+      }
+      fsetdec.
+  - destruct (NatSet.F.choose (NatSet.F.union t0 t2)) eqn:Eq.
+    + assert (NatSet.F.Equal (NatSet.F.union t0 t2) {}N) as HA. {
+        rewrite H2.
+        fnsetdec.
+      }
+      apply NatSet.F.choose_1 in Eq.
+      rewrite HA in Eq.
+      exfalso.
+      fnsetdec.
+    + apply NatSet.F.choose_2 in Eq.
+      assert (NatSet.F.Empty t2). {
+        unfold NatSet.F.Empty in *.
+        unfold not in *.
+        intros.
+        apply (Eq a).
+        fnsetdec.
+      }
+      fnsetdec.
+  - csetdec.
+Qed.
