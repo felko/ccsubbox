@@ -1,7 +1,7 @@
 Require Import Coq.Program.Equality.
 Require Import TaktikZ.
 Require Export CCsub_Hints.
-Require Import CCsub_CvFacts.
+Require Import CCsub_Subcapt.
 
 (** **************************************** **)
 (** Properties of the subtyping relation     **)

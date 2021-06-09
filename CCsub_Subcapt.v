@@ -1,7 +1,6 @@
 Require Import Coq.Program.Equality.
 Require Export CCsub_Hints.
 Require Export CCsub_Lemmas.
-Require Import TaktikZ.
 
 Local Ltac hint := idtac.
 
@@ -1059,6 +1058,7 @@ Proof with eauto using wf_env_subst_tb, wf_cset_in_subst_tb, wf_typ_in_subst_tb 
         forwards (? & ?): subcapt_regular H1.
         inversion select (wf_cset_in _ (cset_set ds _ _)); subst...
 Qed.
+
 
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)

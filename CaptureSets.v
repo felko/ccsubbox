@@ -1021,3 +1021,15 @@ Proof with eauto.
       rewrite HA.
       reflexivity.
 Qed.
+
+Lemma notin_cset_fvars_distributive_over_cset_union : forall x C D,
+  x `notin` `cset_fvars` (cset_union C D) ->
+  x `notin` `cset_fvars` C /\
+  x `notin` `cset_fvars` D.
+Proof.
+  intros.
+  destruct C eqn:EQ__C;
+    destruct D eqn:EQ__D;
+    unfold cset_union in *; split.
+  all : (easy || fsetdec).
+Qed.

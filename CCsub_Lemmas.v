@@ -1410,6 +1410,17 @@ Proof with eauto*.
   1, 2: simpl_env in *; apply wf_cset_extra...
 Qed.
 
+(*
+  opening capture sets in types preserves well-formedness. *)
+Lemma open_ct_wf_typ : forall E Ap Am T C,
+  wf_typ E Ap Am T ->
+  wf_typ E Ap Am (open_ct T C).
+Proof with eauto using type_from_wf_typ.
+  intros *.
+  intros H.
+  closed_type...
+Qed.
+
 Lemma wf_typ_open_capt : forall E C T1 T2,
   ok E ->
   wf_pretyp_in E (typ_arrow T1 T2) ->
@@ -2106,7 +2117,8 @@ Qed.
 
 
 (* ********************************************************************** *)
-(** * #<a name="cvfree"></a># Properties of [free_for_cv] *)
+(** * #<a name="cvfree"></a># Lemmas about free variables -- in particular properties of [free_for_cv] *)
+(** TODO Maybe have a separate file for free_for_cv lemmas **)
 
 
 Lemma cv_free_never_universal : forall e,
@@ -2192,6 +2204,39 @@ Proof with eauto using cv_free_never_universal; eauto*.
       csetdec.
   pose proof cv_free_has_universal_false as HA.
   repeat rewrite HA...
+Qed.
+
+Lemma free_for_cv_bound_typing : forall E e (x : atom) S,
+  typing E e S ->
+  x A`in` (free_for_cv e) ->
+  exists T, binds x (bind_typ T) E.
+Proof with eauto using wf_cset_over_union, cv_free_never_universal.
+  intros * Htyp xIn.
+  induction Htyp; simpl in *...
+  - assert (x = x0) by fsetdec; subst...
+  - assert (x = x0) by fsetdec; subst...
+  - pick fresh y.
+    forwards HA: H2 y.
+    + notin_solve.
+    + forwards (? & ? & ?): free_for_cv_open e1 0 y.
+      unfold open_ee.
+      clear Fr;fsetdec.
+    + destruct HA as (T & HA)...
+      inversion HA.
+      assert (x <> y) by notin_solve.
+      destruct (x == y)...
+      easy.
+  - destruct_union_mem xIn...
+  - pick fresh y.
+    forwards HA: H2 y.
+    + notin_solve.
+    + forwards (? & ? & ?): free_for_cv_open_type e1 0 y.
+      clear Fr;fsetdec.
+    + destruct HA as (T & HA)...
+      inversion HA.
+      assert (x <> y) by notin_solve.
+      destruct (x == y)...
+      easy.
 Qed.
 
 (** This should be easily true: free variables
@@ -2302,6 +2347,103 @@ Proof.
     reflexivity.
   - apply IHt. fsetdec.
   - apply IHt. fsetdec.
+Qed.
+
+
+Lemma subst_commutes_with_free_for_cv : forall x u C e,
+  x `notin` (`cset_fvars` (free_for_cv e)) ->
+  (subst_cset x C (free_for_cv e)) = (free_for_cv (subst_ee x u C e)).
+Proof with eauto.
+  intros *.
+  intro Fr.
+  induction e.
+  - simpl.
+    unfold subst_cset.
+    find_and_destroy_set_mem.
+    + notin_solve.
+    + easy.
+  - simpl in *.
+    assert (a <> x) by fsetdec.
+    destruct (a == x); try easy.
+    cbv.
+    destruct_if.
+    + rewrite <- AtomSetFacts.mem_iff in Heqb. exfalso. fsetdec.
+    + reflexivity.
+  - apply IHe...
+  - simpl in *.
+    pose proof (cv_free_never_universal e1).
+    pose proof (cv_free_never_universal e2).
+    destruct (free_for_cv e1); try easy.
+    destruct (free_for_cv e2); try easy.
+    rewrite <- IHe1...
+    rewrite <- IHe2...
+    rewrite subst_cset_distributive_across_union.
+    reflexivity.
+  - apply IHe...
+  - apply IHe...
+Qed.
+
+Lemma free_for_cv_subst_ee_cset_irrelevancy: forall x u C D t,
+  free_for_cv (subst_ee x u C t) =
+  free_for_cv (subst_ee x u D t).
+Proof.
+  induction t.
+  all : simpl; eauto.
+  rewrite IHt1.
+  rewrite IHt2.
+  trivial.
+Qed.
+
+Lemma subst_te_idempotent_wrt_free_for_cv : forall e x C,
+  free_for_cv (subst_te x C e) = free_for_cv e.
+Proof with eauto.
+  intros.
+  induction e; simpl; eauto.
+  rewrite IHe1.
+  rewrite IHe2.
+  easy.
+Qed.
+
+Lemma bind_typ_notin_fv_tt : forall x S E Ap Am T,
+  binds x (bind_typ S) E ->
+  wf_typ E Ap Am T ->
+  x `~in`A fv_tt T
+with bind_typ_notin_fv_tpt : forall x S E Ap Am T,
+  binds x (bind_typ S) E ->
+  wf_pretyp E Ap Am T ->
+  x `~in`A fv_tpt T.
+Proof with auto.
+{ intros * Hbnd WfT.
+  dependent induction T;simpl...
+  - inversion WfT; subst.
+    eapply bind_typ_notin_fv_tpt; eauto.
+  - inversion WfT; subst.
+    destruct (x == a); [|fsetdec].
+    subst.
+    forwards: binds_unique a; eauto.
+}
+{ intros * Hbnd WfT.
+  dependent induction T; simpl.
+  - fsetdec.
+  - inversion WfT; subst.
+    rename H4 into Wf__t.
+    rename H5 into Wf__t0.
+    pick fresh y.
+    specialize (Wf__t0 y ltac:(fsetdec)).
+    forwards: bind_typ_notin_fv_tt Wf__t; [eauto|..].
+    forwards HA: bind_typ_notin_fv_tt x Wf__t0; [eauto|..].
+    forwards: notin_fv_ct_open_tt HA.
+    notin_solve.
+  - inversion WfT; subst.
+    rename H4 into Wf__t.
+    rename H5 into Wf__t0.
+    pick fresh y.
+    specialize (Wf__t0 y ltac:(fsetdec)).
+    forwards: bind_typ_notin_fv_tt Wf__t; [eauto|..].
+    forwards HA: bind_typ_notin_fv_tt x Wf__t0; [eauto|..].
+    forwards: notin_fv_tt_open_tt HA.
+    notin_solve.
+}
 Qed.
 
 (* ********************************************************************** *)

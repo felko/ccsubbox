@@ -11,6 +11,7 @@ CCsub_Infrastructure.v
 CCsub_Lemmas.v
 CCsub_Subcapt.v
 CCsub_Subtyping.v
+CCsub_Typing.v
 CCsub_Substitution.v
 CCsub_Soundness.v
 CaptureSets.v
