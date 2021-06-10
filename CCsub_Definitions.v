@@ -651,6 +651,7 @@ Inductive state : Type :=
 .
 
 Notation "〈 e | k 〉" := (state_step e k).
+Reserved Notation "st1 --> st2" (at level 69).
 
 Inductive typing_state : state -> Prop :=
   | typ_step : forall e k T,
@@ -659,33 +660,34 @@ Inductive typing_state : state -> Prop :=
       typing_state〈 e | k 〉
   .
 
+Inductive done : state -> Prop :=
+  | done_ret : forall e,
+      value e ->
+      done 〈 e | top 〉
+.
+
 (* ********************************************************************** *)
 (** * #<a name="reduction"></a># Reduction *)
 
-Inductive red : exp -> exp -> Prop :=
-  | red_app_1 : forall e1 e1' e2,
-      expr e2 ->
-      red e1 e1' ->
-      red (exp_app e1 e2) (exp_app e1' e2)
-  | red_app_2 : forall e1 e2 e2',
-      value e1 ->
-      red e2 e2' ->
-      red (exp_app e1 e2) (exp_app e1 e2')
-  | red_tapp : forall e1 e1' V,
-      type V ->
-      red e1 e1' ->
-      red (exp_tapp e1 V) (exp_tapp e1' V)
-  | red_abs : forall T e1 v2,
-      expr (exp_abs T e1) ->
-      value v2 ->
-      red (exp_app (exp_abs T e1) v2)
-        (** is this the right reduction semantics? *)
-        (open_ee e1 v2 (free_for_cv v2))
-  | red_tabs : forall T1 e1 T2,
-      expr (exp_tabs T1 e1) ->
-      type T2 ->
-      red (exp_tapp (exp_tabs T1 e1) T2) (open_te e1 T2)
-.
+Inductive step : state -> state -> Prop :=
+  | step_app : forall e1 e2 k,
+      〈 exp_app e1 e2 | k 〉 --> 〈 e1 | KFun e2 :: k 〉
+
+  | step_tapp : forall e T k,
+      〈 exp_tapp e T | k 〉 --> 〈 e | KTyp T :: k 〉
+
+  | step_pop_1 : forall v arg k,
+      value v ->
+      〈 v | KFun arg :: k 〉 --> 〈 arg | KArg v :: k 〉
+
+  | step_abs : forall v T e k,
+      value v ->
+      〈  v | KArg (exp_abs T e) :: k 〉 --> 〈 (open_ee e v (free_for_cv v)) | k 〉
+
+  | step_tabs : forall T1 T2 e1 k,
+      〈 exp_tabs T1 e1 | KTyp T2 :: k 〉 --> 〈 (open_te e1 T2) | k 〉
+
+where "st1 --> st2" := (step st1 st2).
 
 
 (* ********************************************************************** *)
@@ -700,7 +702,7 @@ Inductive red : exp -> exp -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type pretype expr bound wf_cset wf_typ wf_pretyp wf_env value red sub subcapt typing : core.
+Hint Constructors type pretype expr bound wf_cset wf_typ wf_pretyp wf_env value step sub subcapt typing : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
 Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound : core.
