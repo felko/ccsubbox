@@ -86,7 +86,7 @@ Module AtomImpl : ATOM.
   Module Facts := OrderedTypeFacts Atom_as_OT.
 
   Definition eq_atom_dec : forall x y : atom, {x = y} + {x <> y} :=
-    Facts.eq_dec. 
+    Facts.eq_dec.
 
   (* end hide *)
 
@@ -261,3 +261,22 @@ Proof.
   trivial.
 Qed.
 (* end show *)
+
+
+Lemma atomset_union_right : forall A B C,
+  AtomSet.F.Subset A B ->
+  AtomSet.F.Subset (AtomSet.F.union A C) (AtomSet.F.union B C).
+Proof.
+  intros.
+  fsetdec.
+Qed.
+
+Lemma singleton_set_eq : forall (x y : atom),
+  singleton x = singleton y <-> x = y.
+Proof.
+  split; intros.
+  * assert (AtomSet.F.In y (singleton x)).
+    { rewrite H. fsetdec. }
+    fsetdec.
+  * fsetdec.
+Qed.

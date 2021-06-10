@@ -142,3 +142,20 @@ Tactic Notation
 Hint Resolve notin_empty notin_singleton notin_union : core.
 Hint Extern 4 (_ `notin` _) => simpl_env; notin_solve : core.
 Hint Extern 4 (_ <> _ :> atom) => simpl_env; notin_solve : core.
+
+
+(* Tactics in relation to fsetdec  *)
+Ltac clear_frees :=
+  repeat match goal with
+         | H : _ `notin` _ |- _ =>
+           clear H
+         end.
+
+Ltac prepare_for_fsetdec :=
+  clear_frees; simpl_env in *.
+
+Hint Extern 10 (AtomSet.F.Subset _ _) =>
+(* idtac "go fsetdec go" ; *)
+(* NOTE: "free" hypothesis are unlikely to help with subsets and they can cause fsetdec to hang *)
+try solve [prepare_for_fsetdec; fsetdec]
+: core.

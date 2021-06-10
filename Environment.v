@@ -697,3 +697,51 @@ Proof with eauto.
 Qed.
 
 Hint Resolve ok_ignores_binding : core.
+
+Ltac rewrite_nil_concat :=
+  match goal with
+  | |- _ ?E0 =>
+    rewrite <- nil_concat with (E := E0)
+  | |- _ ?E0 _ =>
+    rewrite <- nil_concat with (E := E0)
+  | |- _ ?E0 _ _ =>
+    rewrite <- nil_concat with (E := E0)
+  | |- _ ?E0 _ _ _ =>
+    rewrite <- nil_concat with (E := E0)
+  end.
+
+Lemma ok_tail : forall A (F E : list (atom * A)),
+  ok (F ++ E) ->
+  ok E.
+Proof.
+  intros.
+  rewrite_env (nil ++ F ++ E) in H.
+  rewrite_env (nil ++ E).
+  eapply ok_remove_mid; eauto.
+Qed.
+
+Hint Extern 1 (ok ?E) =>
+match goal with
+  | H : ok (?F ++ E) |- _ =>
+    apply (ok_tail F E)
+end : core.
+
+Lemma tail_not_in_head : forall A (E F : list (atom * A)) x,
+  ok (F ++ E) ->
+  In x (dom E) ->
+  ~ In x (dom F).
+Proof.
+  intros * Hok Hx.
+  induction F.
+  + notin_solve.
+  + assert (~ In x (dom F)). {
+      apply IHF; inversion Hok; assumption.
+    }
+    destruct a; simpl_env in *...
+    assert (x <> a). {
+      inversion Hok; subst.
+      simpl_env in *.
+      fsetdec.
+    }
+    fsetdec.
+Qed.
