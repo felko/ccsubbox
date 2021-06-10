@@ -599,6 +599,66 @@ Inductive value : exp -> Prop :=
 .
 
 
+(** ******************************************* **)
+(** Stacks / Contexts                           **)
+(** ******************************************* **)
+
+Inductive frame : Type :=
+  (* [](e) *)
+  | KFun : exp -> frame
+  (* v([]) *)
+  | KArg : exp -> frame  (*(e : exp) -> value e -> frame *)
+  (* [] [T] *)
+  | KTyp : typ -> frame
+.
+
+(** We use the following abbreviation to denote runtime stacks *)
+Notation ctx := (list frame).
+
+(** the toplevel / empty runtime stack  *)
+Notation top := (@nil frame).
+
+
+Reserved Notation "|-ctx c ~: T" (at level 70).
+
+
+Inductive typing_ctx : ctx -> typ -> Prop :=
+  | typing_ctx_empty : forall T,
+      |-ctx top ~: T
+
+  | typing_ctx_fun : forall C T1 T1' T2 k e,
+      typing nil e T1' ->
+      sub nil T1' T1 ->
+      |-ctx k ~: (open_ct T2 (cv T1')) ->
+      |-ctx KFun e :: k ~: typ_capt C (typ_arrow T1 T2)
+
+  | typing_ctx_arg : forall C T1 T1' T2 k e,
+      typing nil e (typ_capt C (typ_arrow T1 T2)) ->
+      sub nil T1' T1 ->
+      |-ctx k ~: (open_ct T2 (cv T1')) ->
+      |-ctx KArg e :: k ~: T1'
+
+  | typing_ctx_typ : forall C T T1 T2 k,
+      sub nil T T1 ->
+      |-ctx k ~: (open_tt T2 T) ->
+      |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
+
+where "|-ctx K ~: T" := (typing_ctx K T).
+
+
+Inductive state : Type :=
+  | state_step (e : exp) (c : ctx) : state
+.
+
+Notation "〈 e | k 〉" := (state_step e k).
+
+Inductive typing_state : state -> Prop :=
+  | typ_step : forall e k T,
+      |-ctx k ~: T ->
+      typing nil e T ->
+      typing_state〈 e | k 〉
+  .
+
 (* ********************************************************************** *)
 (** * #<a name="reduction"></a># Reduction *)
 
