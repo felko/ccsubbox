@@ -979,6 +979,21 @@ Hint Extern 1 (expr ?e) =>
   end
 : core.
 
+Hint Extern 1 (wf_pretyp ?E (dom ?E) (dom ?E) ?P) =>
+match goal with
+| H : typing E _ (typ_capt _ P) |- _ =>
+  apply typing_regular in H;
+  destruct H as [_ [_ H]];
+  inversion H; subst; assumption
+end : core.
+
+Hint Extern 1 (wf_pretyp_in ?E ?P) =>
+match goal with
+| H : typing E _ (typ_capt _ P) |- _ =>
+  apply typing_regular in H;
+  destruct H as [_ [_ H]];
+  inversion H; subst; assumption
+end : core.
 
 (** * #<a name="auto"></a># Automation Tests *)
 

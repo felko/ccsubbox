@@ -61,24 +61,6 @@ Qed.
 (************************************************************************ *)
 (** ** Other helpers *)
 
-(** TODO MOVE TO LEMMAS *)
-
-Hint Extern 1 (wf_pretyp ?E (dom ?E) (dom ?E) ?P) =>
-match goal with
-| H : typing E _ (typ_capt _ P) |- _ =>
-  apply typing_regular in H;
-  destruct H as [_ [_ H]];
-  inversion H; subst; assumption
-end : core.
-
-Hint Extern 1 (wf_pretyp_in ?E ?P) =>
-match goal with
-| H : typing E _ (typ_capt _ P) |- _ =>
-  apply typing_regular in H;
-  destruct H as [_ [_ H]];
-  inversion H; subst; assumption
-end : core.
-
 Lemma subst_trivia1 : forall x C e,
     AtomSet.F.In x (`cset_fvars` (free_for_cv e)) ->
     subst_cset x C (free_for_cv e) = cset_union C ((free_for_cv e) A`\` x).
