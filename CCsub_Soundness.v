@@ -262,28 +262,31 @@ Lemma progress_step : forall s1,
   typing_state s1 ->
   done s1 \/ exists s2, s1 --> s2.
 Proof with eauto.
-  admit.
-  (* intros e T Typ. *)
-  (* remember empty. generalize dependent Heql. *)
-  (* assert (Typ' : typing l e T)... *)
-  (* induction Typ; intros EQ; subst... *)
-  (* Case "typing_var". *)
-  (*   inversion H0. *)
-  (* Case "typing_app". *)
-  (*   inversion H0. *)
-  (*   destruct IHTyp1 as [Val1 | [e1' Rede1']]... *)
-  (*   SCase "Val1". *)
-  (*     destruct IHTyp2 as [Val2 | [e2' Rede2']]... *)
-  (*     SSCase "Val2". *)
-  (*       lets (S & e3 & EQ): canonical_form_abs Val1 Typ1. *)
-  (*       subst. *)
-  (*       right. *)
-  (*       exists (open_ee e3 e2 (free_for_cv e2))... *)
-  (* Case "typing_tapp". *)
-  (*   right. *)
-  (*   destruct IHTyp as [Val1 | [e1' Rede1']]... *)
-  (*   SCase "Val1". *)
-  (*     lets (S & e3 & EQ): canonical_form_tabs Val1 Typ. *)
-  (*     subst. *)
-  (*     exists (open_te e3 T)... *)
+  intros * Typ.
+  inversion Typ; subst.
+  remember empty. generalize dependent Heql.
+  rename select (typing l e T) into Typ'.
+  dependent induction Typ'; intros EQ; subst...
+  - inversion select (binds _ _ _).
+  - inversion select (binds _ _ _).
+  - assert (value (exp_abs V e1)) by admit.
+    inversion H; subst...
+    + left...
+      constructor...
+    + right.
+      eexists.
+      rename select (typing empty e _) into TypE.
+      (* forwards: canonical_form_abs TypE... *)
+      admit.                    (* should KArg only contain values? *)
+  - assert (value (exp_tabs V e1)) by admit.
+    inversion H; subst...
+    + left...
+      constructor...
+    + right.
+      eexists.
+      rename select (typing empty e _) into TypE.
+      (* forwards: canonical_form_abs TypE... *)
+      admit.                    (* should KArg only contain values? *)
+  - apply IHTyp'...
+    eapply ctx_typing_narrowing...
 Admitted.
