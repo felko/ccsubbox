@@ -870,21 +870,21 @@ Proof.
   intros e H. induction H; auto.
 Qed.
 
-Lemma red_regular : forall e e',
-  red e e' ->
-  expr e /\ expr e'.
-Proof with auto*.
-  intros e e' H.
-  induction H; assert (J := value_regular); split...
-  - Case "red_abs".
-    inversion H. pick fresh y.
-    rewrite (subst_ee_intro y)...
-    eapply subst_ee_expr...
-    pose proof (cv_free_is_bvar_free v2).
-    destruct (free_for_cv v2); subst...
-  - Case "red_tabs".
-    inversion H. pick fresh Y. rewrite (subst_te_intro Y)...
-Qed.
+(* Lemma red_regular : forall e e', *)
+(*   red e e' -> *)
+(*   expr e /\ expr e'. *)
+(* Proof with auto*. *)
+(*   intros e e' H. *)
+(*   induction H; assert (J := value_regular); split... *)
+(*   - Case "red_abs". *)
+(*     inversion H. pick fresh y. *)
+(*     rewrite (subst_ee_intro y)... *)
+(*     eapply subst_ee_expr... *)
+(*     pose proof (cv_free_is_bvar_free v2). *)
+(*     destruct (free_for_cv v2); subst... *)
+(*   - Case "red_tabs". *)
+(*     inversion H. pick fresh Y. rewrite (subst_te_intro Y)... *)
+(* Qed. *)
 
 
 (* *********************************************************************** *)
@@ -974,8 +974,8 @@ Hint Extern 1 (capt ?C) =>
 Hint Extern 1 (expr ?e) =>
   match goal with
   | H: typing _ ?e _ |- _ => apply (proj1 (proj2 (typing_regular _ _ _ H)))
-  | H: red ?e _ |- _ => apply (proj1 (red_regular _ _ H))
-  | H: red _ ?e |- _ => apply (proj2 (red_regular _ _ H))
+  (* | H: red ?e _ |- _ => apply (proj1 (red_regular _ _ H)) *)
+  (* | H: red _ ?e |- _ => apply (proj2 (red_regular _ _ H)) *)
   end
 : core.
 

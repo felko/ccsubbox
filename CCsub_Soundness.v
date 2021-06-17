@@ -30,87 +30,6 @@ Proof with eauto.
   apply (wf_typ_extract_typ_arrow C)...
 Qed.
 
-
-(* ********************************************************************** *)
-(** * #<a name="preservation"></a># Preservation *)
-
-
-Definition no_type_bindings (E : env) : Prop :=
-  forall X U, ~ binds X (bind_sub U) E.
-
-Lemma inversion_toplevel_type : forall E T,
-  no_type_bindings E ->
-  wf_typ_in E T ->
-  exists C P, T = typ_capt C P.
-Proof with eauto.
-  intros * NoTyp H.
-  inversion H; subst.
-  - inversion H; subst. specialize (NoTyp X U). contradiction.
-  - exists C. exists P...
-Qed.
-
-Lemma preservation : forall E e e' T,
-  no_type_bindings E ->
-  typing E e T ->
-  red e e' ->
-  typing E e' T.
-Proof with simpl_env; eauto.
-  intros * NoTypBnd Typ. generalize dependent e'.
-  induction Typ; intros e' Red; try solve [ inversion Red; subst; eauto ].
-  - Case "typing_app".
-    inversion Red; subst...
-    + SCase "red_abs".
-      forwards (P1 & S2 & L & P2): typing_inv_abs Typ1 T1 T2 Cf. {
-        eapply sub_reflexivity...
-      }
-      pick fresh x.
-      forwards (? & ? & ?): P2 x...
-      rewrite (subst_ee_intro x)...
-      rewrite (subst_ct_intro x)...
-      apply typing_through_subst_ee'
-        with (U := T1')
-            (Ap := dom ([(x, bind_typ T1')] ++ E))
-            (Am := dom E) ...
-      * apply (typing_sub (open_ct S2 (`cset_fvar` x)))...
-        -- rewrite_nil_concat.
-           forwards (U & HtypU & HsubU): values_have_precise_captures e2; eauto.
-           inversion HsubU; subst.
-           eapply (typing_narrowing_typ T)...
-           eauto using (sub_transitivity T1).
-
-           (* lets (C & P & Eq): inversion_toplevel_type E T1'; subst... *)
-           (* rewrite_nil_concat. *)
-           (* eapply (typing_narrowing_typ T)... *)
-           (* eauto using (sub_transitivity T1). *)
-        -- rewrite_nil_concat.
-          apply (sub_narrowing_typ) with (Q := T1)...
-      * replace (singleton x `union` dom E)
-          with (dom E `union` singleton x) by (clear Fr; fsetdec)...
-        rewrite_nil_concat.
-        apply wf_typ_narrowing_typ_base with (V := T)...
-      * eapply wf_cset_set_weakening; [eapply typing_cv | fsetdec]...
-      * assert (wf_cset_in E (cv T1')) as HA. {
-          forwards (_ & _ & ?): typing_regular Typ2.
-          apply cv_wf...
-        }
-        eapply wf_cset_set_weakening; [ apply HA | fsetdec ].
-  - Case "typing_tapp".
-    inversion Red; subst...
-    SCase "red_tabs".
-    forwards (Sub & P1 & L & P2): typing_inv_tabs Typ T1 T2 C. {
-      eapply sub_reflexivity...
-    }
-    pick fresh X.
-    forwards (S2 & ?): P2 X...
-    rewrite (subst_te_intro X)...
-    rewrite (subst_tt_intro X)...
-    rewrite_env (map (subst_tb X T) empty ++ E).
-    apply (typing_through_subst_te T1)...
-Qed.
-
-(* ********************************************************************** *)
-(** * #<a name="progress"></a># Progress *)
-
 (* ********************************************************************** *)
 (** ** Canonical forms (14) *)
 
@@ -151,34 +70,220 @@ Proof.
 Qed.
 
 (* ********************************************************************** *)
-(** ** Progress (16) *)
+(** * #<a name="preservation"></a># Preservation *)
 
-Lemma progress : forall e T,
-  typing empty e T ->
-  value e \/ exists e', red e e'.
+Definition no_type_bindings (E : env) : Prop :=
+  forall X U, ~ binds X (bind_sub U) E.
+
+Lemma inversion_toplevel_type : forall E T,
+  no_type_bindings E ->
+  wf_typ_in E T ->
+  exists C P, T = typ_capt C P.
 Proof with eauto.
-  intros e T Typ.
-  remember empty. generalize dependent Heql.
-  assert (Typ' : typing l e T)...
-  induction Typ; intros EQ; subst...
-  Case "typing_var".
-    inversion H0.
-  Case "typing_app".
-    inversion H0.
-    destruct IHTyp1 as [Val1 | [e1' Rede1']]...
-    SCase "Val1".
-      destruct IHTyp2 as [Val2 | [e2' Rede2']]...
-      SSCase "Val2".
-        lets (S & e3 & EQ): canonical_form_abs Val1 Typ1.
-        subst.
-        right.
-        exists (open_ee e3 e2 (free_for_cv e2))...
-  Case "typing_tapp".
-    right.
-    destruct IHTyp as [Val1 | [e1' Rede1']]...
-    SCase "Val1".
-      lets (S & e3 & EQ): canonical_form_tabs Val1 Typ.
-      subst.
-      exists (open_te e3 T)...
+  intros * NoTyp H.
+  inversion H; subst.
+  - inversion H; subst. specialize (NoTyp X U). contradiction.
+  - exists C. exists P...
 Qed.
 
+Lemma ctx_typing_narrowing : forall T e S,
+  |-ctx e ~: T ->
+  sub empty S T ->
+  |-ctx e ~: S.
+Proof with eauto.
+  intros * Typ Sub. generalize dependent S.
+  dependent induction Typ; intros S Sub.
+  - constructor...
+  - inversion Sub;subst. {
+      inversion select (binds _ _ _).
+    }
+    inversion select (sub_pre _ _ _); subst.
+    econstructor.
+    + apply H.
+    + apply (sub_transitivity T1)...
+    + apply IHTyp.
+      pick fresh x.
+      replace (open_ct S2 (cv T1'))
+        with (subst_ct x (cv T1') (open_ct S2 (`cset_fvar` x))).
+      2: {
+        rewrite subst_ct_open_ct.
+        3: notin_solve.
+        2: eapply capt_from_wf_cset; eapply (cv_wf empty)...
+        f_equal.
+        2: csetdec.
+        symmetry; apply subst_ct_fresh.
+        notin_solve.
+      }
+      replace (open_ct T2 (cv T1'))
+        with (subst_ct x (cv T1') (open_ct T2 (`cset_fvar` x))).
+      2: {
+        rewrite subst_ct_open_ct.
+        3: notin_solve.
+        2: eapply capt_from_wf_cset; eapply (cv_wf empty)...
+        f_equal.
+        2: csetdec.
+        symmetry; apply subst_ct_fresh.
+        notin_solve.
+      }
+      rewrite_env ((map (subst_cb x (cv T1')) empty) ++ empty).
+      apply (sub_through_subst_ct x T1).
+      2: apply sub_implies_subcapt...
+      simpl_env; apply H12; notin_solve.
+  - econstructor...
+    1: apply (sub_transitivity T1')...
+    assert (wf_pretyp_in empty (typ_arrow T1 T2)) as HA by eauto.
+    inversion HA; subst.
+    admit.                      (* by subst_ct_monotonicity *)
+  - inversion Sub;subst. {
+      inversion select (binds _ _ _).
+    }
+    inversion select (sub_pre _ _ _); subst.
+    econstructor.
+    1: apply (sub_transitivity T1)...
+    apply IHTyp.
+    pick fresh x.
+    replace (open_tt S2 T) with (subst_tt x T (open_tt S2 x)).
+    2: {
+      rewrite subst_tt_open_tt...
+      f_equal.
+      2: unfold subst_tt; destruct (x == x); easy.
+      symmetry; apply subst_tt_fresh.
+      notin_solve.
+    }
+    replace (open_tt T2 T) with (subst_tt x T (open_tt T2 x)).
+    2: {
+      rewrite subst_tt_open_tt...
+      f_equal.
+      2: unfold subst_tt; destruct (x == x); easy.
+      symmetry; apply subst_tt_fresh.
+      notin_solve.
+    }
+    rewrite_env ((map (subst_tb x T) empty) ++ empty).
+    apply sub_through_subst_tt with (Z := x) (Q := T1)...
+Admitted.
+
+Lemma preservation : forall e e',
+  typing_state e ->
+  step e e' ->
+  typing_state e'.
+Proof with simpl_env; eauto.
+  intros * Typ Step.
+  inversion Step; subst.
+  - inversion Typ; subst.
+    dependent induction H2. 2: {
+      eapply IHtyping...
+      eapply ctx_typing_narrowing...
+    }
+    econstructor...
+    econstructor...
+  - inversion Typ; subst.
+    dependent induction H2. 2: {
+      eapply IHtyping...
+      eapply ctx_typing_narrowing...
+    }
+    econstructor...
+    econstructor...
+  - inversion Typ; subst.
+    inversion H2; subst.
+    econstructor...
+    econstructor...
+  - inversion Typ; subst.
+    inversion H2; subst.
+    dependent induction H4. 2: {
+      inversion select (sub empty S _); subst. {
+        inversion select (binds _ _ _).
+      }
+      inversion select (sub_pre empty _ _); subst.
+      eapply IHtyping...
+      1: eapply (sub_transitivity T1)...
+      eapply (ctx_typing_narrowing (open_ct T2 (cv T0)))...
+      pick fresh x.
+      replace (open_ct S2 (cv T0))
+        with (subst_ct x (cv T0) (open_ct S2 (`cset_fvar` x))).
+      2: {
+        rewrite subst_ct_open_ct.
+        3: notin_solve.
+        2: eapply capt_from_wf_cset; eapply (cv_wf empty)...
+        f_equal.
+        2: csetdec.
+        symmetry; apply subst_ct_fresh.
+        notin_solve.
+      }
+      replace (open_ct T2 (cv T0))
+        with (subst_ct x (cv T0) (open_ct T2 (`cset_fvar` x))).
+      2: {
+        rewrite subst_ct_open_ct.
+        3: notin_solve.
+        2: eapply capt_from_wf_cset; eapply (cv_wf empty)...
+        f_equal.
+        2: csetdec.
+        symmetry; apply subst_ct_fresh.
+        notin_solve.
+      }
+      rewrite_env ((map (subst_cb x (cv T0)) empty) ++ empty).
+      eapply (sub_through_subst_ct x).
+      1: eauto.
+      apply sub_implies_subcapt...
+    }
+    econstructor...
+    pick fresh x.
+    replace (open_ee e0 v (free_for_cv v))
+         with (subst_ee x v (free_for_cv v) (open_ee e0 x (`cset_fvar` x))).
+    2: {
+      rewrite subst_ee_open_ee...
+      2: admit.
+      f_equal.
+      3: csetdec.
+      2: unfold subst_ee; destruct (x == x); easy.
+      symmetry; apply subst_ee_fresh...
+    }
+    replace (open_ct T2 (cv T0))
+      with (subst_ct x (cv T0) (open_ct T2 (`cset_fvar` x))).
+    2: {
+      rewrite subst_ct_open_ct...
+      f_equal.
+      2: csetdec.
+      symmetry; apply subst_ct_fresh...
+    }
+    eapply typing_through_subst_ee'.
+    (* T0 = (C T0') for some C, T0' b/c (typing empty v T0) *)
+    all: admit.
+  - inversion Typ; subst.
+    admit.
+Admitted.
+
+(* ********************************************************************** *)
+(** * #<a name="progress"></a># Progress *)
+
+(* ********************************************************************** *)
+(** ** Progress (16) *)
+
+Lemma progress_step : forall s1,
+  typing_state s1 ->
+  done s1 \/ exists s2, s1 --> s2.
+Proof with eauto.
+  admit.
+  (* intros e T Typ. *)
+  (* remember empty. generalize dependent Heql. *)
+  (* assert (Typ' : typing l e T)... *)
+  (* induction Typ; intros EQ; subst... *)
+  (* Case "typing_var". *)
+  (*   inversion H0. *)
+  (* Case "typing_app". *)
+  (*   inversion H0. *)
+  (*   destruct IHTyp1 as [Val1 | [e1' Rede1']]... *)
+  (*   SCase "Val1". *)
+  (*     destruct IHTyp2 as [Val2 | [e2' Rede2']]... *)
+  (*     SSCase "Val2". *)
+  (*       lets (S & e3 & EQ): canonical_form_abs Val1 Typ1. *)
+  (*       subst. *)
+  (*       right. *)
+  (*       exists (open_ee e3 e2 (free_for_cv e2))... *)
+  (* Case "typing_tapp". *)
+  (*   right. *)
+  (*   destruct IHTyp as [Val1 | [e1' Rede1']]... *)
+  (*   SCase "Val1". *)
+  (*     lets (S & e3 & EQ): canonical_form_tabs Val1 Typ. *)
+  (*     subst. *)
+  (*     exists (open_te e3 T)... *)
+Admitted.

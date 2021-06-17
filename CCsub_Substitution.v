@@ -1075,8 +1075,7 @@ Lemma typing_through_subst_ee' : forall U E Ap Am x T e u,
   wf_cset E Ap (cv U) ->
   typing E (subst_ee x u (free_for_cv u) e) (subst_ct x (cv U) T).
 Proof with simpl_env; eauto.
-  intros *.
-  intros HtypT HwfT Hnotin HApRsnbl HAmRsnbl HvalU HtypU WfFvU WfC.
+  intros * HtypT HwfT Hnotin HApRsnbl HAmRsnbl HvalU HtypU WfFvU WfC.
   assert (typing E (subst_ee x u (free_for_cv u) e) (subst_ct x (free_for_cv u) T))
     as Hthrough. {
     apply values_have_precise_captures in HtypU...
