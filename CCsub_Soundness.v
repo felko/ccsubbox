@@ -249,7 +249,27 @@ Proof with simpl_env; eauto.
     (* T0 = (C T0') for some C, T0' b/c (typing empty v T0) *)
     all: admit.
   - inversion Typ; subst.
-    admit.
+    dependent induction H2. 2: {
+      eapply IHtyping...
+      eapply ctx_typing_narrowing...
+    }
+    inversion H1; subst.
+    econstructor...
+    pick fresh x.
+    replace (open_te e1 T2) with (subst_te x T2 (open_te e1 x)). 2: {
+      rewrite subst_te_open_te...
+      f_equal.
+      2: unfold subst_tt; destruct (x == x); easy.
+      symmetry; apply subst_te_fresh...
+    }
+    replace (open_tt T0 T2) with (subst_tt x T2 (open_tt T0 x)). 2: {
+      rewrite subst_tt_open_tt...
+      f_equal.
+      2: unfold subst_tt; destruct (x == x); easy.
+      symmetry; apply subst_tt_fresh...
+    }
+    rewrite_env (map (subst_tb x T2) empty ++ empty).
+    apply (typing_through_subst_te T1) with (Z := x)...
 Admitted.
 
 (* ********************************************************************** *)
