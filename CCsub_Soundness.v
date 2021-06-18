@@ -230,8 +230,9 @@ Proof with simpl_env; eauto.
     replace (open_ee e0 v (free_for_cv v))
          with (subst_ee x v (free_for_cv v) (open_ee e0 x (`cset_fvar` x))).
     2: {
+      rename select (typing empty v _) into TypV.
+      forwards WfFvV: typing_cv TypV.
       rewrite subst_ee_open_ee...
-      2: admit.
       f_equal.
       3: csetdec.
       2: unfold subst_ee; destruct (x == x); easy.
@@ -245,9 +246,31 @@ Proof with simpl_env; eauto.
       2: csetdec.
       symmetry; apply subst_ct_fresh...
     }
+    assert (wf_typ_in empty T0) as WfTypV by eauto.
+    forwards (C & P & ?): inversion_toplevel_type WfTypV;subst. {
+      intros ? ? ?.
+      inversion select (binds _ _ empty).
+    }
     eapply typing_through_subst_ee'.
-    (* T0 = (C T0') for some C, T0' b/c (typing empty v T0) *)
-    all: admit.
+    1: {                        (* typing *)
+      rewrite_env (empty ++ [(x, bind_typ (typ_capt C P))] ++ empty).
+      eapply typing_narrowing_typ...
+    }
+    1: {                        (* wf_typ *)
+      rewrite_env (empty ++ [(x, bind_typ (typ_capt C P))] ++ empty).
+      eapply wf_typ_narrowing_typ_base; simpl_env...
+    }
+    all: eauto.                 (* garbage, evars instantiated by above goal *)
+    1: {                        (* wf_cset free_for_cv *)
+      rename select (typing empty v _) into TypV.
+      forwards WfFvV: typing_cv TypV.
+      applys wf_cset_set_weakening WfFvV...
+    }
+    1: {                        (* wf_cset C *)
+      simpl...
+      assert (wf_cset_in empty C) as WfC by eauto.
+      applys wf_cset_set_weakening WfC...
+    }
   - inversion Typ; subst.
     dependent induction H2. 2: {
       eapply IHtyping...
