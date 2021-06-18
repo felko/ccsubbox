@@ -133,21 +133,95 @@ Proof with eauto.
       simpl_env; apply H12; notin_solve.
   - Case "KArg".
     econstructor...
-    apply (sub_transitivity T1')...
+    1: apply (sub_transitivity T1')...
+    assert (wf_pretyp_in empty (typ_arrow T1 T2)) as HA by eauto.
+    inversion HA; subst.
     apply IHTyp.
-    assert (wf_pretyp_in empty (typ_arrow T1 T2)) as WfArrow by eauto.
-    pose proof (sub_implies_subcapt _ _ _ Sub) as SubCapt...
-    inversion WfArrow; subst.
-
-    pick fresh X.
-    specialize (H8 X ltac:(notin_solve)).
-
-    replace (open_ct T2 (cv S)) with (subst_ct X (cv S) (open_ct T2 (`cset_fvar` X))).
-    replace (open_ct T2 (cv T1')) with (subst_ct X (cv T1') (open_ct T2 (`cset_fvar` X))).
-    eapply (plain_subst_ct_monotonicity empty {}A {}A)...
-    admit.
-    rewrite <- (subst_ct_intro X)...
-    rewrite <- (subst_ct_intro X)...
+    inversion HA; subst.
+    pick fresh x.
+    replace (open_ct T2 (cv S))
+      with (subst_ct x (cv S) (open_ct T2 (`cset_fvar` x))).
+    2: {
+      rewrite subst_ct_open_ct.
+      3: notin_solve.
+      2: eapply capt_from_wf_cset; eapply (cv_wf empty)...
+      f_equal.
+      2: csetdec.
+      symmetry; apply subst_ct_fresh.
+      notin_solve.
+    }
+    replace (open_ct T2 (cv T1'))
+      with (subst_ct x (cv T1') (open_ct T2 (`cset_fvar` x))).
+    2: {
+      rewrite subst_ct_open_ct.
+      3: notin_solve.
+      2: eapply capt_from_wf_cset; eapply (cv_wf empty)...
+      f_equal.
+      2: csetdec.
+      symmetry; apply subst_ct_fresh.
+      notin_solve.
+    }
+    enough (sub ([(x, bind_typ T1)] ++ empty)
+                (subst_ct x (cv S) (open_ct T2 (`cset_fvar` x)))
+                (subst_ct x (cv T1') (open_ct T2 (`cset_fvar` x)))) as HE. {
+      rewrite_env (empty ++ [(x, bind_typ T1)] ++ empty) in HE.
+      forwards HP: sub_through_subst_ct (cv T1) HE. {
+        eapply subcapt_reflexivity.
+        - eapply cv_wf...
+        - csetdec.
+      }
+      simpl_env in HP.
+      assert (x `notin` (`cset_fvars` (cv S))). {
+        assert (wf_cset_in empty (cv S)) as HAA by (apply cv_wf;eauto).
+        inversion HAA; subst; simpl_env in *.
+        clear Fr.
+        intros ?.
+        (* How come this doesn't work ??? *)
+        (* assert (x `in`A {}A) by fsetdec. *)
+        assert ({x}A `c`A fvars) by fsetdec.
+        assert ({x}A `c`A {}A) as HSubSet by fsetdec.
+        forwards HSubSet': HSubSet x.
+        1: fsetdec.
+        assert (x `notin` {}A) by (clear_frees;fsetdec).
+        easy.
+      }
+      assert (x `~in`A `cset_fvars` (cv T1')). {
+        assert (wf_cset_in empty (cv T1')) as HAA by (apply cv_wf;eauto).
+        inversion HAA; subst; simpl_env in *.
+        clear Fr.
+        intros ?.
+        (* How come this doesn't work ??? *)
+        (* assert (x `in`A {}A) by fsetdec. *)
+        assert ({x}A `c`A fvars) by fsetdec.
+        assert ({x}A `c`A {}A) as HSubSet by fsetdec.
+        forwards HSubSet': HSubSet x.
+        1: fsetdec.
+        assert (x `notin` {}A) by (clear_frees;fsetdec).
+        easy.
+      }
+      repeat (rewrite subst_ct_useless_repetition in HP by notin_solve).
+      apply HP.
+    }
+    assert (wf_env [(x, bind_typ T1)]) by (constructor;eauto).
+    applys plain_subst_ct_monotonicity; simpl_env.
+    5: apply H10.
+    all: simpl_env;eauto.
+    1: eapply type_from_wf_typ...
+    1: apply sub_implies_subcapt;
+      rewrite_env (empty ++ [(x, bind_typ T1)] ++ empty);
+      apply sub_weakening;simpl_env...
+    1: {
+      assert (wf_cset_in empty (cv S)) as WfCvS by (apply cv_wf;eauto).
+      rewrite_env (empty ++ empty) in WfCvS.
+      rewrite_env (empty ++ [(x, bind_typ T1)] ++ empty).
+      applys wf_cset_weakening WfCvS; simpl_env...
+    }
+    1: {
+      assert (wf_cset_in empty (cv T1')) as WfCvT1' by (apply cv_wf;eauto).
+      rewrite_env (empty ++ empty) in WfCvT1'.
+      rewrite_env (empty ++ [(x, bind_typ T1)] ++ empty).
+      applys wf_cset_weakening WfCvT1'; simpl_env...
+    }
   - Case "KTyp".
     inversion Sub;subst. {
       inversion select (binds _ _ _).
@@ -175,7 +249,7 @@ Proof with eauto.
     }
     rewrite_env ((map (subst_tb x T) empty) ++ empty).
     apply sub_through_subst_tt with (Z := x) (Q := T1)...
-Admitted.
+Qed.
 
 Lemma preservation : forall e e',
   typing_state e ->
