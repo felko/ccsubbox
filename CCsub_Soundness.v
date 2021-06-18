@@ -140,7 +140,7 @@ Proof with eauto.
     inversion WfArrow; subst.
 
     pick fresh X.
-    specialize (H7 X ltac:(notin_solve)).
+    specialize (H8 X ltac:(notin_solve)).
 
     replace (open_ct T2 (cv S)) with (subst_ct X (cv S) (open_ct T2 (`cset_fvar` X))).
     replace (open_ct T2 (cv T1')) with (subst_ct X (cv T1') (open_ct T2 (`cset_fvar` X))).
@@ -204,7 +204,7 @@ Proof with simpl_env; eauto.
     econstructor...
   - inversion Typ; subst.
     inversion H2; subst.
-    dependent induction H4. 2: {
+    dependent induction H5. 2: {
       inversion select (sub empty S _); subst. {
         inversion select (binds _ _ _).
       }

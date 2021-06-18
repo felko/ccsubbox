@@ -633,6 +633,7 @@ Inductive typing_ctx : ctx -> typ -> Prop :=
       |-ctx KFun e :: k ~: typ_capt C (typ_arrow T1 T2)
 
   | typing_ctx_arg : forall C T1 T1' T2 k e,
+      value e ->
       typing nil e (typ_capt C (typ_arrow T1 T2)) ->
       sub nil T1' T1 ->
       |-ctx k ~: (open_ct T2 (cv T1')) ->
