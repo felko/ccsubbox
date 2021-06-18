@@ -93,8 +93,10 @@ Lemma ctx_typing_narrowing : forall T e S,
 Proof with eauto.
   intros * Typ Sub. generalize dependent S.
   dependent induction Typ; intros S Sub.
-  - constructor...
-  - inversion Sub;subst. {
+  - Case "top".
+    constructor...
+  - Case "KFun".
+    inversion Sub;subst. {
       inversion select (binds _ _ _).
     }
     inversion select (sub_pre _ _ _); subst.
@@ -129,12 +131,25 @@ Proof with eauto.
       apply (sub_through_subst_ct x T1).
       2: apply sub_implies_subcapt...
       simpl_env; apply H12; notin_solve.
-  - econstructor...
-    1: apply (sub_transitivity T1')...
-    assert (wf_pretyp_in empty (typ_arrow T1 T2)) as HA by eauto.
-    inversion HA; subst.
-    admit.                      (* by subst_ct_monotonicity *)
-  - inversion Sub;subst. {
+  - Case "KArg".
+    econstructor...
+    apply (sub_transitivity T1')...
+    apply IHTyp.
+    assert (wf_pretyp_in empty (typ_arrow T1 T2)) as WfArrow by eauto.
+    pose proof (sub_implies_subcapt _ _ _ Sub) as SubCapt...
+    inversion WfArrow; subst.
+
+    pick fresh X.
+    specialize (H7 X ltac:(notin_solve)).
+
+    replace (open_ct T2 (cv S)) with (subst_ct X (cv S) (open_ct T2 (`cset_fvar` X))).
+    replace (open_ct T2 (cv T1')) with (subst_ct X (cv T1') (open_ct T2 (`cset_fvar` X))).
+    eapply (plain_subst_ct_monotonicity empty {}A {}A)...
+    admit.
+    rewrite <- (subst_ct_intro X)...
+    rewrite <- (subst_ct_intro X)...
+  - Case "KTyp".
+    inversion Sub;subst. {
       inversion select (binds _ _ _).
     }
     inversion select (sub_pre _ _ _); subst.
