@@ -732,23 +732,28 @@ Inductive done : state -> Prop :=
 (** * #<a name="reduction"></a># Reduction *)
 
 Inductive step : state -> state -> Prop :=
-  | step_app : forall e1 e2 k Q,
-      〈 exp_app e1 e2 | k | Q 〉 --> 〈 e1 | KFun e2 :: k | Q 〉
+  | step_app : forall e1 e2 k E,
+      〈 exp_app e1 e2 | k | E 〉 --> 〈 e1 | KFun e2 :: k | E 〉
 
-  | step_tapp : forall e T k Q,
-      〈 exp_tapp e T | k | Q 〉 --> 〈 e | KTyp T :: k | Q 〉
+  | step_tapp : forall e T k E,
+      〈 exp_tapp e T | k | E 〉 --> 〈 e | KTyp T :: k | E 〉
 
-  | step_pop_1 : forall v arg k Q,
+  | step_pop_1 : forall v arg k E,
       value v ->
-      〈 v | KFun arg :: k | Q 〉 --> 〈 arg | KArg v :: k | Q 〉
+      〈 v | KFun arg :: k | E 〉 --> 〈 arg | KArg v :: k | E 〉
 
-  | step_abs : forall v T e k Q,
+  | step_abs : forall v T e k E,
       value v ->
-      〈  v | KArg (exp_abs T e) :: k | Q 〉 --> 〈 (open_ee e v (free_for_cv v)) | k | Q 〉
+      〈  v | KArg (exp_abs T e) :: k | E 〉 --> 〈 (open_ee e v (free_for_cv v)) | k | E 〉
 
-  | step_tabs : forall T1 T2 e1 k Q,
-      〈 exp_tabs T1 e1 | KTyp T2 :: k | Q 〉 --> 〈 (open_te e1 T2) | k | Q 〉
+  | step_tabs : forall T1 T2 e1 k E,
+      〈 exp_tabs T1 e1 | KTyp T2 :: k | E 〉 --> 〈 (open_te e1 T2) | k | E 〉
 
+  | step_try : forall T e a k E,
+      a `notin` dom E ->
+      〈 exp_try T e | k | E 〉--> 
+        〈 open_ee e (exp_handler a) (`cset_fvar` a) | H a T :: k | 
+          [(a, bind_typ (typ_capt {*} (typ_exc T)))] ++ E 〉
 where "st1 --> st2" := (step st1 st2).
 
 
