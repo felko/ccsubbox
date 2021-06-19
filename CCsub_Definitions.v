@@ -651,6 +651,12 @@ Inductive frame : Type :=
   | KArg : exp -> frame  (*(e : exp) -> value e -> frame *)
   (* [] [T] *)
   | KTyp : typ -> frame
+  (* try/reset_a [Targ] {exp} *) (** add reset as an expression when we reify continuations *)
+  | H : atom -> typ -> frame
+  (* throw [] (e) *)
+  | KThrowHandler : exp -> frame
+  (* throw v [] *)
+  | KThrowArg : exp -> frame
 .
 
 (** We use the following abbreviation to denote runtime stacks *)
@@ -684,50 +690,69 @@ Inductive typing_ctx : ctx -> typ -> Prop :=
       sub nil T T1 ->
       |-ctx k ~: (open_tt T2 T) ->
       |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
+  
+  | typing_ctx_reset : forall a T Targ k,
+      (** explicit subtyping step here -- do we need it? *)
+      sub nil Targ T ->
+      |-ctx k ~: T ->
+      |-ctx H a Targ :: k ~: Targ
+
+  | typing_ctx_throw_handler : forall C T Targ k e,
+      |-ctx k ~: T ->
+      (** for exceptions: need to make sure the type on the handler matches
+          the current answer type T *)
+      typing nil e (typ_capt C (typ_exc Targ)) ->
+      |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
+  
+  | typing_ctk_throw_arg : forall C T Targ k e,
+      value e ->
+      |-ctx k ~: T ->
+      typing nil e (typ_capt C (typ_exc Targ)) ->
+      |-ctx KThrowArg e :: k ~: Targ
 
 where "|-ctx K ~: T" := (typing_ctx K T).
 
 
 Inductive state : Type :=
-  | state_step (e : exp) (c : ctx) : state
+  | state_step (e : exp) (c : ctx) (Q : sig) : state
 .
 
-Notation "〈 e | k 〉" := (state_step e k).
+Notation "〈 e | k | Q 〉" := (state_step e k Q).
 Reserved Notation "st1 --> st2" (at level 69).
 
 Inductive typing_state : state -> Prop :=
-  | typ_step : forall e k T,
+  | typ_step : forall e k T Q,
       |-ctx k ~: T ->
       typing nil e T ->
-      typing_state〈 e | k 〉
+      typing_state〈 e | k | Q 〉
   .
 
 Inductive done : state -> Prop :=
-  | done_ret : forall e,
+  | done_ret : forall e Q,
       value e ->
-      done 〈 e | top 〉
+      done 〈 e | top | Q 〉
 .
 
 (* ********************************************************************** *)
 (** * #<a name="reduction"></a># Reduction *)
 
 Inductive step : state -> state -> Prop :=
-  | step_app : forall e1 e2 k,
-      〈 exp_app e1 e2 | k 〉 --> 〈 e1 | KFun e2 :: k 〉
+  | step_app : forall e1 e2 k Q,
+      〈 exp_app e1 e2 | k | Q 〉 --> 〈 e1 | KFun e2 :: k | Q 〉
 
-  | step_tapp : forall e T k,
-      〈 exp_tapp e T | k 〉 --> 〈 e | KTyp T :: k 〉
+  | step_tapp : forall e T k Q,
+      〈 exp_tapp e T | k | Q 〉 --> 〈 e | KTyp T :: k | Q 〉
 
-  | step_pop_1 : forall v arg k,
+  | step_pop_1 : forall v arg k Q,
       value v ->
-      〈 v | KFun arg :: k 〉 --> 〈 arg | KArg v :: k 〉
+      〈 v | KFun arg :: k | Q 〉 --> 〈 arg | KArg v :: k | Q 〉
 
-  | step_abs : forall v T e k,
+  | step_abs : forall v T e k Q,
       value v ->
-      〈  v | KArg (exp_abs T e) :: k 〉 --> 〈 (open_ee e v (free_for_cv v)) | k 〉
+      〈  v | KArg (exp_abs T e) :: k | Q 〉 --> 〈 (open_ee e v (free_for_cv v)) | k | Q 〉
 
-  | step_tabs : forall T1 T2 e1 k,
-      〈 exp_tabs T1 e1 | KTyp T2 :: k 〉 --> 〈 (open_te e1 T2) | k 〉
+  | step_tabs : forall T1 T2 e1 k Q,
+      〈 exp_tabs T1 e1 | KTyp T2 :: k | Q 〉 --> 〈 (open_te e1 T2) | k | Q 〉
 
 where "st1 --> st2" := (step st1 st2).
 
