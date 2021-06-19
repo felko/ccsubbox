@@ -33,6 +33,8 @@ with pretyp : Type :=
   | typ_top : pretyp
   | typ_arrow : typ -> typ -> pretyp
   | typ_all : typ -> typ -> pretyp
+  (** non-local returns: handlers need to be annotated with their return value *)
+  | typ_exc : typ -> pretyp
   .
 
 
@@ -43,6 +45,13 @@ Inductive exp : Type :=
   | exp_app : exp -> exp -> exp
   | exp_tabs : typ -> exp -> exp
   | exp_tapp : exp -> typ -> exp
+  (** try[Targ] { handler => exp }
+      for non-local returns. *)
+  | exp_try : typ -> exp -> exp
+  (** throw[exp_1/handler] exp_2 *)
+  | exp_throw : exp -> exp -> exp
+  (** handler value -- generated at runtime *)
+  | exp_handler : atom -> exp
 .
 
 (** We declare the constructors for indices and variables to be
@@ -110,6 +119,7 @@ with open_tpt_rec (K : nat) (U : typ) (T : pretyp)  {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
   | typ_all T1 T2 => typ_all (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
+  | typ_exc T1 => typ_exc (open_tt_rec K U T1)
   end.
 
 Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
@@ -120,6 +130,9 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   | exp_app e1 e2 => exp_app  (open_te_rec K U e1) (open_te_rec K U e2)
   | exp_tabs V e1 => exp_tabs (open_tt_rec K U V)  (open_te_rec (S K) U e1)
   | exp_tapp e1 V => exp_tapp (open_te_rec K U e1) (open_tt_rec K U V)
+  | exp_try Targ e1 => exp_try (open_tt_rec K U Targ) (open_te_rec K U e1)
+  | exp_throw e1 e2 => exp_throw (open_te_rec K U e1) (open_te_rec K U e2)
+  | exp_handler a => exp_handler a
   end.
 
 Fixpoint open_ct_rec (k : nat) (c : cap) (T : typ)  {struct T} : typ :=
@@ -133,6 +146,7 @@ with open_cpt_rec (k : nat) (c : cap) (T : pretyp)  {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
   | typ_all T1 T2 => typ_all (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
+  | typ_exc T1 => typ_exc (open_ct_rec k c T1)
   end.
 
 Fixpoint open_ee_rec (k : nat) (f : exp) (c : cap) (e : exp)  {struct e} : exp :=
@@ -143,6 +157,9 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (c : cap) (e : exp)  {struct e} : exp :
   | exp_app e1 e2 => exp_app (open_ee_rec k f c e1) (open_ee_rec k f c e2)
   | exp_tabs t e1 => exp_tabs (open_ct_rec k c t) (open_ee_rec (S k) f c e1)
   | exp_tapp e1 t => exp_tapp (open_ee_rec k f c e1) (open_ct_rec k c t)
+  | exp_try Targ e1 => exp_try (open_ct_rec k c Targ) (open_ee_rec (S k) f c e1)
+  | exp_throw e1 e2 => exp_throw (open_ee_rec k f c e1) (open_ee_rec k f c e2)
+  | exp_handler a => exp_handler a
   end.
 
 
@@ -230,6 +247,9 @@ with pretype : pretyp -> Prop :=
     type T1 ->
     (forall X : atom, X `notin` L -> type (open_tt T2 X)) ->
     pretype (typ_all T1 T2)
+  | type_exc : forall T1,
+    type T1 ->
+    pretype (typ_exc T1)
 .
 
 Inductive expr : exp -> Prop :=
@@ -250,7 +270,18 @@ Inductive expr : exp -> Prop :=
   | expr_tapp : forall e1 V,
       expr e1 ->
       type V ->
-      expr (exp_tapp e1 V).
+      expr (exp_tapp e1 V)
+  | expr_try : forall L Targ e1,
+      type Targ ->
+      (forall x : atom, x `notin` L -> expr (open_ee e1 x (`cset_fvar` x))) ->
+      expr (exp_try Targ e1)
+  | expr_throw : forall e1 e2,
+      expr e1 ->
+      expr e2 ->
+      expr (exp_throw e1 e2)
+  | expr_handler : forall a,
+      expr (exp_handler a)
+  .
 
 
 (* ********************************************************************** *)
@@ -274,6 +305,10 @@ Inductive binding : Type :=
   | bind_sub : typ -> binding
   | bind_typ : typ -> binding.
 
+Inductive signature : Type :=
+  (** signature bindings : arg type -> signature *)
+  | bind_sig : typ -> signature.
+
 (** A binding [(X, bind_sub T)] records that a type variable [X] is a
     subtype of [T], and a binding [(x, bind_typ U)] records that an
     expression variable [x] has type [U].
@@ -293,6 +328,7 @@ Inductive binding : Type :=
 
 Notation env := (list (atom * binding)).
 Notation empty := (@nil (atom * binding)).
+Notation sig := (list (atom * signature)).
 
 (** We also define a notation that makes it convenient to write one
     element lists.  This notation is useful because of our convention
@@ -430,6 +466,20 @@ Inductive wf_env : env -> Prop :=
       x `notin` dom E ->
       wf_env ([(x, bind_typ T)] ++ E).
 
+(** The definition of "fv" used in typing jdmgnts*)
+Fixpoint free_for_cv (e : exp) : cap :=
+match e with
+  | exp_bvar i => {}
+  | exp_fvar x => (`cset_fvar` x)
+  | exp_abs t e1 => (free_for_cv e1)
+  | exp_app e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
+  | exp_tabs t e1 => (free_for_cv e1)
+  | exp_tapp e1 t => (free_for_cv e1)
+  | exp_try Targ e1 => (free_for_cv e1)
+  | exp_throw e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
+  | exp_handler x => (`cset_fvar` x) (** do we do this??? *)
+  end.
+
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
 
@@ -537,16 +587,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
 (* ********************************************************************** *)
 (** * #<a name="typing_doc"></a># Typing *)
 
-(** The definition of "fv" used in typing jdmgnts*)
-Fixpoint free_for_cv (e : exp) : cap :=
-match e with
-  | exp_bvar i => {}
-  | exp_fvar x => (`cset_fvar` x)
-  | exp_abs t e1 => (free_for_cv e1)
-  | exp_app e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
-  | exp_tabs t e1 => (free_for_cv e1)
-  | exp_tapp e1 t => (free_for_cv e1)
-  end.
+
 
 Inductive typing : env -> exp -> typ -> Prop :=
   | typing_var_tvar : forall E x X,
