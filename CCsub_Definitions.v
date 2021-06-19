@@ -305,10 +305,6 @@ Inductive binding : Type :=
   | bind_sub : typ -> binding
   | bind_typ : typ -> binding.
 
-Inductive signature : Type :=
-  (** signature bindings : arg type -> signature *)
-  | bind_sig : typ -> signature.
-
 (** A binding [(X, bind_sub T)] records that a type variable [X] is a
     subtype of [T], and a binding [(x, bind_typ U)] records that an
     expression variable [x] has type [U].
@@ -328,7 +324,6 @@ Inductive signature : Type :=
 
 Notation env := (list (atom * binding)).
 Notation empty := (@nil (atom * binding)).
-Notation sig := (list (atom * signature)).
 
 (** We also define a notation that makes it convenient to write one
     element lists.  This notation is useful because of our convention
@@ -666,71 +661,71 @@ Notation ctx := (list frame).
 Notation top := (@nil frame).
 
 
-Reserved Notation "|-ctx c ~: T" (at level 70).
+Reserved Notation "E |-ctx c ~: T" (at level 70).
 
 
-Inductive typing_ctx : ctx -> typ -> Prop :=
-  | typing_ctx_empty : forall T,
-      |-ctx top ~: T
+Inductive typing_ctx : env -> ctx -> typ -> Prop :=
+  | typing_ctx_empty : forall E T,
+      E |-ctx top ~: T
 
-  | typing_ctx_fun : forall C T1 T1' T2 k e,
-      typing nil e T1' ->
-      sub nil T1' T1 ->
-      |-ctx k ~: (open_ct T2 (cv T1')) ->
-      |-ctx KFun e :: k ~: typ_capt C (typ_arrow T1 T2)
+  | typing_ctx_fun : forall E C T1 T1' T2 k e,
+      typing E e T1' ->
+      sub E T1' T1 ->
+      E |-ctx k ~: (open_ct T2 (cv T1')) ->
+      E |-ctx KFun e :: k ~: typ_capt C (typ_arrow T1 T2)
 
-  | typing_ctx_arg : forall C T1 T1' T2 k e,
+  | typing_ctx_arg : forall E C T1 T1' T2 k e,
       value e ->
-      typing nil e (typ_capt C (typ_arrow T1 T2)) ->
-      sub nil T1' T1 ->
-      |-ctx k ~: (open_ct T2 (cv T1')) ->
-      |-ctx KArg e :: k ~: T1'
+      typing E e (typ_capt C (typ_arrow T1 T2)) ->
+      sub E T1' T1 ->
+      E |-ctx k ~: (open_ct T2 (cv T1')) ->
+      E |-ctx KArg e :: k ~: T1'
 
-  | typing_ctx_typ : forall C T T1 T2 k,
-      sub nil T T1 ->
-      |-ctx k ~: (open_tt T2 T) ->
-      |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
+  | typing_ctx_typ : forall E C T T1 T2 k,
+      sub E T T1 ->
+      E |-ctx k ~: (open_tt T2 T) ->
+      E |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
   
-  | typing_ctx_reset : forall a T Targ k,
+  | typing_ctx_reset : forall E a T Targ k,
       (** explicit subtyping step here -- do we need it? *)
-      sub nil Targ T ->
-      |-ctx k ~: T ->
-      |-ctx H a Targ :: k ~: Targ
+      sub E Targ T ->
+      E |-ctx k ~: T ->
+      E |-ctx H a Targ :: k ~: Targ
 
-  | typing_ctx_throw_handler : forall C T Targ k e,
-      |-ctx k ~: T ->
+  | typing_ctx_throw_handler : forall E C T Targ k e,
+      E |-ctx k ~: T ->
       (** for exceptions: need to make sure the type on the handler matches
           the current answer type T *)
       typing nil e (typ_capt C (typ_exc Targ)) ->
-      |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
+      E |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
   
-  | typing_ctk_throw_arg : forall C T Targ k e,
+  | typing_ctk_throw_arg : forall E C T Targ k e,
       value e ->
-      |-ctx k ~: T ->
+      E |-ctx k ~: T ->
       typing nil e (typ_capt C (typ_exc Targ)) ->
-      |-ctx KThrowArg e :: k ~: Targ
+      E |-ctx KThrowArg e :: k ~: Targ
 
-where "|-ctx K ~: T" := (typing_ctx K T).
+where "E |-ctx K ~: T" := (typing_ctx E K T).
 
 
 Inductive state : Type :=
-  | state_step (e : exp) (c : ctx) (Q : sig) : state
+  | state_step (e : exp) (c : ctx) (E : env) : state
 .
 
-Notation "〈 e | k | Q 〉" := (state_step e k Q).
+Notation "〈 e | k | E 〉" := (state_step e k E).
 Reserved Notation "st1 --> st2" (at level 69).
 
 Inductive typing_state : state -> Prop :=
-  | typ_step : forall e k T Q,
-      |-ctx k ~: T ->
-      typing nil e T ->
-      typing_state〈 e | k | Q 〉
+  | typ_step : forall e k T E,
+      E |-ctx k ~: T ->
+      typing E e T ->
+      typing_state〈 e | k | E 〉
   .
 
 Inductive done : state -> Prop :=
-  | done_ret : forall e Q,
+  | done_ret : forall e E,
       value e ->
-      done 〈 e | top | Q 〉
+      done 〈 e | top | E 〉
 .
 
 (* ********************************************************************** *)
