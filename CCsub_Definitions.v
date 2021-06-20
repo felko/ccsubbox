@@ -690,19 +690,19 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       (** explicit subtyping step here -- do we need it? *)
       sub E Targ T ->
       E |-ctx k ~: T ->
-      E |-ctx H a Targ :: k ~: Targ
+      [(a, bind_typ (typ_capt {*} (typ_exc Targ)))] ++ E |-ctx H a Targ :: k ~: Targ
 
   | typing_ctx_throw_handler : forall E C T Targ k e,
       E |-ctx k ~: T ->
       (** for exceptions: need to make sure the type on the handler matches
           the current answer type T *)
-      typing nil e (typ_capt C (typ_exc Targ)) ->
+      typing E e (typ_capt C (typ_exc Targ)) ->
       E |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
   
   | typing_ctk_throw_arg : forall E C T Targ k e,
       value e ->
       E |-ctx k ~: T ->
-      typing nil e (typ_capt C (typ_exc Targ)) ->
+      typing E e (typ_capt C (typ_exc Targ)) ->
       E |-ctx KThrowArg e :: k ~: Targ
 
 where "E |-ctx K ~: T" := (typing_ctx E K T).
