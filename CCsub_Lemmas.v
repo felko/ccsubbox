@@ -40,6 +40,15 @@ Proof.
   congruence.
 Qed.
 
+Lemma binds_lab_unique : forall T1 T2 X E,
+  binds X (bind_lab T1) E ->
+  binds X (bind_lab T2) E ->
+  T1 = T2.
+Proof.
+  intros* Hb1 Hb2.
+  congruence.
+Qed.
+
 
 
 
@@ -249,12 +258,12 @@ Proof with eauto.
     assert (X `notin` fvars). {
       unfold allbound in *.
       intro Hin; specialize (H1 X Hin) as [T B].
-      destruct B as [B|B]; apply binds_In in B; intuition.
+      destruct B as [B|B|B]; apply binds_In in B...
     }
     notin_solve.
 -------
-  intros * Wf_pretyp.
-  induction Wf_pretyp; intros FrE; simpl...
+intros * Wf_pretyp.
+induction Wf_pretyp; intros FrE; simpl...
   - pick fresh Y.
     specialize (notin_fv_wf_typ _ _ _ X _ H ltac:(assumption)) as HT1.
     specialize (H0 Y ltac:(notin_solve)) as WfT2.
@@ -383,6 +392,8 @@ Proof with auto.
     rewrite <- subst_tt_fresh... eapply notin_fv_wf_typ; eauto.
   rewrite <- IHwf_env...
     rewrite <- subst_tt_fresh... eapply notin_fv_wf_typ; eauto.
+  rewrite <- IHwf_env...
+    rewrite <- subst_tt_fresh... eapply notin_fv_wf_typ; eauto.
 Qed.
 
 
@@ -503,7 +514,7 @@ Qed.
 Lemma free_for_cv_bound_typing : forall E e (x : atom) S,
   typing E e S ->
   x A`in` (free_for_cv e) ->
-  exists T, binds x (bind_typ T) E.
+  exists T, binds x (bind_typ T) E \/ binds x (bind_lab T) E.
 Proof with eauto using wf_cset_over_union, cv_free_never_universal.
   intros * Htyp xIn.
   induction Htyp; simpl in *...
@@ -515,33 +526,45 @@ Proof with eauto using wf_cset_over_union, cv_free_never_universal.
     + forwards (? & ? & ?): free_for_cv_open e1 0 y.
       unfold open_ee.
       clear Fr;fsetdec.
-    + destruct HA as (T & HA)...
-      inversion HA.
-      assert (x <> y) by notin_solve.
-      destruct (x == y)...
-      easy.
+    + destruct HA as (T & [HA|HA])...
+      * inversion HA.
+        assert (x <> y) by notin_solve.
+        destruct (x == y)...
+        easy.
+      * inversion HA.
+        assert (x <> y) by notin_solve.
+        destruct (x == y)...
+        easy.
   - destruct_union_mem xIn...
   - pick fresh y.
     forwards HA: H2 y.
     + notin_solve.
     + forwards (? & ? & ?): free_for_cv_open_type e1 0 y.
       clear Fr;fsetdec.
-    + destruct HA as (T & HA)...
-      inversion HA.
-      assert (x <> y) by notin_solve.
-      destruct (x == y)...
-      easy.
+    + destruct HA as (T & [HA|HA])...
+      * inversion HA.
+        assert (x <> y) by notin_solve.
+        destruct (x == y)...
+        easy.
+      * inversion HA.
+        assert (x <> y) by notin_solve.
+        destruct (x == y)...
+        easy.
   - pick fresh y.
     forwards HA: H0 y.
     + notin_solve.
     + forwards (? & ? & ?): free_for_cv_open e 0 y.
       clear Fr.
       fsetdec.
-    + destruct HA as (T & HA)...
-      inversion HA.
-      assert (x <> y) by notin_solve.
-      destruct (x == y)...
-      easy.
+    + destruct HA as (T & [HA|HA])...
+      * inversion HA.
+        assert (x <> y) by notin_solve.
+        destruct (x == y)...
+        easy.
+      * inversion HA.
+        assert (x <> y) by notin_solve.
+        destruct (x == y)...
+        easy.
   - destruct_union_mem xIn...
   - assert (x = x0) by fsetdec; subst...
 Qed.
@@ -597,7 +620,7 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
       fsetdec.
     }
     simpl_env in *.
-    exists T. destruct B as [B|B]; binds_cases B...
+    exists T. destruct B as [B|B|B]; binds_cases B...
   - apply wf_cset_over_union...
   - (* typing_app_poly *)
     pick fresh y.
@@ -631,7 +654,7 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
       fsetdec.
     }
     simpl_env in *.
-    exists T. destruct B as [B|B]; binds_cases B...
+    exists T. destruct B as [B|B|B]; binds_cases B...
   - admit.
   - admit.
   - admit.

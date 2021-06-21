@@ -157,12 +157,14 @@ Definition subst_tb (Z : atom) (P : typ) (b : binding) : binding :=
   match b with
   | bind_sub T => bind_sub (subst_tt Z P T)
   | bind_typ T => bind_typ (subst_tt Z P T)
+  | bind_lab T => bind_lab (subst_tt Z P T)
   end.
 
 Definition subst_cb (Z : atom) (c : cap) (b : binding) : binding :=
   match b with
   | bind_sub T => bind_sub (subst_ct Z c T)
   | bind_typ T => bind_typ (subst_ct Z c T)
+  | bind_lab T => bind_lab (subst_ct Z c T)
   end.
 
 (* ********************************************************************** *)

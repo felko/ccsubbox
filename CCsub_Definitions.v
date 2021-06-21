@@ -303,7 +303,8 @@ Inductive expr : exp -> Prop :=
 
 Inductive binding : Type :=
   | bind_sub : typ -> binding
-  | bind_typ : typ -> binding.
+  | bind_typ : typ -> binding
+  | bind_lab : typ -> binding.
 
 (** A binding [(X, bind_sub T)] records that a type variable [X] is a
     subtype of [T], and a binding [(x, bind_typ U)] records that an
@@ -384,7 +385,11 @@ Inductive bound (x : atom) (T : typ) (E : env) : Prop :=
     bound x T E
   | bound_sub :
     binds x (bind_sub T) E ->
-    bound x T E.
+    bound x T E
+  | bound_lab :
+    binds x (bind_lab T) E ->
+    bound x T E
+  .
 
 Definition allbound (E : env) (fvars : atoms) : Prop :=
   forall x, x `in`A fvars -> exists T, bound x T E.
@@ -463,7 +468,12 @@ Inductive wf_env : env -> Prop :=
       wf_env E ->
       wf_typ_in E T ->
       x `notin` dom E ->
-      wf_env ([(x, bind_typ T)] ++ E).
+      wf_env ([(x, bind_typ T)] ++ E)
+  | wf_env_lab : forall (E : env) (x : atom) (T : typ),
+      wf_env E ->
+      wf_typ_in E T ->
+      x `notin` dom E ->
+      wf_env ([(x, bind_lab T)] ++ E).
 
 (** The definition of "fv" used in typing jdmgnts*)
 Fixpoint free_for_cv (e : exp) : cap :=
@@ -637,10 +647,11 @@ Inductive typing : env -> exp -> typ -> Prop :=
       typing E e1 (typ_capt C (typ_exc T1)) ->
       typing E e2 T1 ->
       typing E (exp_throw e1 e2) T2
+  (* The bind_lab and handler constructs are only used at runtime and not part of the surface language *)
   | typing_handler : forall E C T x,
       wf_env E ->
-      binds x (bind_typ (typ_capt C (typ_exc T))) E ->
-      typing E (exp_handler x) (typ_capt C (typ_exc T))
+      binds x (bind_lab (typ_capt C (typ_exc T))) E ->
+      typing E (exp_handler x) (typ_capt (`cset_fvar` x) (typ_exc T))
   .
 
 
@@ -654,6 +665,8 @@ Inductive value : exp -> Prop :=
   | value_tabs : forall T e1,
       expr (exp_tabs T e1) ->
       value (exp_tabs T e1)
+  | value_handler : forall x,
+      value (exp_handler x)
 .
 
 
@@ -683,10 +696,11 @@ Notation ctx := (list frame).
 Notation top := (@nil frame).
 
 
+(* TODO maybe replace the return type with atoms and specialize this function *)
 Fixpoint bound_capabilities (k : ctx) : env :=
   match k with
   | nil => empty
-  | H x T :: k =>  [(x, bind_typ (typ_capt {*} (typ_exc T)))] ++ (bound_capabilities k)
+  | H x T :: k =>  [(x, bind_lab (typ_capt {*} (typ_exc T)))] ++ (bound_capabilities k)
   | _ :: k => bound_capabilities k
   end.
 
@@ -695,8 +709,8 @@ Reserved Notation "E |-ctx c ~: T" (at level 70).
 
 
 Inductive typing_ctx : env -> ctx -> typ -> Prop :=
-  | typing_ctx_empty : forall E T,
-      E |-ctx top ~: T
+  | typing_ctx_empty : forall T,
+      empty |-ctx top ~: T
 
   | typing_ctx_fun : forall E C T1 T1' T2 k e,
       typing E e T1' ->
@@ -720,7 +734,7 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       (** explicit subtyping step here -- do we need it? *)
       sub E Targ T ->
       E |-ctx k ~: T ->
-      [(a, bind_typ (typ_capt {*} (typ_exc Targ)))] ++ E |-ctx H a Targ :: k ~: Targ
+      [(a, bind_lab (typ_capt {*} (typ_exc Targ)))] ++ E |-ctx H a Targ :: k ~: Targ
 
   | typing_ctx_throw_handler : forall E C T Targ k e,
       E |-ctx k ~: T ->
@@ -771,6 +785,8 @@ Inductive step : state -> state -> Prop :=
   | step_pop_1 : forall v arg k,
       value v ->
       〈 v | KFun arg :: k 〉 --> 〈 arg | KArg v :: k 〉
+
+  (* TODO add the pop variants for other frames *)
 
   | step_abs : forall v T e k,
       value v ->

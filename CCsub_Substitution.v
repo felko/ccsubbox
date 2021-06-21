@@ -28,6 +28,8 @@ Proof with subst; simpl; eauto.
   - forwards: IHHtyp...
     apply (subcapt_transitivity (cv S))...
     eapply sub_implies_subcapt with (S := S) (T := T)...
+  - inversion P3; subst.
+    apply subcapt_reflexivity with (A := dom E)...
 Qed.
 
 Lemma values_have_precise_captures : forall E u T,
@@ -55,6 +57,12 @@ Proof with hint.
       eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
   - forwards (U & HtypU & HsubS): IHHtyp...
     exists U; eauto using (sub_transitivity S).
+  - Case "exp_abs".
+    exists (typ_exc T).
+    split.
+    + simpl; eapply typing_handler...
+    + note (wf_typ_in E (typ_capt C (typ_exc T))) by eauto.
+      eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
 Qed.
 
 
@@ -83,18 +91,23 @@ Proof with eauto using cv_free_never_universal.
   - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
     rewrite <- IHe1...
     rewrite <- IHe2...
+  - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
+    rewrite <- IHe1...
+    rewrite <- IHe2...
 Qed.
 
 (* x in (fv e) ->
   (fv u) union (fv e remove x) = fv (e[x !-> u][x !-> fv u])
 *)
-Lemma subst_trivia2 : forall x e u,
+Lemma subst_trivia2 : forall E T S x e u,
+  binds x (bind_typ T) E ->
+  typing E e S ->
   AtomSet.F.In x (`cset_fvars` (free_for_cv e)) ->
   (cset_union (free_for_cv u) ((free_for_cv e) A`\` x)) =
         (free_for_cv (subst_ee x u (free_for_cv u) e)).
 Proof with eauto using cv_free_never_universal.
-  intros * Hin.
-  induction e; simpl in *...
+  intros * Bind Typ Hin.
+  dependent induction e; simpl in *...
   - csetdec.
   - destruct (a == x) eqn:HX.
     + subst.
@@ -139,6 +152,49 @@ Proof with eauto using cv_free_never_universal.
         rewrite Heqc.
         cbn [cset_union].
         csetdec.
+  - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
+      simpl in *; try fsetdec.
+    (* + rewrite (AtomSetFacts.union_iff t t1 x) in Hin. *)
+    (*   destruct Hin. *)
+    (*   * specialize (IHe1 H). *)
+    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e1)). *)
+    (*     symmetry in IHe1. *)
+    (*     contradiction. *)
+    (*   * specialize (IHe2 H). *)
+    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e2)). *)
+    (*     symmetry in IHe2. *)
+    (*     contradiction. *)
+    (*   (* we only want to consider the case where all u, e1 and e2 have a concrete cv...  *) *)
+    + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
+      rewrite (AtomSetFacts.mem_iff) in Hin.
+      rewrite (AtomSetFacts.union_b) in Hin.
+      destruct (AtomSet.F.mem x t) eqn:InT;
+        destruct (AtomSet.F.mem x t1) eqn:InT1;
+        rewrite_set_facts_in InT;
+        rewrite_set_facts_in InT1;
+        inversion Hin; subst...
+      * rewrite <- IHe1...
+        rewrite <- IHe2...
+        cbn [cset_union].
+        csetdec.
+      * rewrite <- IHe1...
+        rewrite <- (subst_contratrivia2 u x _ e2)...
+        2: rewrite Heqc0; assumption.
+        cbn [cset_union].
+        rewrite Heqc0.
+        csetdec.
+      * rewrite <- IHe2...
+        rewrite <- (subst_contratrivia2 u x _ e1)...
+        2: rewrite Heqc; assumption.
+        rewrite Heqc.
+        cbn [cset_union].
+        csetdec.
+  - destruct (a == x) eqn:HX.
+    + subst.
+      csetdec.
+      destruct (free_for_cv u)...
+      csetdec.
+    + exfalso. apply n. fsetdec.
 Qed.
 
 Lemma subst_ct_monotonicity : forall E Ap Am x C D T,
