@@ -50,6 +50,9 @@ Fixpoint fv_ce (e : exp) {struct e} : atoms :=
   | exp_app e1 e2 => (fv_ce e1) `u`A (fv_ce e2)
   | exp_tabs V e1 => (fv_ct V) `u`A (fv_ce e1)
   | exp_tapp e1 V => (fv_ct V) `u`A (fv_ce e1)
+  | exp_try T e1 => (fv_ct T) `u`A (fv_ce e1)
+  | exp_throw e1 e2 => (fv_ce e1) `u`A (fv_ce e2)
+  | exp_handler x => {}A (* TODO is this correct? *)
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
@@ -60,6 +63,9 @@ Fixpoint fv_te (e : exp) {struct e} : atoms :=
   | exp_app e1 e2 => (fv_te e1) `u`A (fv_te e2)
   | exp_tabs V e1 => (fv_tt V) `u`A (fv_te e1)
   | exp_tapp e1 V => (fv_tt V) `u`A (fv_te e1)
+  | exp_try T e1 => (fv_tt T) `u`A (fv_te e1)
+  | exp_throw e1 e2 => (fv_te e1) `u`A (fv_te e2)
+  | exp_handler x => {}A (* TODO is this correct? *)
   end.
 
 Fixpoint fv_ee (e : exp) {struct e} : atoms :=
@@ -70,6 +76,9 @@ Fixpoint fv_ee (e : exp) {struct e} : atoms :=
   | exp_app e1 e2 => (fv_ee e1) `u`A (fv_ee e2)
   | exp_tabs V e1 => (fv_ee e1)
   | exp_tapp e1 V => (fv_ee e1)
+  | exp_try T e1 => fv_ee e1
+  | exp_throw e1 e2 => (fv_ee e1) `u`A (fv_ee e2)
+  | exp_handler x => singleton x
   end.
 
 
