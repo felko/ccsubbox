@@ -3,6 +3,10 @@
 (** * Bespoke *)
 Ltac hint := idtac.
 
+Ltac solve_obvious := try solve [econstructor; eauto].
+
+
+
 Ltac note0 T id tac :=
   assert (T) as id by tac;
   inversion id;

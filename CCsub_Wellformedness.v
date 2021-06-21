@@ -454,12 +454,8 @@ Proof with eauto using capt_from_wf_cset.
   econstructor...
 ------
   intros *. intros H.
-  induction H.
-  - trivial.
-  - pick fresh X and apply type_arrow...
-  - pick fresh X and apply type_all...
+  induction H; solve_obvious.
 Qed.
-
 
 Lemma wf_pretyp_adapt : forall {Ap' Am' E Ap Am T},
   wf_pretyp E Ap' Am' T ->
@@ -481,6 +477,9 @@ Proof.
   congruence.
 Qed.
 
+Tactic Notation "solve_obvious" "with" ident(id) :=
+  try solve [econstructor; eauto using id].
+
 Lemma wf_typ_strengthen : forall x E Ap Am P,
   x `~in`A (dom E) ->
   wf_typ E Ap Am P ->
@@ -491,15 +490,14 @@ with wf_pretyp_strengthen : forall x E Ap Am P,
   wf_pretyp E (Ap `\`A x) (Am `\`A x) P.
 Proof with eauto using wf_cset_strengthen.
 { intros * ? WfP.
-  dependent induction WfP.
+  dependent induction WfP; solve_obvious with wf_cset_strengthen.
   - econstructor...
     apply binds_In in H0.
     fsetdec.
   - econstructor...
 }
 { intros * ? WfP.
-  dependent induction WfP.
-  - constructor.
+  dependent induction WfP; solve_obvious.
   - pick fresh y and apply wf_typ_arrow...
     specialize (H1 y ltac:(notin_solve)).
     eapply (wf_typ_strengthen x) in H1...
@@ -537,8 +535,7 @@ Proof with simpl_env; eauto using wf_cset_weakening.
   intros.
   remember (G ++ E).
   generalize dependent G.
-  induction H; intros G Hok Heq; subst.
-  - apply wf_typ_top.
+  induction H; intros G Hok Heq; subst; solve_obvious.
   (* typ_arrow case *)
   - pick fresh Y and apply wf_typ_arrow.
     eapply wf_typ_weakening...
@@ -630,7 +627,7 @@ Proof with simpl_env; eauto using wf_cset_narrowing_base.
   intros.
   remember (F ++ [(X, bind_sub V)] ++ E).
   generalize dependent F.
-  induction H; intros F Hok Heq; subst; try solve [econstructor].
+  induction H; intros F Hok Heq; subst; solve_obvious.
   (* typ_arrow *)
   - pick fresh Y and apply wf_typ_arrow...
     rewrite <- concat_assoc.
@@ -661,8 +658,7 @@ Proof with simpl_env; eauto using wf_cset_narrowing_typ_base.
   intros *. intros Hwf_typ Hok.
   remember (F ++ [(X, bind_typ V)] ++ E).
   generalize dependent F.
-  induction Hwf_typ; intros F Hok Heq; subst.
-  - constructor.
+  induction Hwf_typ; intros F Hok Heq; subst; solve_obvious.
   - Case "typ_arrow".
     pick fresh Y and apply wf_typ_arrow...
     rewrite <- concat_assoc.
@@ -732,8 +728,7 @@ Proof with eauto.
   intros* H.
   remember (F ++ [(x, bind_typ T1)] ++ E).
   generalize dependent F.
-  induction H; intros F Eq; subst.
-  - econstructor.
+  induction H; intros F Eq; subst; solve_obvious.
   - pick fresh X and apply wf_typ_arrow.
     + eapply wf_typ_ignores_typ_bindings...
     + rewrite_parenthesise_binding.
@@ -768,8 +763,7 @@ Proof with eauto.
   intros Hok H.
   remember (F ++ [(x, bind_sub T1)] ++ E).
   generalize dependent F.
-  induction H; intros F Eq; subst.
-  - econstructor.
+  induction H; intros F Eq; subst; solve_obvious.
   - pick fresh X and apply wf_typ_arrow.
     + eapply wf_typ_ignores_sub_bindings...
     + rewrite_parenthesise_binding.
@@ -997,8 +991,7 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
     econstructor...
 ------
   intros * HwfT HwfPp HwfPm Hok.
-  dependent induction HwfT; simpl.
-  - constructor.
+  dependent induction HwfT; simpl; solve_obvious.
   - Case "wf_typ_arrow".
     pick fresh Y and apply wf_typ_arrow...
     + SCase "T2".
@@ -1215,8 +1208,7 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
   intros * HwfT HwfCp HwfCm Hok HokZ.
   remember (F ++ [(Z, bind_typ Q)] ++ E).
   generalize dependent F.
-  induction HwfT; intros F ? Hok; subst; simpl subst_ct.
-  - constructor.
+  induction HwfT; intros F ? Hok; subst; simpl subst_ct; solve_obvious.
   - Case "wf_typ_arrow".
     pick fresh Y and apply wf_typ_arrow.
     all : fold subst_ct...
@@ -1556,8 +1548,7 @@ Proof with eauto.
 { intros * ? ? ? WfT.
   generalize dependent Ap.
   generalize dependent Am.
-  induction T; intros ? ? ? ? WfT.
-  - constructor...
+  induction T; intros ? ? ? ? WfT; solve_obvious.
   - wf_typ_inversion WfT.
     split; intros ? WfC.
     + pick fresh y and apply wf_typ_arrow; fold subst_ct...
@@ -1614,6 +1605,12 @@ Proof with eauto.
       apply (proj2 H8)...
       rewrite_nil_concat.
       eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+  - wf_typ_inversion WfT.
+    split; intros NotIn WfC.
+    + apply wf_typ_exc; fold subst_ct.
+      unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Ap Am t _ _ _ _) as [ IH1 IH2 ]...
+    + apply wf_typ_exc; fold subst_ct.
+      unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Ap Am t _ _ _ _) as [ IH1 IH2 ]...
 }
 Qed.
 
