@@ -1075,8 +1075,8 @@ Proof with hint.
       rewrite subst_trivia2 with (u := u)...
       2 : {
         pick fresh y.
-
-        eapply subst_trivia2_helper.
+        eapply notin_fv_le_open_ee with (y := y)...
+        eapply subst_trivia2_helper with (F := [(y, bind_typ V)] ++ F).
         epose proof (H1 y ltac:(notin_solve)).
         rewrite_env (([(y, bind_typ V)] ++
         F) ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) in H5.
@@ -1166,6 +1166,15 @@ Proof with hint.
       assert (x `in` `cset_fvars` (free_for_cv e1)) by (rewrite AtomSetFacts.mem_iff; assumption).
       rewrite subst_trivia1...
       rewrite subst_trivia2 with (u := u)...
+      2 : {
+        pick fresh Y.
+        eapply notin_fv_le_open_te with (y := Y)...
+        eapply subst_trivia2_helper with (F := [(Y, bind_sub V)] ++ F).
+        epose proof (H1 Y ltac:(notin_solve)).
+        rewrite_env (([(Y, bind_sub V)] ++
+        F) ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) in H5.
+        apply H5.
+      }
       pick fresh y and apply typing_tabs...
       * eapply wf_typ_in_subst_cset...
       * assert (y <> x) by fsetdec.
