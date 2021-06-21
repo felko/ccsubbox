@@ -39,6 +39,7 @@ with fv_tpt (T : pretyp) {struct T} : atoms :=
   | typ_top => {}A
   | typ_arrow T1 T2 => (fv_tt T1) `u`A (fv_tt T2)
   | typ_all T1 T2 => (fv_tt T1) `u`A (fv_tt T2)
+  | typ_exc T => fv_tt T
   end.
 
 Fixpoint fv_ce (e : exp) {struct e} : atoms :=

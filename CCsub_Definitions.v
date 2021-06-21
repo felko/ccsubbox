@@ -427,7 +427,11 @@ with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
                    wf_typ ([(X, bind_sub T1)] ++ E)
                           (Ap `u`A {X}A)
                           (Am `u`A {X}A) (open_tt T2 X)) ->
-      wf_pretyp E Ap Am (typ_all T1 T2).
+      wf_pretyp E Ap Am (typ_all T1 T2)
+  | wf_typ_exc : forall E Ap Am T,
+      wf_typ E Ap Am T ->
+      wf_pretyp E Ap Am (typ_exc T)
+  .
 
 Definition wf_typ_in (E : env) (T : typ) : Prop :=
   wf_typ E (dom E) (dom E) T.
@@ -472,7 +476,7 @@ match e with
   | exp_tapp e1 t => (free_for_cv e1)
   | exp_try Targ e1 => (free_for_cv e1)
   | exp_throw e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
-  | exp_handler x => (`cset_fvar` x) (** do we do this??? *)
+  | exp_handler x => (`cset_fvar` x) (** this is crucial! *)
   end.
 
 (* ********************************************************************** *)
@@ -576,7 +580,11 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
           wf_typ ([(X, bind_sub S1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt S2 X)) ->
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
-      sub_pre E (typ_all S1 S2) (typ_all T1 T2).
+      sub_pre E (typ_all S1 S2) (typ_all T1 T2)
+
+  | sub_exc : forall E T1 T2,
+      sub E T1 T2 ->
+      sub_pre E (typ_exc T1) (typ_exc T2).
 
 
 (* ********************************************************************** *)
@@ -619,7 +627,21 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_sub : forall S E e T,
       typing E e S ->
       sub E S T ->
-      typing E e T.
+      typing E e T
+
+  | typing_try : forall L E T1 T2 e,
+      (forall x : atom, x `notin` L ->
+        typing ([(x, bind_typ (typ_capt {*} (typ_exc T1)))] ++ E) (open_ee e x (`cset_fvar` x)) T2) ->
+      typing E (exp_try T1 e) T2
+  | typing_throw : forall E C T1 T2 e1 e2,
+      typing E e1 (typ_capt C (typ_exc T1)) ->
+      typing E e2 T1 ->
+      typing E (exp_throw e1 e2) T2
+  | typing_handler : forall E C T x,
+      wf_env E ->
+      binds x (bind_typ (typ_capt C (typ_exc T))) E ->
+      typing E (exp_handler x) (typ_capt C (typ_exc T))
+  .
 
 
 (* ********************************************************************** *)
