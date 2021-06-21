@@ -782,11 +782,16 @@ Inductive step : state -> state -> Prop :=
   | step_tapp : forall e T k,
       〈 exp_tapp e T | k 〉 --> 〈 e | KTyp T :: k 〉
 
-  | step_pop_1 : forall v arg k,
+  | step_pop_app : forall v arg k,
       value v ->
       〈 v | KFun arg :: k 〉 --> 〈 arg | KArg v :: k 〉
 
-  (* TODO add the pop variants for other frames *)
+  | step_throw : forall e1 e2 k,
+      〈 exp_throw e1 e2 | k 〉 --> 〈 e1 | KThrowHandler e2 :: k 〉   
+
+  | step_pop_throw : forall v e2 k,
+      value v ->
+      〈 v | KThrowHandler e2 :: k 〉 --> 〈 e2 | KThrowArg v :: k 〉
 
   | step_abs : forall v T e k,
       value v ->
