@@ -110,6 +110,7 @@ with subst_tpt (Z : atom) (U : typ) (T : pretyp) {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (subst_tt Z U T1) (subst_tt Z U T2)
   | typ_all T1 T2 => typ_all (subst_tt Z U T1) (subst_tt Z U T2)
+  | typ_exc T => typ_exc (subst_tt Z U T)
   end.
 
 Fixpoint subst_ct (z : atom) (c : cap) (T : typ) {struct T} : typ :=
@@ -123,6 +124,7 @@ with subst_cpt (z : atom) (c : cap) (T : pretyp) {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (subst_ct z c T1) (subst_ct z c T2)
   | typ_all T1 T2 => typ_all (subst_ct z c T1) (subst_ct z c T2)
+  | typ_exc T => typ_exc (subst_ct z c T)
   end.
 
 Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
@@ -133,6 +135,9 @@ Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
   | exp_app e1 e2 => exp_app  (subst_te Z U e1) (subst_te Z U e2)
   | exp_tabs V e1 => exp_tabs (subst_tt Z U V)  (subst_te Z U e1)
   | exp_tapp e1 V => exp_tapp (subst_te Z U e1) (subst_tt Z U V)
+  | exp_try T e1 => exp_try (subst_tt Z U T)  (subst_te Z U e1)
+  | exp_throw e1 e2 => exp_throw (subst_te Z U e1) (subst_te Z U e2)
+  | exp_handler x => exp_handler x
   end.
 
 Fixpoint subst_ee (z : atom) (u : exp) (c : cap) (e : exp) {struct e} : exp :=
@@ -143,6 +148,9 @@ Fixpoint subst_ee (z : atom) (u : exp) (c : cap) (e : exp) {struct e} : exp :=
   | exp_app e1 e2 => exp_app (subst_ee z u c e1) (subst_ee z u c e2)
   | exp_tabs t e1 => exp_tabs (subst_ct z c t) (subst_ee z u c e1)
   | exp_tapp e1 t => exp_tapp (subst_ee z u c e1) (subst_ct z c t)
+  | exp_try T e1 => exp_try (subst_ct z c T)  (subst_ee z u c e1)
+  | exp_throw e1 e2 => exp_throw (subst_ee z u c e1) (subst_ee z u c e2)
+  | exp_handler x => exp_handler x
   end.
 
 Definition subst_tb (Z : atom) (P : typ) (b : binding) : binding :=
@@ -274,7 +282,10 @@ with pretypeN : nat -> pretyp -> Prop :=
   | typeN_all : forall n T1 T2,
     typeN n T1 ->
     typeN (`succ` n) T2 ->
-    pretypeN n (typ_all T1 T2).
+    pretypeN n (typ_all T1 T2)
+  | typeN_exc : forall n T1,
+    typeN n T1 ->
+    pretypeN n (typ_exc T1).
 
 Lemma open_tt_rec_typeN_aux : forall n S T,
   typeN n (open_tt_rec n S T) ->
@@ -303,12 +314,7 @@ Proof with eauto*.
   - constructor.
 }
 { intros * H.
-  dependent induction T.
-  - constructor.
-  - inversion H; subst.
-    constructor...
-  - inversion H; subst.
-    constructor...
+  dependent induction T; inversion H; subst; constructor...
 }
 Qed.
 
@@ -336,12 +342,7 @@ Proof with eauto*.
   - constructor.
 }
 { intros * H.
-  dependent induction T.
-  - constructor.
-  - inversion H; subst.
-    constructor...
-  - inversion H; subst.
-    constructor...
+  dependent induction T; inversion H; subst; constructor...
 }
 Qed.
 
@@ -369,6 +370,7 @@ Proof with eauto.
     pick fresh X.
     unfold open_ct in H0.
     eapply (open_tt_rec_typeN_aux 0 X)...
+  - constructor...
   }
 Qed.
 
@@ -413,11 +415,7 @@ Proof with eauto*.
   - easy.
 }
 { intros * H1 H2.
-  induction T; simpl...
-  - inversion H1; subst.
-    f_equal...
-  - inversion H1; subst.
-    f_equal...
+  induction T; simpl; inversion H1; subst; f_equal...
 }
 Qed.
 
@@ -440,11 +438,7 @@ Proof with eauto*.
     specialize (H4 m mIn); lia.
 ------
   intros * H1 H2.
-  induction T; simpl...
-  - inversion H1; subst.
-    f_equal...
-  - inversion H1; subst.
-    f_equal...
+  induction T; simpl; inversion H1; subst; f_equal...
 Qed.
 
 Lemma open_tt_rec_type : forall T U k,
@@ -653,7 +647,17 @@ Inductive exprN : nat -> exp -> Prop :=
   | exprN_tapp : forall n e1 V,
       exprN n e1 ->
       typeN n V ->
-      exprN n (exp_tapp e1 V).
+      exprN n (exp_tapp e1 V)
+  | exprN_try : forall n T e1,
+      typeN n T ->
+      exprN (S n) e1 ->
+      exprN n (exp_try T e1)
+  | exprN_throw : forall n e1 e2,
+      exprN n e1 ->
+      exprN n e2 ->
+      exprN n (exp_throw e1 e2)
+  | exprN_handler : forall n a,
+      exprN n (exp_handler a).
 
 Lemma typeN_weakening_aux : forall n T,
   typeN n T ->
@@ -719,6 +723,9 @@ Proof with eauto*.
     eapply open_ct_rec_typeN_aux...
   * constructor; inversion H...
     eapply open_ct_rec_typeN_aux...
+  * constructor; inversion H...
+    eapply open_ct_rec_typeN_aux...
+  * constructor; inversion H...
 Qed.
 
 Lemma open_te_rec_exprN_aux : forall n S e,
@@ -734,6 +741,9 @@ Proof with eauto*.
     eapply open_tt_rec_typeN_aux...
   * constructor; inversion H; subst...
     eapply open_tt_rec_typeN_aux...
+  * constructor; inversion H; subst...
+    eapply open_tt_rec_typeN_aux...
+  * constructor; inversion H; subst...
 Qed.
 
 Lemma expr_to_expr0 : forall e,
@@ -745,6 +755,8 @@ Proof with eauto using into_typeN, open_ee_rec_exprN_aux, open_te_rec_exprN_aux.
     eapply (open_ee_rec_exprN_aux 0 x (`cset_fvar` x))...
   * pick fresh X.
     eapply (open_te_rec_exprN_aux 0 X)...
+  * pick fresh x.
+    eapply (open_ee_rec_exprN_aux 0 x (`cset_fvar` x))...
 Qed.
 
 Lemma open_ee_rec_exprN : forall n s c e,
@@ -779,6 +791,11 @@ Proof with auto using open_tt_rec_type.
     eapply open_te_rec_exprN...
     eapply exprN_weakening with (n := 1); try lia...
     eapply open_te_rec_exprN_aux with (S0 := X)...
+    eapply expr_to_expr0...
+    eapply H0...
+  - pick fresh x. eapply open_te_rec_exprN...
+    eapply exprN_weakening with (n := 1); try lia...
+    eapply open_ee_rec_exprN_aux with (s := x) (c := `cset_fvar` x)...
     eapply expr_to_expr0...
     eapply H0...
 Qed.
@@ -1101,11 +1118,8 @@ Proof with eauto*.
     specialize (H2 i iIn)...
     exfalso; lia.
 ------
-  dependent induction T; intros * Htp Hineq; simpl in *...
-  - inversion Htp; subst.
-    f_equal...
-  - inversion Htp; subst.
-    f_equal...
+  dependent induction T; intros * Htp Hineq; simpl in *;
+    try solve [ inversion Htp; subst; f_equal; eauto ]...
 Qed.
 
 Lemma open_ct_rec_type : forall T C k,
@@ -1227,6 +1241,12 @@ Proof with auto*.
     apply (open_te_rec_exprN_aux 0 X).
     apply expr_to_expr0...
   - apply open_ct_rec_type...
+  - apply open_ct_rec_type...
+  - pick fresh x.
+    specialize H1 with (x := x) (k := S k).
+    apply open_ee_rec_expr_aux with (j := 0) (v := x) (D := (`cset_fvar` x));
+      simpl...
+    + autounfold in *. fsetdec.
 Qed.
 
 Lemma subst_ct_fresh : forall (x: atom) c t,
@@ -1391,9 +1411,8 @@ Proof with auto.
   - apply subst_cpt_open_cpt_rec...
 ------
   intros X C1 T C2.
-  induction T; intros; simpl; try trivial.
-  - f_equal; apply subst_ct_open_ct_rec...
-  - f_equal; apply subst_ct_open_ct_rec...
+  induction T; intros; simpl; try trivial;
+    try solve [f_equal; apply subst_ct_open_ct_rec; eauto].
 Qed.
 
 Lemma subst_ct_open_tt_rec_fresh : forall c z P t k,
@@ -1584,18 +1603,14 @@ Lemma subst_te_expr : forall Z P e,
   expr (subst_te Z P e).
 Proof with eauto using subst_tt_type.
   intros Z P e He Hp.
-  induction He; simpl ; econstructor...
-  (* case exp_abs *)
-  - instantiate (1 := L `union` singleton Z). intros.
-   rewrite subst_te_open_ee_var.
-   apply H1.
-   fsetdec.
-   apply Hp...
-   csetdec.
-
-  (* case exp_tabs *)
-  - instantiate (1 := L `union` singleton Z). intros.
-    rewrite subst_te_open_te_var. apply H1. fsetdec. fsetdec. auto.
+  induction He; simpl;
+    try solve [econstructor; eauto using subst_tt_type].
+  - pick fresh x and apply expr_abs...
+    rewrite subst_te_open_ee_var...
+  - pick fresh x and apply expr_tabs...
+    rewrite subst_te_open_te_var...
+  - pick fresh x and apply expr_try...
+    rewrite subst_te_open_ee_var...
 Qed.
 
 (** The following lemma depends on [subst_ee_open_ee_var] and
@@ -1854,12 +1869,7 @@ Proof with auto.
   all : trivial.
 }
 { intros.
-  induction T; simpl; try reflexivity.
-  - rewrite subst_ct_useless_repetition.
-    rewrite subst_ct_useless_repetition.
-    all : trivial.
-  - rewrite subst_ct_useless_repetition.
-    rewrite subst_ct_useless_repetition.
-    all : trivial.
+  induction T; simpl; try reflexivity;
+    try solve [repeat try rewrite subst_ct_useless_repetition; auto].
 }
 Qed.

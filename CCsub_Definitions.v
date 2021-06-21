@@ -130,7 +130,7 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   | exp_app e1 e2 => exp_app  (open_te_rec K U e1) (open_te_rec K U e2)
   | exp_tabs V e1 => exp_tabs (open_tt_rec K U V)  (open_te_rec (S K) U e1)
   | exp_tapp e1 V => exp_tapp (open_te_rec K U e1) (open_tt_rec K U V)
-  | exp_try Targ e1 => exp_try (open_tt_rec K U Targ) (open_te_rec K U e1)
+  | exp_try Targ e1 => exp_try (open_tt_rec K U Targ) (open_te_rec (S K) U e1)
   | exp_throw e1 e2 => exp_throw (open_te_rec K U e1) (open_te_rec K U e2)
   | exp_handler a => exp_handler a
   end.
