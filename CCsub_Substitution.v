@@ -100,124 +100,119 @@ Qed.
 (* x in (fv e) ->
   (fv u) union (fv e remove x) = fv (e[x !-> u][x !-> fv u])
 *)
+
+Fixpoint fv_le (e : exp) {struct e} : atoms :=
+  match e with
+  | exp_bvar i => {}A
+  | exp_fvar x => {}A
+  | exp_abs V e1 => (fv_le e1)
+  | exp_app e1 e2 => (fv_le e1) `u`A (fv_le e2)
+  | exp_tabs V e1 => (fv_le e1)
+  | exp_tapp e1 V => (fv_le e1)
+  | exp_try T e1 => fv_le e1
+  | exp_throw e1 e2 => (fv_le e1) `u`A (fv_le e2)
+  | exp_handler x => singleton x
+  end.
+
 Lemma subst_trivia2 : forall x e u,
-  (* binds x (bind_typ T) E ->
-  typing E e S -> *)
+  x `notin` fv_le e ->
   AtomSet.F.In x (`cset_fvars` (free_for_cv e)) ->
   (cset_union (free_for_cv u) ((free_for_cv e) A`\` x)) =
         (free_for_cv (subst_ee x u (free_for_cv u) e)).
 Proof with eauto using cv_free_never_universal.
-Admitted.
-(*
-  intros * Bind Typ Hin.
-  dependent induction e.
+  intros * Fr Hin.
+  induction e; simpl in *...
   - csetdec.
-  - admit.
-  (* destruct (a == x) eqn:HX.
+  - destruct (a == x) eqn:HX.
     + subst.
       csetdec.
       destruct (free_for_cv u)...
       csetdec.
-    + exfalso. apply n. fsetdec. *)
-  - admit.
+    + exfalso. apply n. fsetdec.
   - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
       simpl in *; try fsetdec.
+    + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
+      rewrite (AtomSetFacts.mem_iff) in Hin.
+      rewrite (AtomSetFacts.union_b) in Hin.
+      destruct (AtomSet.F.mem x t) eqn:InT;
+        destruct (AtomSet.F.mem x t1) eqn:InT1;
+        rewrite_set_facts_in InT;
+        rewrite_set_facts_in InT1;
+        inversion Hin; subst...
+      * rewrite <- IHe1...
+        rewrite <- IHe2...
+        cbn [cset_union].
+        csetdec.
+      * rewrite <- IHe1...
+        rewrite <- (subst_contratrivia2 u x _ e2)...
+        2: rewrite Heqc0; assumption.
+        cbn [cset_union].
+        rewrite Heqc0.
+        csetdec.
+      * rewrite <- IHe2...
+        rewrite <- (subst_contratrivia2 u x _ e1)...
+        2: rewrite Heqc; assumption.
+        rewrite Heqc.
+        cbn [cset_union].
+        csetdec.
+  - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
+    simpl in *; try fsetdec.
+    + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
+      rewrite (AtomSetFacts.mem_iff) in Hin.
+      rewrite (AtomSetFacts.union_b) in Hin.
+      destruct (AtomSet.F.mem x t) eqn:InT;
+        destruct (AtomSet.F.mem x t1) eqn:InT1;
+        rewrite_set_facts_in InT;
+        rewrite_set_facts_in InT1;
+        inversion Hin; subst...
+      * rewrite <- IHe1...
+        rewrite <- IHe2...
+        cbn [cset_union].
+        csetdec.
+      * rewrite <- IHe1...
+        rewrite <- (subst_contratrivia2 u x _ e2)...
+        2: rewrite Heqc0; assumption.
+        cbn [cset_union].
+        rewrite Heqc0.
+        csetdec.
+      * rewrite <- IHe2...
+        rewrite <- (subst_contratrivia2 u x _ e1)...
+        2: rewrite Heqc; assumption.
+        rewrite Heqc.
+        cbn [cset_union].
+        csetdec.
+  - fsetdec.
+Qed.
+
+Lemma fvar_open_inversion : forall (x : atom) e y C,
+  exp_fvar x = open_ee e y C ->
+  e = x \/ exists (n : nat), e = n.
+Proof with eauto*.
+  intros. induction e;
+    try solve [exfalso; cbv [open_ee open_ee_rec] in H; fold open_ee_rec in H; discriminate].
+  - right. exists n...
+  - left...
+Qed.
+
+Lemma subst_trivia2_helper : forall F E x e Tx T,
+  typing (F ++ [(x, bind_typ Tx)] ++ E) e T ->
+  x `notin` fv_le e.
+Proof with eauto*.
+  intros * Typ.
+  dependent induction Typ; simpl...
+  * pick fresh y. 
+    specialize (H2 y ltac:(notin_solve) ([(y, bind_typ V)] ++ F) E x Tx ltac:(reflexivity)).
     admit.
-    (* + rewrite (AtomSetFacts.union_iff t t1 x) in Hin. *)
-    (*   destruct Hin. *)
-    (*   * specialize (IHe1 H). *)
-    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e1)). *)
-    (*     symmetry in IHe1. *)
-    (*     contradiction. *)
-    (*   * specialize (IHe2 H). *)
-    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e2)). *)
-    (*     symmetry in IHe2. *)
-    (*     contradiction. *)
-    (*   (* we only want to consider the case where all u, e1 and e2 have a concrete cv...  *) *)
-
-(*
-
-    + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
-      rewrite (AtomSetFacts.mem_iff) in Hin.
-      rewrite (AtomSetFacts.union_b) in Hin.
-      destruct (AtomSet.F.mem x t) eqn:InT;
-        destruct (AtomSet.F.mem x t1) eqn:InT1;
-        rewrite_set_facts_in InT;
-        rewrite_set_facts_in InT1;
-        inversion Hin; subst...
-      * rewrite <- IHe1...
-        rewrite <- IHe2...
-        cbn [cset_union].
-        csetdec.
-      * rewrite <- IHe1...
-        rewrite <- (subst_contratrivia2 u x _ e2)...
-        2: rewrite Heqc0; assumption.
-        cbn [cset_union].
-        rewrite Heqc0.
-        csetdec.
-      * rewrite <- IHe2...
-        rewrite <- (subst_contratrivia2 u x _ e1)...
-        2: rewrite Heqc; assumption.
-        rewrite Heqc.
-        cbn [cset_union].
-        csetdec.
-
-        *)
-  - admit.
-  - admit.
-  - admit.
-
-  - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
-      simpl in *; try fsetdec.
-      admit.
-
-(*
-
-    (* + rewrite (AtomSetFacts.union_iff t t1 x) in Hin. *)
-    (*   destruct Hin. *)
-    (*   * specialize (IHe1 H). *)
-    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e1)). *)
-    (*     symmetry in IHe1. *)
-    (*     contradiction. *)
-    (*   * specialize (IHe2 H). *)
-    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e2)). *)
-    (*     symmetry in IHe2. *)
-    (*     contradiction. *)
-    (*   (* we only want to consider the case where all u, e1 and e2 have a concrete cv...  *) *)
-    + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
-      rewrite (AtomSetFacts.mem_iff) in Hin.
-      rewrite (AtomSetFacts.union_b) in Hin.
-      destruct (AtomSet.F.mem x t) eqn:InT;
-        destruct (AtomSet.F.mem x t1) eqn:InT1;
-        rewrite_set_facts_in InT;
-        rewrite_set_facts_in InT1;
-        inversion Hin; subst...
-      * rewrite <- IHe1...
-        rewrite <- IHe2...
-        cbn [cset_union].
-        csetdec.
-      * rewrite <- IHe1...
-        rewrite <- (subst_contratrivia2 u x _ e2)...
-        2: rewrite Heqc0; assumption.
-        cbn [cset_union].
-        rewrite Heqc0.
-        csetdec.
-      * rewrite <- IHe2...
-        rewrite <- (subst_contratrivia2 u x _ e1)...
-        2: rewrite Heqc; assumption.
-        rewrite Heqc.
-        cbn [cset_union].
-        csetdec.
-
-*)
-
-  - destruct (a == x) eqn:HX.
-    + subst.
-      dependent induction Typ...
-      forwards: binds_unique H0 Bind.
-      inversion H1.
-    + exfalso. apply n.
-Admitted. *)
+  * pick fresh Y.
+    specialize (H2 Y ltac:(notin_solve) ([(Y, bind_sub V)] ++ F) E x Tx ltac:(reflexivity)).
+    admit.
+  * pick fresh y.
+    specialize (H0 y ltac:(notin_solve) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F)
+      E x Tx ltac:(reflexivity)).
+    admit.
+  * intro. assert (x = x0) by fsetdec. subst. binds_cases H0; simpl_env in *...
+    admit.
+Admitted.
 
 Lemma subst_ct_monotonicity : forall E Ap Am x C D T,
   wf_env E ->
@@ -1010,7 +1005,22 @@ Proof with hint.
     + SCase "x in fv e1".
       assert (x `in` `cset_fvars` (free_for_cv e1)) by (rewrite AtomSetFacts.mem_iff; assumption).
       rewrite subst_trivia1...
+      (**
+        what do we have here:
+            we have that (open_ee e1 y y) is well typed in an environment where x is bound to a type.
+            therefore x cannot show up in a binds_lab, and hence
+            x isn't wrapped in a exp_handler 
+      *)
       rewrite subst_trivia2 with (u := u)...
+      2 : {
+        pick fresh y.
+
+        eapply subst_trivia2_helper.
+        epose proof (H1 y ltac:(notin_solve)).
+        rewrite_env (([(y, bind_typ V)] ++
+        F) ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) in H5.
+        apply H5.
+      }
       pick fresh y and apply typing_abs...
       * eapply wf_typ_in_subst_cset...
       * assert (y <> x) by fsetdec.
