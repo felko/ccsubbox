@@ -661,6 +661,14 @@ Notation ctx := (list frame).
 Notation top := (@nil frame).
 
 
+Fixpoint bound_capabilities (k : ctx) : env :=
+  match k with
+  | nil => empty
+  | H x T :: k =>  [(x, bind_typ (typ_capt {*} (typ_exc T)))] ++ (bound_capabilities k)
+  | _ :: k => bound_capabilities k
+  end.
+
+
 Reserved Notation "E |-ctx c ~: T" (at level 70).
 
 
@@ -685,7 +693,7 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       sub E T T1 ->
       E |-ctx k ~: (open_tt T2 T) ->
       E |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
-  
+
   | typing_ctx_reset : forall E a T Targ k,
       (** explicit subtyping step here -- do we need it? *)
       sub E Targ T ->
@@ -698,7 +706,7 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
           the current answer type T *)
       typing E e (typ_capt C (typ_exc Targ)) ->
       E |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
-  
+
   | typing_ctk_throw_arg : forall E C T Targ k e,
       value e ->
       E |-ctx k ~: T ->
@@ -709,51 +717,50 @@ where "E |-ctx K ~: T" := (typing_ctx E K T).
 
 
 Inductive state : Type :=
-  | state_step (e : exp) (c : ctx) (E : env) : state
+  | state_step (e : exp) (c : ctx) : state
 .
 
-Notation "〈 e | k | E 〉" := (state_step e k E).
+Notation "〈 e | k 〉" := (state_step e k).
 Reserved Notation "st1 --> st2" (at level 69).
 
 Inductive typing_state : state -> Prop :=
   | typ_step : forall e k T E,
       E |-ctx k ~: T ->
       typing E e T ->
-      typing_state〈 e | k | E 〉
+      typing_state〈 e | k 〉
   .
 
 Inductive done : state -> Prop :=
-  | done_ret : forall e E,
+  | done_ret : forall e,
       value e ->
-      done 〈 e | top | E 〉
+      done 〈 e | top 〉
 .
 
 (* ********************************************************************** *)
 (** * #<a name="reduction"></a># Reduction *)
 
 Inductive step : state -> state -> Prop :=
-  | step_app : forall e1 e2 k E,
-      〈 exp_app e1 e2 | k | E 〉 --> 〈 e1 | KFun e2 :: k | E 〉
+  | step_app : forall e1 e2 k,
+      〈 exp_app e1 e2 | k 〉 --> 〈 e1 | KFun e2 :: k 〉
 
-  | step_tapp : forall e T k E,
-      〈 exp_tapp e T | k | E 〉 --> 〈 e | KTyp T :: k | E 〉
+  | step_tapp : forall e T k,
+      〈 exp_tapp e T | k 〉 --> 〈 e | KTyp T :: k 〉
 
-  | step_pop_1 : forall v arg k E,
+  | step_pop_1 : forall v arg k,
       value v ->
-      〈 v | KFun arg :: k | E 〉 --> 〈 arg | KArg v :: k | E 〉
+      〈 v | KFun arg :: k 〉 --> 〈 arg | KArg v :: k 〉
 
-  | step_abs : forall v T e k E,
+  | step_abs : forall v T e k,
       value v ->
-      〈  v | KArg (exp_abs T e) :: k | E 〉 --> 〈 (open_ee e v (free_for_cv v)) | k | E 〉
+      〈  v | KArg (exp_abs T e) :: k 〉 --> 〈 (open_ee e v (free_for_cv v)) | k 〉
 
-  | step_tabs : forall T1 T2 e1 k E,
-      〈 exp_tabs T1 e1 | KTyp T2 :: k | E 〉 --> 〈 (open_te e1 T2) | k | E 〉
+  | step_tabs : forall T1 T2 e1 k,
+      〈 exp_tabs T1 e1 | KTyp T2 :: k 〉 --> 〈 (open_te e1 T2) | k 〉
 
-  | step_try : forall T e a k E,
-      a `notin` dom E ->
-      〈 exp_try T e | k | E 〉--> 
-        〈 open_ee e (exp_handler a) (`cset_fvar` a) | H a T :: k | 
-          [(a, bind_typ (typ_capt {*} (typ_exc T)))] ++ E 〉
+  | step_try : forall T e a k,
+      a `notin` dom (bound_capabilities k) ->
+      〈 exp_try T e | k 〉-->
+        〈 open_ee e (exp_handler a) (`cset_fvar` a) | H a T :: k 〉
 where "st1 --> st2" := (step st1 st2).
 
 
