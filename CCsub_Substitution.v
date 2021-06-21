@@ -194,6 +194,65 @@ Proof with eauto*.
   - left...
 Qed.
 
+
+Lemma notin_fv_le_open_ee_rec : forall k u (y x : atom) t,
+  x `notin` fv_le (open_ee_rec k u (`cset_fvar` y) t) ->
+  x <> y ->
+  x `notin` fv_le t.
+Proof with eauto.
+  intros. generalize dependent k.
+  induction t; simpl in *; intros k H; try (trivial || notin_solve).
+  - apply (IHt (S k)). notin_solve.
+  - apply notin_union...
+    + apply (IHt1 k). notin_solve.
+    + apply (IHt2 k). notin_solve.
+  - eapply (IHt (S k)). notin_solve.
+  - apply (IHt k). notin_solve.
+  - apply (IHt (S k)). notin_solve.
+  - apply notin_union...
+    + apply (IHt1 k). notin_solve.
+    + apply (IHt2 k). notin_solve.
+Qed.
+
+Lemma notin_fv_le_open_ee : forall u (y x : atom) t,
+  x `notin` fv_le (open_ee t u (`cset_fvar` y)) ->
+  x <> y ->
+  x `notin` fv_le t.
+Proof with eauto.
+  intros. unfold open_ee in *.
+  apply (notin_fv_le_open_ee_rec 0 u y)...
+Qed.
+
+Lemma notin_fv_le_open_te_rec : forall k (y x : atom) t,
+  x `notin` fv_le (open_te_rec k y t) ->
+  x <> y ->
+  x `notin` fv_le t.
+Proof with eauto.
+  intros. generalize dependent k.
+  induction t; simpl in *; intros k H; try (trivial || notin_solve).
+  - apply (IHt (S k)). notin_solve.
+  - apply notin_union...
+    + apply (IHt1 k). notin_solve.
+    + apply (IHt2 k). notin_solve.
+  - apply (IHt (S k)). notin_solve.
+  - apply (IHt k). notin_solve.
+  - apply (IHt (S k)). notin_solve.
+  - apply notin_union...
+    + apply (IHt1 k). notin_solve.
+    + apply (IHt2 k). notin_solve.
+Qed.
+
+Lemma notin_fv_le_open_te : forall (y x : atom) t,
+  x `notin` fv_le (open_te t y) ->
+  x <> y ->
+  x `notin` fv_le t.
+Proof with eauto.
+  intros. unfold open_ee in *.
+  apply (notin_fv_le_open_te_rec 0 y)...
+Qed.
+
+
+
 Lemma subst_trivia2_helper : forall F E x e Tx T,
   typing (F ++ [(x, bind_typ Tx)] ++ E) e T ->
   x `notin` fv_le e.
@@ -202,17 +261,19 @@ Proof with eauto*.
   dependent induction Typ; simpl...
   * pick fresh y. 
     specialize (H2 y ltac:(notin_solve) ([(y, bind_typ V)] ++ F) E x Tx ltac:(reflexivity)).
-    admit.
+    eapply notin_fv_le_open_ee...
   * pick fresh Y.
     specialize (H2 Y ltac:(notin_solve) ([(Y, bind_sub V)] ++ F) E x Tx ltac:(reflexivity)).
-    admit.
+    eapply notin_fv_le_open_te...
   * pick fresh y.
     specialize (H0 y ltac:(notin_solve) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F)
       E x Tx ltac:(reflexivity)).
-    admit.
-  * intro. assert (x = x0) by fsetdec. subst. binds_cases H0; simpl_env in *...
-    admit.
-Admitted.
+    eapply notin_fv_le_open_ee...
+  * intro.
+    apply ok_from_wf_env in H.
+    assert (x = x0) by fsetdec. subst. binds_cases H0; simpl_env in *...
+    apply binds_In in H3... apply binding_uniq_from_ok in H... fsetdec.
+Qed.
 
 Lemma subst_ct_monotonicity : forall E Ap Am x C D T,
   wf_env E ->
