@@ -312,6 +312,10 @@ Proof with eauto.
     + apply (IHt2 k). notin_solve.
   - eapply (IHt (S k)). notin_solve.
   - apply (IHt k). notin_solve.
+  - apply (IHt (S k)). notin_solve.
+  - apply notin_union...
+    + apply (IHt1 k). notin_solve.
+    + apply (IHt2 k). notin_solve.
 Qed.
 
 Lemma notin_fv_ee_open_ee : forall u (y x : atom) t,
@@ -353,6 +357,10 @@ Proof with eauto.
     + apply (IHt2 k). notin_solve.
   - apply (IHt (S k)). notin_solve.
   - apply (IHt k). notin_solve.
+  - apply (IHt (S k)). notin_solve.
+  - apply notin_union...
+    + apply (IHt1 k). notin_solve.
+    + apply (IHt2 k). notin_solve.
 Qed.
 
 Lemma notin_fv_ee_open_te : forall (y x : atom) t,
@@ -387,11 +395,16 @@ Lemma cv_free_never_universal : forall e,
   ~ `* in` (free_for_cv e).
 Proof with eauto*.
   intros. induction e; unfold free_for_cv; try discriminate...
-  fold free_for_cv.
-  unfold cset_union...
-  destruct (free_for_cv e1) eqn:Hfc1;
-    destruct (free_for_cv e2) eqn:Hfc2...
-  csetdec.
+  - fold free_for_cv.
+    unfold cset_union...
+    destruct (free_for_cv e1) eqn:Hfc1;
+      destruct (free_for_cv e2) eqn:Hfc2...
+    csetdec.
+  - fold free_for_cv.
+    unfold cset_union...
+    destruct (free_for_cv e1) eqn:Hfc1;
+      destruct (free_for_cv e2) eqn:Hfc2...
+    csetdec.
 Qed.
 
 Lemma cv_free_has_universal_false : forall e,
@@ -427,12 +440,22 @@ Proof with eauto*.
     csetdec.
     pose proof (cv_free_has_universal_false) as HA.
     repeat rewrite HA...
+  - specialize (IHe1 k y).
+    specialize (IHe2 k y).
+    csetdec.
+    pose proof (cv_free_has_universal_false) as HA.
+    repeat rewrite HA...
 Qed.
 
 Lemma free_for_cv_open_type : forall e k (y : atom),
   cset_subset_prop (free_for_cv e) (free_for_cv (open_te_rec k y e)).
 Proof with eauto*.
   intros e; induction e; intros; simpl...
+  - specialize (IHe1 k y).
+    specialize (IHe2 k y).
+    csetdec.
+    pose proof (cv_free_has_universal_false) as HA.
+    repeat rewrite HA...
   - specialize (IHe1 k y).
     specialize (IHe2 k y).
     csetdec.
@@ -454,6 +477,13 @@ Proof with eauto using wf_cset_over_union, cv_free_never_universal.
     inversion H0.
     + apply IHe1... apply H.
     + apply IHe2... apply H.
+  - apply wf_cset_over_union in H...
+    apply cset_references_fvar_over_union in H0...
+    inversion H0.
+    + apply IHe1... apply H.
+    + apply IHe2... apply H.
+  - assert (x = a) by fsetdec; subst...
+    inversion H; subst...
 Qed.
 
 Lemma free_for_cv_is_free_ee : forall e,
@@ -464,8 +494,10 @@ Proof with eauto using cv_free_never_universal; eauto*.
   induction e; try destruct (free_for_cv e) eqn:Hcve;
     subst; simpl; try rewrite Hcve; try constructor; try inversion IHe;
       csetdec.
-  pose proof cv_free_has_universal_false as HA.
-  repeat rewrite HA...
+  - pose proof cv_free_has_universal_false as HA.
+    repeat rewrite HA...
+  - pose proof cv_free_has_universal_false as HA.
+    repeat rewrite HA...
 Qed.
 
 Lemma free_for_cv_bound_typing : forall E e (x : atom) S,
@@ -499,6 +531,19 @@ Proof with eauto using wf_cset_over_union, cv_free_never_universal.
       assert (x <> y) by notin_solve.
       destruct (x == y)...
       easy.
+  - pick fresh y.
+    forwards HA: H0 y.
+    + notin_solve.
+    + forwards (? & ? & ?): free_for_cv_open e 0 y.
+      clear Fr.
+      fsetdec.
+    + destruct HA as (T & HA)...
+      inversion HA.
+      assert (x <> y) by notin_solve.
+      destruct (x == y)...
+      easy.
+  - destruct_union_mem xIn...
+  - assert (x = x0) by fsetdec; subst...
 Qed.
 
 (** This should be easily true: free variables
@@ -587,7 +632,10 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     }
     simpl_env in *.
     exists T. destruct B as [B|B]; binds_cases B...
-Qed.
+  - admit.
+  - admit.
+  - admit.
+Admitted.
 
 
 Lemma subst_cset_fresh_for_cv : forall z t C,
@@ -609,6 +657,14 @@ Proof.
     reflexivity.
   - apply IHt. fsetdec.
   - apply IHt. fsetdec.
+  - apply IHt. fsetdec.
+  - rewrite subst_cset_distributive_across_union.
+    rewrite IHt1 by notin_solve.
+    rewrite IHt2 by notin_solve.
+    reflexivity.
+  - cbv.
+    replace (AtomSet.F.mem z (singleton a)) with false by fset_mem_dec.
+    reflexivity.
 Qed.
 
 
@@ -643,27 +699,45 @@ Proof with eauto.
     reflexivity.
   - apply IHe...
   - apply IHe...
+  - apply IHe...
+  - simpl in *.
+    pose proof (cv_free_never_universal e1).
+    pose proof (cv_free_never_universal e2).
+    destruct (free_for_cv e1); try easy.
+    destruct (free_for_cv e2); try easy.
+    rewrite <- IHe1...
+    rewrite <- IHe2...
+    rewrite subst_cset_distributive_across_union.
+    reflexivity.
+  - simpl in *.
+    assert (a <> x) by fsetdec.
+    destruct (a == x); try easy.
+    cbv.
+    destruct_if.
+    + rewrite <- AtomSetFacts.mem_iff in Heqb. exfalso. fsetdec.
+    + reflexivity.
 Qed.
 
 Lemma free_for_cv_subst_ee_cset_irrelevancy: forall x u C D t,
   free_for_cv (subst_ee x u C t) =
   free_for_cv (subst_ee x u D t).
-Proof.
-  induction t.
-  all : simpl; eauto.
-  rewrite IHt1.
-  rewrite IHt2.
-  trivial.
+Proof with eauto.
+  induction t; simpl; eauto.
+  - rewrite IHt1.
+    rewrite IHt2...
+  - rewrite IHt1.
+    rewrite IHt2...
 Qed.
 
 Lemma subst_te_idempotent_wrt_free_for_cv : forall e x C,
   free_for_cv (subst_te x C e) = free_for_cv e.
 Proof with eauto.
   intros.
-  induction e; simpl; eauto.
-  rewrite IHe1.
-  rewrite IHe2.
-  easy.
+  induction e; simpl...
+  - rewrite IHe1.
+    rewrite IHe2...
+  - rewrite IHe1.
+    rewrite IHe2...
 Qed.
 
 Lemma bind_typ_notin_fv_tt : forall x S E Ap Am T,
@@ -705,8 +779,11 @@ Proof with auto.
     forwards HA: bind_typ_notin_fv_tt x Wf__t0; [eauto|..].
     forwards: notin_fv_tt_open_tt HA.
     notin_solve.
+  - inversion WfT; subst.
+    eapply bind_typ_notin_fv_tt...
+    admit.
 }
-Qed.
+Admitted.
 
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)
@@ -787,6 +864,8 @@ Proof with simpl_env; eauto*.
     + auto*.
     + apply wf_typ_all with (L := L `u`A dom E)...
     + apply wf_typ_all with (L := L `u`A dom E)...
+  - pose proof (sub_regular E _ _ H).
+    repeat split...
 Qed.
 
 Lemma typing_regular : forall E e T,
@@ -861,7 +940,10 @@ Proof with simpl_env; auto*.
       inversion Hwf; subst...
   - repeat split...
     forwards: sub_regular H0...
-Qed.
+  - admit.
+  - admit.
+  - admit.
+Admitted.
 
 Lemma value_regular : forall e,
   value e ->
