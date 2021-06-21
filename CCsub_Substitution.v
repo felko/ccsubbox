@@ -96,27 +96,83 @@ Proof with eauto using cv_free_never_universal.
     rewrite <- IHe2...
 Qed.
 
+
 (* x in (fv e) ->
   (fv u) union (fv e remove x) = fv (e[x !-> u][x !-> fv u])
 *)
-Lemma subst_trivia2 : forall E T S x e u,
-  binds x (bind_typ T) E ->
-  typing E e S ->
+Lemma subst_trivia2 : forall x e u,
+  (* binds x (bind_typ T) E ->
+  typing E e S -> *)
   AtomSet.F.In x (`cset_fvars` (free_for_cv e)) ->
   (cset_union (free_for_cv u) ((free_for_cv e) A`\` x)) =
         (free_for_cv (subst_ee x u (free_for_cv u) e)).
 Proof with eauto using cv_free_never_universal.
+Admitted.
+(*
   intros * Bind Typ Hin.
-  dependent induction e; simpl in *...
+  dependent induction e.
   - csetdec.
-  - destruct (a == x) eqn:HX.
+  - admit.
+  (* destruct (a == x) eqn:HX.
     + subst.
       csetdec.
       destruct (free_for_cv u)...
       csetdec.
-    + exfalso. apply n. fsetdec.
+    + exfalso. apply n. fsetdec. *)
+  - admit.
   - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
       simpl in *; try fsetdec.
+    admit.
+    (* + rewrite (AtomSetFacts.union_iff t t1 x) in Hin. *)
+    (*   destruct Hin. *)
+    (*   * specialize (IHe1 H). *)
+    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e1)). *)
+    (*     symmetry in IHe1. *)
+    (*     contradiction. *)
+    (*   * specialize (IHe2 H). *)
+    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e2)). *)
+    (*     symmetry in IHe2. *)
+    (*     contradiction. *)
+    (*   (* we only want to consider the case where all u, e1 and e2 have a concrete cv...  *) *)
+
+(*
+
+    + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
+      rewrite (AtomSetFacts.mem_iff) in Hin.
+      rewrite (AtomSetFacts.union_b) in Hin.
+      destruct (AtomSet.F.mem x t) eqn:InT;
+        destruct (AtomSet.F.mem x t1) eqn:InT1;
+        rewrite_set_facts_in InT;
+        rewrite_set_facts_in InT1;
+        inversion Hin; subst...
+      * rewrite <- IHe1...
+        rewrite <- IHe2...
+        cbn [cset_union].
+        csetdec.
+      * rewrite <- IHe1...
+        rewrite <- (subst_contratrivia2 u x _ e2)...
+        2: rewrite Heqc0; assumption.
+        cbn [cset_union].
+        rewrite Heqc0.
+        csetdec.
+      * rewrite <- IHe2...
+        rewrite <- (subst_contratrivia2 u x _ e1)...
+        2: rewrite Heqc; assumption.
+        rewrite Heqc.
+        cbn [cset_union].
+        csetdec.
+
+        *)
+  - admit.
+  - admit.
+  - admit.
+
+  - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
+      simpl in *; try fsetdec.
+      admit.
+
+(*
+
     (* + rewrite (AtomSetFacts.union_iff t t1 x) in Hin. *)
     (*   destruct Hin. *)
     (*   * specialize (IHe1 H). *)
@@ -152,50 +208,16 @@ Proof with eauto using cv_free_never_universal.
         rewrite Heqc.
         cbn [cset_union].
         csetdec.
-  - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
-      simpl in *; try fsetdec.
-    (* + rewrite (AtomSetFacts.union_iff t t1 x) in Hin. *)
-    (*   destruct Hin. *)
-    (*   * specialize (IHe1 H). *)
-    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e1)). *)
-    (*     symmetry in IHe1. *)
-    (*     contradiction. *)
-    (*   * specialize (IHe2 H). *)
-    (*     epose proof (cv_free_never_universal (subst_ee x u cset_universal e2)). *)
-    (*     symmetry in IHe2. *)
-    (*     contradiction. *)
-    (*   (* we only want to consider the case where all u, e1 and e2 have a concrete cv...  *) *)
-    + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
-      rewrite (AtomSetFacts.mem_iff) in Hin.
-      rewrite (AtomSetFacts.union_b) in Hin.
-      destruct (AtomSet.F.mem x t) eqn:InT;
-        destruct (AtomSet.F.mem x t1) eqn:InT1;
-        rewrite_set_facts_in InT;
-        rewrite_set_facts_in InT1;
-        inversion Hin; subst...
-      * rewrite <- IHe1...
-        rewrite <- IHe2...
-        cbn [cset_union].
-        csetdec.
-      * rewrite <- IHe1...
-        rewrite <- (subst_contratrivia2 u x _ e2)...
-        2: rewrite Heqc0; assumption.
-        cbn [cset_union].
-        rewrite Heqc0.
-        csetdec.
-      * rewrite <- IHe2...
-        rewrite <- (subst_contratrivia2 u x _ e1)...
-        2: rewrite Heqc; assumption.
-        rewrite Heqc.
-        cbn [cset_union].
-        csetdec.
+
+*)
+
   - destruct (a == x) eqn:HX.
     + subst.
-      csetdec.
-      destruct (free_for_cv u)...
-      csetdec.
-    + exfalso. apply n. fsetdec.
-Qed.
+      dependent induction Typ...
+      forwards: binds_unique H0 Bind.
+      inversion H1.
+    + exfalso. apply n.
+Admitted. *)
 
 Lemma subst_ct_monotonicity : forall E Ap Am x C D T,
   wf_env E ->
@@ -449,6 +471,11 @@ Proof with simpl_env; eauto; fold subst_cpt.
            ++ rewrite_nil_concat.
               eapply wf_cset_ignores_sub_bindings.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
+  - simpl. split; intros.
+    + constructor.
+      forwards (Sub1 & Sub2) : subst_ct_monotonicity x H4 Hsc...
+    + constructor.
+      forwards (Sub1 & Sub2) : subst_ct_monotonicity x H4 Hsc...
 Qed.
 
 Lemma plain_subst_ct_monotonicity : forall E Ap Am x C D T,
@@ -511,6 +538,15 @@ Proof with eauto.
   - cbn [fv_ee].
     assert (wf_typ_in E T) as HA...
   - eauto.
+  - simpl.
+    pick fresh y.
+    specialize (H0 y ltac:(fsetdec)).
+    specialize (H y ltac:(fsetdec)).
+    eapply notin_fv_ee_open_ee...
+  - cbn [fv_ee].
+    apply notin_union...
+  - assert (x <> x0) by (apply binds_In in H0; fsetdec).
+    unfold fv_ee. notin_solve.
 Qed.
 
 
@@ -705,6 +741,7 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
     + repeat rewrite subst_tt_open_tt_var...
       rewrite_env (map (subst_tb Z P) ([(y, bind_sub T1)] ++ F) ++ E).
       eapply sub_through_subst_tt...
+  - econstructor...
 }
 Qed.
 
@@ -853,6 +890,7 @@ Proof with eauto using wf_env_subst_cb, wf_typ_in_subst_cset, subcapt_through_su
       rewrite subst_ct_open_tt_var...
       rewrite_env (map (subst_cb x C) ([(y, bind_sub T1)] ++ F) ++ E).
       eapply sub_through_subst_ct; simpl_env...
+  - econstructor...
 }
 Qed.
 
@@ -1117,7 +1155,45 @@ Proof with hint.
     + eapply sub_through_subst_ct...
       simpl.
       eapply subcapt_reflexivity...
-Qed.
+  - Case "typing_try".
+    assert (wf_env (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E)) as HwfNarrE. {
+      pick fresh z for L.
+      pose proof (H z Fr)...
+    }
+    pose proof HwfNarrE as HxUniq.
+    apply binding_uniq_from_wf_env in HxUniq.
+    (* assert (wf_typ_in (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) V). {
+      pick fresh z for L.
+      pose proof (H1 z Fr) as HtypE1...
+    } *)
+
+    simpl subst_ct.
+    destruct (AtomSet.F.mem x (`cset_fvars` (free_for_cv e))) eqn:EqMem.
+    + SCase "x in fv e1".
+      assert (x `in` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.mem_iff; assumption).
+      pick fresh y and apply typing_try...
+      * assert (y <> x) by fsetdec.
+        rewrite subst_ee_open_ee_var...
+        replace
+          ([(y, bind_typ (typ_capt {*} (typ_exc (subst_ct x (free_for_cv u) T1))))] ++  map (subst_cb x (free_for_cv u)) F ++ E)
+        with
+          (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
+        apply H0...
+        admit.
+    + SCase "x not in fv e1".
+      assert (x `notin` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
+      pick fresh y and apply typing_try...
+      * assert (y <> x) by fsetdec.
+        rewrite subst_ee_open_ee_var...
+        replace
+          ([(y, bind_typ (typ_capt {*} (typ_exc (subst_ct x (free_for_cv u) T1))))] ++  map (subst_cb x (free_for_cv u)) F ++ E)
+        with
+          (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
+        apply H0...
+        admit.
+  - admit.
+  - admit.
+Admitted.
 
 Lemma typing_through_subst_ee' : forall U E Ap Am x T e u,
   typing ([(x, bind_typ U)] ++ E) e T ->
@@ -1211,6 +1287,8 @@ Proof with eauto with fsetdec.
     + apply subst_tt_open_ct_rec_straight...
   - f_equal.
     + apply subst_tt_open_ct_rec_straight...
+    + apply subst_tt_open_ct_rec_straight...
+  - f_equal.
     + apply subst_tt_open_ct_rec_straight...
 }
 Qed.
@@ -1348,7 +1426,13 @@ Proof with simpl_env;
       forwards: fresh_mid_head Ok.
       assert (y <> Z) by notin_solve.
       clear Fr.
-      binds_cases Zbnd.
+      destruct Zbnd as [ZZ|ZZ]; binds_cases ZZ.
+      - rename select (binds Z _ E) into Err.
+        forwards: binds_In Err.
+        exfalso;fsetdec.
+      - rename select (binds Z _ _) into Err.
+        forwards: binds_In Err;simpl_env in *.
+        exfalso;fsetdec.
       - rename select (binds Z _ E) into Err.
         forwards: binds_In Err.
         exfalso;fsetdec.
@@ -1412,7 +1496,13 @@ Proof with simpl_env;
       forwards: fresh_mid_head Ok.
       assert (y <> Z) by notin_solve.
       clear Fr.
-      binds_cases Zbnd.
+      destruct Zbnd as [ZZ|ZZ]; binds_cases ZZ.
+      - rename select (binds Z _ E) into Err.
+        forwards: binds_In Err.
+        exfalso;fsetdec.
+      - rename select (binds Z _ _) into Err.
+        forwards: binds_In Err;simpl_env in *.
+        exfalso;fsetdec.
       - rename select (binds Z _ E) into Err.
         forwards: binds_In Err.
         exfalso;fsetdec.
@@ -1445,4 +1535,6 @@ Proof with simpl_env;
       apply H2...
   - Case "typing_tapp".
     rewrite subst_tt_open_tt...
-Qed.
+  - admit.
+  - admit.
+Admitted.
