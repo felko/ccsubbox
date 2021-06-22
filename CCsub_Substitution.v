@@ -1372,7 +1372,11 @@ Lemma typing_through_subst_te : forall Q E F Z e T P,
 Proof with simpl_env;
            eauto 6 using wf_env_subst_tb,
                          wf_typ_subst_tb,
-                         sub_through_subst_tt.
+                         sub_through_subst_tt,
+                         subcapt_from_binds,
+                         wf_typ_from_binds_typ,
+                         wf_pretyp_weakening,
+                         wf_typ_set_weakening.
   intros *.
   intros Typ PsubQ.
   remember (F ++ [(Z, bind_sub Q)] ++ E).
@@ -1394,56 +1398,43 @@ Proof with simpl_env;
            eapply typing_var_tvar...
            apply binds_map with (f := (subst_tb Z P')) in H0.
            simpl in H0.
-           destruct (Z == Z); try easy.
-           rewrite_env (empty ++ map (subst_tb Z P') F ++ map (subst_tb Z P') E).
-           apply binds_weaken...
+           destruct (Z == Z); try easy...
         -- assert (wf_env (map (subst_tb Z (typ_capt C P)) F ++ E)) as HA...
            rewrite (map_subst_tb_id E Z (typ_capt C P)) in HA;
              [ | auto | eapply fresh_mid_tail; eauto ].
            apply binds_map with (f := (subst_tb Z (typ_capt C P))) in H0.
-           assert (binds x (subst_tb Z (typ_capt C P) (bind_typ Z))
-                         (empty ++ map (subst_tb Z (typ_capt C P)) F ++
-                                map (subst_tb Z (typ_capt C P)) E)) as HAbinds. {
-             apply binds_weaken...
+
+           assert (binds x (bind_typ (typ_capt C P))
+             (map (subst_tb Z (typ_capt C P)) F ++
+              map (subst_tb Z (typ_capt C P)) E)) as HAbinds. {
+
+             replace (bind_typ (typ_capt C P)) with (subst_tb Z (typ_capt C P) (bind_typ Z))...
+             simpl.
+             destruct (Z == Z); try easy.
            }
-           simpl in HAbinds.
-           destruct (Z == Z); try easy.
            apply (typing_sub (typ_capt (`cset_fvar` x) P))...
            apply wf_typ_from_binds_typ in HAbinds as HAwfP...
            inversion HAwfP; subst.
-           match goal with H : wf_pretyp _ _ _ P |- _ =>
-             simpl_env in H
-           end.
+           simpl_env in *.
            apply sub_capt.
            ++ destruct C; eauto using wf_cset_from_binds, subcapt_from_binds.
-           ++ let d :=
-                  constr:(
-                    dom (map (subst_tb Z (typ_capt C P)) F ++ map (subst_tb Z (typ_capt C P)) E))
-              in apply sub_pre_reflexivity with (Ap := d) (Am := d)...
+           ++ eapply sub_pre_reflexivity...
       * rewrite <- (map_subst_tb_id E Z P);
           [ | auto | eapply fresh_mid_tail; eauto ].
+
         assert (binds x (subst_tb Z P (bind_typ Z)) (map (subst_tb Z P) F)) as HA...
         simpl in HA.
         destruct (Z == Z); try easy.
         assert (type P) as Typ...
-        destruct Typ. {
-          apply typing_var_tvar...
-        }
-        eapply typing_sub. {
-          eapply typing_var...
-        }
-        apply sub_capt.
-        1: {
-          eapply subcapt_from_binds...
-        }
+        destruct Typ...
+        eapply typing_sub...
+        apply sub_capt...
         let d := constr:(dom (map (subst_tb Z (typ_capt C P)) F ++ E))
         in apply sub_pre_reflexivity with (Ap := d) (Am := d)...
         apply sub_regular, proj2, proj1 in PsubQ.
         inversion PsubQ; subst.
         rewrite_nil_concat.
-        eapply wf_pretyp_weakening; simpl_env.
-        1: eauto.
-        all: trivial...
+        eapply wf_pretyp_weakening; simpl_env...
     + subst.
       apply typing_var_tvar...
       rewrite (map_subst_tb_id E Z P);
@@ -1461,7 +1452,7 @@ Proof with simpl_env;
       destruct (Z == x)...
       assert (binds Z (bind_sub Q) (F ++ [(Z, bind_sub Q)] ++ E)) by auto.
       forwards: binds_unique (bind_sub Q) (bind_typ (typ_capt C P0))...
-      exfalso;congruence.
+      exfalso; congruence.
     }
     unfold subst_cset.
     find_and_destroy_set_mem; [exfalso;fsetdec|].
@@ -1603,6 +1594,52 @@ Proof with simpl_env;
       apply H2...
   - Case "typing_tapp".
     rewrite subst_tt_open_tt...
-  - admit.
+  - Case "typing_try".
+    assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
+      pick fresh z for L.
+      pose proof (H z Fr)...
+    }
+    replace (free_for_cv e) with (free_for_cv (subst_te Z P e)).
+    2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
+    replace (subst_cset Z (cv P) (free_for_cv (subst_te Z P e)))
+      with (free_for_cv (subst_te Z P e)).
+    2: {
+      unfold subst_cset.
+      find_and_destroy_set_mem.
+      pick fresh y.
+      forwards HA: H0 y ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F); [notin_solve|..]...
+      forwards (U & Zbnd): free_for_cv_bound_typing Z HA. {
+        rewrite subst_te_idempotent_wrt_free_for_cv.
+        rewrite subst_te_idempotent_wrt_free_for_cv in ZIn.
+        forwards (? & ? & ?): free_for_cv_open e 0 y...
+      }
+      assert (ok (F ++ [(Z, bind_sub Q)] ++ E)) as Ok by auto.
+      forwards: fresh_mid_tail Ok.
+      forwards: fresh_mid_head Ok.
+      assert (y <> Z) by notin_solve.
+      clear Fr.
+      destruct Zbnd as [ZZ|ZZ]; binds_cases ZZ.
+      - rename select (binds Z _ E) into Err.
+        forwards: binds_In Err.
+        exfalso;fsetdec.
+      - rename select (binds Z _ _) into Err.
+        forwards: binds_In Err;simpl_env in *.
+        exfalso;fsetdec.
+      - rename select (binds Z _ E) into Err.
+        forwards: binds_In Err.
+        exfalso;fsetdec.
+      - rename select (binds Z _ _) into Err.
+        forwards: binds_In Err;simpl_env in *.
+        exfalso;fsetdec.
+    }
+    pick fresh y and apply typing_try.
+    + rewrite subst_te_open_ee_var...
+      specialize (H y ltac:(notin_solve)).
+      assert ( typ_capt {*} (typ_exc (subst_tt Z P T1)) = subst_tt Z P (typ_capt {*} (typ_exc T1))). {
+        admit.
+      }
+      rewrite H1.
+      rewrite_env (map (subst_tb Z P) ([(y,  bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
+      apply H0...
   - admit.
 Admitted.
