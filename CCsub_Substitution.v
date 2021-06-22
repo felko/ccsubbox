@@ -1261,23 +1261,17 @@ Proof with hint.
       pick fresh y and apply typing_try...
       * assert (y <> x) by fsetdec.
         rewrite subst_ee_open_ee_var...
-        replace
-          ([(y, bind_typ (typ_capt {*} (typ_exc (subst_ct x (free_for_cv u) T1))))] ++  map (subst_cb x (free_for_cv u)) F ++ E)
-        with
-          (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
+        rewrite <- (subst_cset_univ_idempotent x (free_for_cv u)).
+        rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
         apply H0...
-        { simpl. rewrite subst_cset_univ_idempotent... }
     + SCase "x not in fv e1".
       assert (x `notin` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
       pick fresh y and apply typing_try...
       * assert (y <> x) by fsetdec.
         rewrite subst_ee_open_ee_var...
-        replace
-          ([(y, bind_typ (typ_capt {*} (typ_exc (subst_ct x (free_for_cv u) T1))))] ++  map (subst_cb x (free_for_cv u)) F ++ E)
-        with
-          (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
+        rewrite <- (subst_cset_univ_idempotent x (free_for_cv u)).
+        rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
         apply H0...
-        admit.
   - admit.
   - admit.
 Admitted.
