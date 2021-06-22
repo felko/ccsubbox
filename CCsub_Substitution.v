@@ -1641,5 +1641,22 @@ Proof with simpl_env;
       rewrite H1.
       rewrite_env (map (subst_tb Z P) ([(y,  bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
       apply H0...
-  - admit.
+  - assert (Z <> x). {
+      destruct (Z == x)...
+      assert (binds Z (bind_sub Q) (F ++ [(Z, bind_sub Q)] ++ E)) by auto.
+      forwards: binds_unique (bind_sub Q) (bind_typ (typ_capt C (typ_exc T)))...
+      exfalso; congruence.
+    }
+    unfold subst_cset.
+    find_and_destroy_set_mem; [exfalso;fsetdec|].
+    apply typing_handler with (C := (subst_cset Z (cv P) C))...
+    rewrite (map_subst_tb_id E Z P);
+      [ | auto | eapply fresh_mid_tail; eauto ].
+    binds_cases H0.
+    + admit.
+    + enough (binds x (subst_tb Z P (bind_typ (typ_capt C (typ_exc T)))) (map (subst_tb Z P) (F ++ E))) as HA...
+      simpl in HA.
+      rewrite_env (map (subst_tb Z P) F ++ map (subst_tb Z P) E) in HA...
+      admit.
+      admit.
 Admitted.
