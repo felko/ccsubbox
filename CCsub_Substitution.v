@@ -968,18 +968,11 @@ Lemma typing_through_subst_ee : forall P E F x T e u,
          (subst_ee x u (free_for_cv u) e)
          (subst_ct x (free_for_cv u) T).
 Local Ltac hint ::=
-  eauto 4 using wf_env_subst_cb, typing_cv.
+  eauto 4 using wf_env_subst_cb, typing_cv, subst_ct_fresh, subst_cpt_fresh, wf_typ_from_binds_typ, notin_fv_wf_pretyp.
 Proof with hint.
   intros *.
   intros HtypT HvalU HtypU.
-  assert (wf_env E) as HwfE. {
-    apply wf_env_strengthening
-      with (F := (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))])); simpl_env...
-  }
   assert (wf_cset_in E (free_for_cv u)) as HwfFv...
-  assert (capt (free_for_cv u)) as HcaptFv. {
-    eapply capt_from_wf_cset...
-  }
   remember (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E).
   generalize dependent F.
   induction HtypT; intros F EQ; subst; simpl subst_ee...
@@ -1008,13 +1001,9 @@ Proof with hint.
         destruct (free_for_cv u); csetdec.
       }
 
-      replace (subst_cpt x (free_for_cv u) P) with P.
-      2: {
-        forwards: binding_uniq_from_wf_env H.
-        epose proof (notin_fv_wf_pretyp E (dom E) (dom E) x P ltac:(auto) ltac:(notin_solve)).
-        rewrite <- subst_cpt_fresh...
-      }
-      forwards: values_have_precise_captures E u (typ_capt (free_for_cv u) P); eauto*.
+      replace (subst_cpt x (free_for_cv u) P) with P...
+      forwards: binding_uniq_from_wf_env H.
+      forwards: notin_fv_wf_pretyp E (dom E) (dom E) x P...
     + SCase "x0 <> x".
       binds_cases H0.
       * assert (x `notin` fv_cpt P). {
@@ -1023,39 +1012,24 @@ Proof with hint.
           assert (wf_pretyp_in E P) as HA2...
           forwards: notin_fv_wf_pretyp HA2 HA1...
         }
-        replace (subst_ct x C (typ_capt (`cset_fvar` x0) P)) with (typ_capt (`cset_fvar` x0) P).
-        2: {
-          apply subst_ct_fresh; simpl_env...
-        }
+        replace (subst_ct x C (typ_capt (`cset_fvar` x0) P)) with (typ_capt (`cset_fvar` x0) P)...
         rewrite_nil_concat.
         apply typing_weakening; simpl_env...
         simpl.
         rewrite <- (subst_cset_fresh x)...
-        replace (subst_cpt x (free_for_cv u) P0) with P0.
-        2: {
-          apply wf_typ_from_binds_typ in H0 as WfP0...
+        replace (subst_cpt x (free_for_cv u) P0) with P0...
+        { apply wf_typ_from_binds_typ in H0 as WfP0...
           wf_typ_inversion WfP0.
           apply binding_uniq_from_wf_env in H as ?.
-          pose proof (notin_fv_wf_pretyp E (dom E) (dom E) x P0 ltac:(auto) ltac:(notin_solve)).
-          rewrite <- subst_cpt_fresh...
+          forwards : notin_fv_wf_pretyp x P0...
         }
-        trivial...
       * simpl.
         rewrite <- (subst_cset_fresh x)...
-        eapply typing_var...
-        (* heavy environment wrangling ahead... *)
-        assert (binds x0
-                      (bind_typ (subst_ct x (free_for_cv u) (typ_capt C P0)))
-                      (map (subst_cb x (free_for_cv u)) F)). {
-          replace (bind_typ (subst_ct x (free_for_cv u) (typ_capt C P0)))
-            with (subst_cb x (free_for_cv u) (bind_typ (typ_capt C P0))) by auto...
-        }
-        rewrite <- concat_nil.
-        rewrite -> concat_assoc.
-        apply binds_weaken.
-        -- rewrite -> concat_nil...
-        -- rewrite -> concat_nil...
-
+        eapply typing_var with (C := subst_cset x (free_for_cv u) C)...
+        replace (bind_typ
+          (typ_capt (subst_cset x (free_for_cv u) C)
+            (subst_cpt x (free_for_cv u) P0)))
+        with (subst_cb x (free_for_cv u) (bind_typ (typ_capt C P0)))...
   - Case "typing_abs".
     assert (wf_env (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E)) as HwfNarrE. {
       pick fresh z for L.
@@ -1378,19 +1352,18 @@ with subst_tpt_open_cpt_rec_straight : forall Z P k S T,
   type P ->
   subst_tpt Z P (open_cpt_rec k (cv S) T) = open_cpt_rec k (cv (subst_tt Z P S)) (subst_tpt Z P T).
 Proof with eauto with fsetdec.
-{ intros * Typ.
+------
+  intros * Typ.
   dependent induction T; cbn...
-  - f_equal.
-    2: apply subst_tpt_open_cpt_rec_straight...
-    rewrite subst_cset_open_cset_rec by (apply type_implies_capt_cv;assumption).
+  - f_equal...
+    rewrite subst_cset_open_cset_rec by (apply type_implies_capt_cv; assumption).
     rewrite cv_subst_correspondence...
   - destruct (a == Z)...
     apply open_ct_rec_type...
-}
-{ intros * Typ.
+------
+  intros * Typ.
   dependent induction T; cbn;
     f_equal; repeat (apply subst_tt_open_ct_rec_straight)...
-}
 Qed.
 
 Lemma typing_through_subst_te : forall Q E F Z e T P,
