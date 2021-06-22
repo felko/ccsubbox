@@ -87,22 +87,18 @@ Proof with eauto.
 Qed.
 
 Lemma ctx_typing_narrowing : forall E T e S,
-  no_type_bindings E ->
   E |-ctx e ~: T ->
   sub E S T ->
   E |-ctx e ~: S.
 Proof with eauto.
-  intros * TypFree Typ Sub. generalize dependent S. 
+  intros * Typ Sub. generalize dependent S. 
   dependent induction Typ; intros S Sub.
   - Case "top".
     constructor...
   - Case "KFun".
-    inversion Sub;subst. {
-      inversion select (binds _ _ _).
-      assert (wf_env E)...
-      assert (wf_typ_in E X)...
-      forwards [? [? ?]]: inversion_toplevel_type H5...
-      inversion H6...
+    dependent induction Sub...
+    {
+      econstructor...
     }
     inversion select (sub_pre _ _ _); subst.
     econstructor.
@@ -222,12 +218,8 @@ Proof with eauto.
       applys wf_cset_weakening WfCvT1'; simpl_env...
     }
   - Case "KTyp".
-    inversion Sub;subst. {
-      inversion select (binds _ _ _).
-      assert (wf_env E)...
-      assert (wf_typ_in E X)...
-      forwards [? [? ?]]: inversion_toplevel_type H4...
-      inversion H5...
+    dependent induction Sub... {
+      econstructor...
     }
     inversion select (sub_pre _ _ _); subst.
     econstructor.
@@ -252,7 +244,19 @@ Proof with eauto.
     }
     rewrite_env ((map (subst_tb x T) empty) ++ E).
     apply sub_through_subst_tt with (Z := x) (Q := T1)...
-Qed.
+  - Case "HReset".
+    admit.
+  - case "KThrowHandler".
+    admit.
+  - Case "KThrowArg".
+    admit.
+  - Case "Ctx-Var".
+    apply IHTyp.
+    eapply sub_transitivity...
+    eapply sub_trans_tvar...
+    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+    apply wf_typ_from_binds_sub in H...
+Admitted.
 
 Lemma preservation : forall e e',
   typing_state e ->
