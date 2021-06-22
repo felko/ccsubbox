@@ -101,6 +101,7 @@ Qed.
   (fv u) union (fv e remove x) = fv (e[x !-> u][x !-> fv u])
 *)
 
+(* The free labels of an expression *)
 Fixpoint fv_le (e : exp) {struct e} : atoms :=
   match e with
   | exp_bvar i => {}A
@@ -259,7 +260,7 @@ Lemma subst_trivia2_helper : forall F E x e Tx T,
 Proof with eauto*.
   intros * Typ.
   dependent induction Typ; simpl...
-  * pick fresh y. 
+  * pick fresh y.
     specialize (H2 y ltac:(notin_solve) ([(y, bind_typ V)] ++ F) E x Tx ltac:(reflexivity)).
     eapply notin_fv_le_open_ee...
   * pick fresh Y.
@@ -951,6 +952,12 @@ Proof with eauto using wf_env_subst_cb, wf_typ_in_subst_cset, subcapt_through_su
 Qed.
 
 
+Lemma subst_cset_univ_idempotent : forall x C,
+  subst_cset x C {*} = {*}.
+Proof.
+  intros. cbv.
+  destruct_set_mem x {}A. fsetdec. trivial.
+Qed.
 
 
 Lemma typing_through_subst_ee : forall P E F x T e u,
@@ -1070,7 +1077,7 @@ Proof with hint.
         what do we have here:
             we have that (open_ee e1 y y) is well typed in an environment where x is bound to a type.
             therefore x cannot show up in a binds_lab, and hence
-            x isn't wrapped in a exp_handler 
+            x isn't wrapped in a exp_handler
       *)
       rewrite subst_trivia2 with (u := u)...
       2 : {
@@ -1259,7 +1266,7 @@ Proof with hint.
         with
           (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
         apply H0...
-        admit.
+        { simpl. rewrite subst_cset_univ_idempotent... }
     + SCase "x not in fv e1".
       assert (x `notin` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
       pick fresh y and apply typing_try...
