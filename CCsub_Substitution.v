@@ -1634,11 +1634,7 @@ Proof with simpl_env;
     }
     pick fresh y and apply typing_try.
     + rewrite subst_te_open_ee_var...
-      specialize (H y ltac:(notin_solve)).
-      assert ( typ_capt {*} (typ_exc (subst_tt Z P T1)) = subst_tt Z P (typ_capt {*} (typ_exc T1))). {
-        admit.
-      }
-      rewrite H1.
+      rewrite <- (subst_cset_univ_idempotent Z (cv P)).
       rewrite_env (map (subst_tb Z P) ([(y,  bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
       apply H0...
   - assert (Z <> x). {
