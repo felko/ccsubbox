@@ -1459,11 +1459,11 @@ Proof with simpl_env;
     apply typing_var with (C := (subst_cset Z (cv P) C))...
     rewrite (map_subst_tb_id E Z P);
       [ | auto | eapply fresh_mid_tail; eauto ].
-    binds_cases H0.
-    + enough (binds x (subst_tb Z P (bind_typ (typ_capt C P0))) (map (subst_tb Z P) E))...
-    + enough (binds x (subst_tb Z P (bind_typ (typ_capt C P0))) (map (subst_tb Z P) (F ++ E))) as HA...
-      simpl in HA.
-      rewrite_env (map (subst_tb Z P) F ++ map (subst_tb Z P) E) in HA...
+    binds_cases H0;
+      replace
+        (bind_typ (typ_capt (subst_cset Z (cv P) C) (subst_tpt Z P P0)))
+      with
+        (subst_tb Z P (bind_typ (typ_capt C P0)))...
   - Case "typing_abs".
     assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
       pick fresh z for L.
@@ -1555,18 +1555,9 @@ Proof with simpl_env;
       forwards: fresh_mid_head Ok.
       assert (y <> Z) by notin_solve.
       clear Fr.
-      destruct Zbnd as [ZZ|ZZ]; binds_cases ZZ.
-      - rename select (binds Z _ E) into Err.
-        forwards: binds_In Err.
-        exfalso;fsetdec.
-      - rename select (binds Z _ _) into Err.
-        forwards: binds_In Err;simpl_env in *.
-        exfalso;fsetdec.
-      - rename select (binds Z _ E) into Err.
-        forwards: binds_In Err.
-        exfalso;fsetdec.
-      - rename select (binds Z _ _) into Err.
-        forwards: binds_In Err;simpl_env in *.
+      destruct Zbnd as [ZZ|ZZ]; binds_cases ZZ;
+        rename select (binds Z _ _) into Err;
+        forwards: binds_In Err; simpl_env in *;
         exfalso;fsetdec.
     }
     pick fresh Y and apply typing_tabs.
