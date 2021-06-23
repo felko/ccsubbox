@@ -17,6 +17,7 @@ Lemma typing_weakening : forall E F G e T,
   typing (G ++ F ++ E) e T.
 Proof with simpl_env;
            eauto using wf_typ_weakening,
+                       wf_typ_in_weakening,
                        wf_typ_from_wf_env_typ,
                        wf_typ_from_wf_env_sub,
                        sub_weakening,
@@ -59,10 +60,7 @@ Proof with simpl_env;
       simpl_env in *.
       rewrite <- concat_assoc.
       apply (H0 X)...
-      (* by environment in K and inversion and wf_typ_weakening *)
-      assert (wf_typ_in (G ++ F ++ E) T1). { admit. }
-      constructor...
-Admitted.
+Qed.
 
 
 (************************************************************************ *)
