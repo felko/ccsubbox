@@ -620,8 +620,8 @@ Inductive typing : env -> exp -> typ -> Prop :=
       typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
   | typing_app : forall T1 E e1 e2 T2 Cf T1',
       typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
-      typing E e2 T1' ->
-      sub E T1' T1 ->
+      typing E e2 T1' -> (** typing E e2 T1 *)
+      sub E T1' T1 -> (** e : S', S' <: S, f : S -> T |- f e : T[x |- cv(S')] *)
       typing E (exp_app e1 e2) (open_ct T2 (cv T1'))
   | typing_tabs : forall L E V e1 T1,
       wf_typ_in E V ->
@@ -730,11 +730,13 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       E |-ctx k ~: (open_tt T2 T) ->
       E |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
 
-  | typing_ctx_reset : forall E a T Targ k,
+  | typing_ctx_reset : forall E a T Targ Thole k,
       (** explicit subtyping step here -- do we need it? *)
+      (** do not exist in the typing for try. *)
       sub E Targ T ->
+      sub ([(a, bind_lab (typ_capt {*} (typ_exc Targ)))] ++ E) Thole Targ ->
       E |-ctx k ~: T ->
-      [(a, bind_lab (typ_capt {*} (typ_exc Targ)))] ++ E |-ctx H a Targ :: k ~: Targ
+      [(a, bind_lab (typ_capt {*} (typ_exc Targ)))] ++ E |-ctx H a Targ :: k ~: Thole
 
   | typing_ctx_throw_handler : forall E C T Targ k e,
       E |-ctx k ~: T ->
@@ -743,20 +745,45 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       typing E e (typ_capt C (typ_exc Targ)) ->
       E |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
 
-  | typing_ctk_throw_arg : forall E C T Targ k e,
+  | typing_ctx_throw_arg : forall E C T Targ k e,
       value e ->
       E |-ctx k ~: T ->
       typing E e (typ_capt C (typ_exc Targ)) ->
       E |-ctx KThrowArg e :: k ~: Targ
+
+  (** TODO: might get stuck at inversion // added to simplify 
+      proofs around narrowing. *)
+  | typing_ctx_sub : forall E S T k,
+      E |-ctx k ~: T ->
+      sub E S T ->
+      E |-ctx k ~: S
+
+  (*
+  | typing_ctx_tvar : forall E T (X : atom) k,
+      E |-ctx k ~: T ->
+      binds X (bind_sub T) E ->
+      E |-ctx k ~: X
+
+    C[t] --> C[v]
+    t --> v
+    ----------
+    
+
+  | typing_ctx_sub : forall E S T k,
+      E |-ctx k ~: T ->
+      sub E S T ->
+      E |-ctx k ~: S *)
 
 where "E |-ctx K ~: T" := (typing_ctx E K T).
 
 
 Inductive state : Type :=
   | state_step (e : exp) (c : ctx) : state
+  | state_wind (a : atom) (v : exp) (c : ctx) : state
 .
 
 Notation "〈 e | k 〉" := (state_step e k).
+Notation "〈throw a # v | k 〉" :=  (state_wind a v k).
 Reserved Notation "st1 --> st2" (at level 69).
 
 Inductive typing_state : state -> Prop :=
@@ -764,6 +791,11 @@ Inductive typing_state : state -> Prop :=
       E |-ctx k ~: T ->
       typing E e T ->
       typing_state〈 e | k 〉
+  | typ_wind : forall a v k C T Teff E,
+      E |-ctx k ~: T ->
+      typing E v Teff ->
+      binds a (bind_lab (typ_capt C (typ_exc Teff))) E ->
+      typing_state〈throw a # v | k 〉
   .
 
 Inductive done : state -> Prop :=
@@ -804,6 +836,28 @@ Inductive step : state -> state -> Prop :=
       a `notin` dom (bound_capabilities k) ->
       〈 exp_try T e | k 〉-->
         〈 open_ee e (exp_handler a) (`cset_fvar` a) | H a T :: k 〉
+    
+  (** shifting into unwind *)
+  | step_unwind : forall v a k,
+    value v ->
+    〈 v | KThrowArg (exp_handler a) :: k 〉--> 
+      〈throw a # v | k 〉
+  
+  | step_unwind_skip_fun : forall a v e k,
+    〈throw a # v | KFun e :: k 〉 --> 〈throw a # v | k 〉
+  | step_unwind_skip_arg : forall a v e k,
+    〈throw a # v | KArg e :: k 〉 --> 〈throw a # v | k 〉
+  | step_unwind_skip_throw : forall a v e k,
+    〈throw a # v | KThrowHandler e :: k 〉 --> 〈throw a # v | k 〉
+  | step_unwind_skip_throw_arg : forall a v e k,
+    〈throw a # v | KThrowArg e :: k 〉 --> 〈throw a # v | k 〉
+ 
+  | step_unwind_skip_frame : forall a1 v a2 T k,
+    a1 <> a2 ->
+    〈throw a1 # v | H a2 T :: k 〉--> 〈throw a1 # v | k 〉 
+  | step_unwind_match_frame : forall a v T k,
+    〈throw a # v | H a T :: k 〉--> 〈 v | k 〉
+
 where "st1 --> st2" := (step st1 st2).
 
 
