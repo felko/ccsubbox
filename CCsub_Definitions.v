@@ -742,7 +742,7 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       E |-ctx k ~: T ->
       (** for exceptions: need to make sure the type on the handler matches
           the current answer type T *)
-      typing E e (typ_capt C (typ_exc Targ)) ->
+      typing E e Targ ->
       E |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
 
   | typing_ctx_throw_arg : forall E C T Targ k e,
