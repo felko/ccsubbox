@@ -639,10 +639,10 @@ Inductive typing : env -> exp -> typ -> Prop :=
       sub E S T ->
       typing E e T
 
-  | typing_try : forall L E T1 T2 e,
+  | typing_try : forall L E T1 e,
       (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ (typ_capt {*} (typ_exc T1)))] ++ E) (open_ee e x (`cset_fvar` x)) T2) ->
-      typing E (exp_try T1 e) T2
+        typing ([(x, bind_typ (typ_capt {*} (typ_exc T1)))] ++ E) (open_ee e x (`cset_fvar` x)) T1) ->
+      typing E (exp_try T1 e) T1
   | typing_throw : forall E C T1 T2 e1 e2,
       typing E e1 (typ_capt C (typ_exc T1)) ->
       typing E e2 T1 ->
@@ -730,13 +730,11 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       E |-ctx k ~: (open_tt T2 T) ->
       E |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
 
-  | typing_ctx_reset : forall E a T Targ Thole k,
+  | typing_ctx_reset : forall E a T Targ k,
       (** explicit subtyping step here -- do we need it? *)
       (** do not exist in the typing for try. *)
-      sub E Targ T ->
-      sub ([(a, bind_lab (typ_capt {*} (typ_exc Targ)))] ++ E) Thole Targ ->
       E |-ctx k ~: T ->
-      [(a, bind_lab (typ_capt {*} (typ_exc Targ)))] ++ E |-ctx H a Targ :: k ~: Thole
+      [(a, bind_lab (typ_capt {*} (typ_exc Targ)))] ++ E |-ctx H a Targ :: k ~: Targ
 
   | typing_ctx_throw_handler : forall E C T Targ k e,
       E |-ctx k ~: T ->
