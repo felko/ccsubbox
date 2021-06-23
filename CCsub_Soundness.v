@@ -245,17 +245,19 @@ Proof with eauto.
     rewrite_env ((map (subst_tb x T) empty) ++ E).
     apply sub_through_subst_tt with (Z := x) (Q := T1)...
   - Case "HReset".
+    eapply typing_ctx_reset.
     admit.
   - case "KThrowHandler".
     admit.
   - Case "KThrowArg".
     admit.
+(*
   - Case "Ctx-Var".
     apply IHTyp.
     eapply sub_transitivity...
     eapply sub_trans_tvar...
     eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-    apply wf_typ_from_binds_sub in H...
+    apply wf_typ_from_binds_sub in H... *)
 Admitted.
 
 Lemma preservation : forall e e',

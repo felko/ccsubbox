@@ -748,11 +748,22 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       E |-ctx k ~: T ->
       typing E e (typ_capt C (typ_exc Targ)) ->
       E |-ctx KThrowArg e :: k ~: Targ
-    
+
+  (*
   | typing_ctx_tvar : forall E T (X : atom) k,
       E |-ctx k ~: T ->
       binds X (bind_sub T) E ->
       E |-ctx k ~: X
+
+    C[t] --> C[v]
+    t --> v
+    ----------
+    
+
+  | typing_ctx_trans : forall E S T k,
+      E |-ctx k ~: T ->
+      sub E S T ->
+      E |-ctx k ~: S *)
 
 where "E |-ctx K ~: T" := (typing_ctx E K T).
 
