@@ -1648,11 +1648,9 @@ Proof with simpl_env;
     apply typing_handler with (C := (subst_cset Z (cv P) C))...
     rewrite (map_subst_tb_id E Z P);
       [ | auto | eapply fresh_mid_tail; eauto ].
-    binds_cases H0.
-    + admit.
-    + enough (binds x (subst_tb Z P (bind_typ (typ_capt C (typ_exc T)))) (map (subst_tb Z P) (F ++ E))) as HA...
-      simpl in HA.
-      rewrite_env (map (subst_tb Z P) F ++ map (subst_tb Z P) E) in HA...
-      admit.
-      admit.
-Admitted.
+    binds_cases H0;
+      replace
+        (bind_lab (typ_capt (subst_cset Z (cv P) C) (typ_exc (subst_tt Z P T))))
+      with
+        (subst_tb Z P (bind_lab (typ_capt C (typ_exc T))))...
+Qed.
