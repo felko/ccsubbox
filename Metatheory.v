@@ -9,6 +9,7 @@ Require Export Atom.
 Require Export Nat.
 Require Export Bool.
 Require Export Environment.
+Require Export Label.
 
 Declare Scope metatheory_scope.
 Declare Scope set_scope.
@@ -23,6 +24,8 @@ Notation "x == y" :=
   (eq_atom_dec x y) (at level 67) : metatheory_scope.
 Notation "i === j" :=
   (Peano_dec.eq_nat_dec i j) (at level 67) : metatheory_scope.
+Notation "l ==== m" :=
+  (eq_label_dec l m) (at level 67) : metatheory_scope.
 
 (** Common set operations may be written using infix notation. *)
 
@@ -73,11 +76,23 @@ Notation "E `\`N x" := (NatSet.F.remove x E) (at level 69, right associativity) 
 Notation "x `in`N F" := (NatSet.F.In x F) (at level 69) : set_scope.
 Notation "x `~in`N F" := (~ NatSet.F.In x F) (at level 69) : set_scope.
 
+Notation "E `u`L F" :=
+  (LabelSet.F.union E F) (at level 69, right associativity, format "E  `u`L  '/' F") : set_scope.
+Notation "E `c`L F" := (LabelSet.F.Subset E F) (at level 68) : set_scope.
+Notation "E `\`L x" := (LabelSet.F.remove x E) (at level 69, right associativity) : set_scope.
+Notation "x `in`L F" := (LabelSet.F.In x F) (at level 69) : set_scope.
+Notation "x `~in`L F" := (~ LabelSet.F.In x F) (at level 69) : set_scope.
+
+
 Notation "{ x }A" := (AtomSet.F.singleton x) (at level 0, format "{ x }A") : set_scope.
 Notation "{}A" := (AtomSet.F.empty) (at level 0) : set_scope.
 
 Notation "{ x }N" := (NatSet.F.singleton x) (at level 0, format "{ x }N") : set_scope.
 Notation "{}N" := (NatSet.F.empty) (at level 0) : set_scope.
+
+Notation "{ x }L" := (LabelSet.F.singleton x) (at level 0, format "{ x }L") : set_scope.
+Notation "{}L" := (LabelSet.F.empty) (at level 0) : set_scope.
+
 
 (* Open Scope set_scope. *)
 (* Open Scope metatheory_scope. *)
@@ -88,6 +103,7 @@ Notation "{}N" := (NatSet.F.empty) (at level 0) : set_scope.
 (** Hints *)
 Hint Extern 1 (~ AtomSet.F.In _ _) => simpl_env in *; try notin_solve : core.
 Hint Extern 1 (~ NatSet.F.In _ _) => simpl_env in *; try nnotin_solve : core.
+Hint Extern 1 (~ LabelSet.F.In _ _) => simpl_env in *; try lnotin_solve : core.
 
 
 (** Open the notation scopes declared above. *)
