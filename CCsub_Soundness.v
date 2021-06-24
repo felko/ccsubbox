@@ -96,6 +96,78 @@ Proof with eauto.
   * intro. binds_cases H0...
 Qed.
 
+Lemma non_derivation_implies_absence: forall Q E T v a,
+  value v ->
+  `cset_uvar` (cv T) = false ->
+  a `~in`A `cset_fvars` (cv T) ->
+  typing ([(a, bind_lab Q)] ++ E) v T ->
+  ~ a A`in` (free_for_cv v).
+Proof with eauto.
+  intros * Val NonDerivation1 NonDerivation2 Typ.
+  destruct_set_mem a (`cset_fvars` (free_for_cv v)).
+  2: trivial.
+  assert (subcapt ([(a, bind_lab Q)] ++ E) (`cset_fvar` a) (cv T)). {
+    forwards (U & HA1 & HA2): values_have_precise_captures Typ...
+    inversion HA2; subst; simpl.
+    apply (subcapt_transitivity (free_for_cv v))...
+    note (wf_cset_in ([(a, bind_lab Q)] ++ E) (free_for_cv v)).
+    rename select (_ = (free_for_cv v)) into EQ.
+    rewrite <- EQ in aIn.
+    eapply subcapt_in ...
+    admit.                  (* wf_cset *)
+  }
+  dependent induction H.
+  - rewrite <- x in NonDerivation1.
+    congruence.
+  - rewrite <- x in NonDerivation2.
+    assert (x0 `in`A {x0}A) as HA by fsetdec.
+    rewrite x1 in HA.
+    assert (x0 = a) by fsetdec.
+    subst; clear HA. clear x1.
+    exfalso;fsetdec.
+  - assert (x0 `in`A {x0}A) as HA by fsetdec.
+    rewrite x in HA.
+    assert (x0 = a) by fsetdec.
+    subst; clear HA. clear x.
+    admit.
+  - assert (x0 `in`A {x0}A) as HA by fsetdec.
+    rewrite x in HA.
+    assert (x0 = a) by fsetdec.
+    subst; clear HA. clear x.
+    admit.                      (* same as the admit above *)
+  - applys H1 a a T E Q...
+    fsetdec.
+Admitted.
+
+Fixpoint env_fv_ct (F : env) {struct F} : atoms :=
+  match F with
+  | nil => {}A
+  | (_, bind_typ T) :: F' => (fv_ct T) `u`A (env_fv_ct F')
+  | (_, bind_sub T) :: F' => (fv_ct T) `u`A (env_fv_ct F')
+  | (_, bind_lab T) :: F' => (fv_ct T) `u`A (env_fv_ct F')
+  end.
+
+Lemma typing_strengthening_lab_aux: forall F a Q E v T,
+  ~ a `in`A fv_ee v ->
+  ~ a `in`A fv_ce v ->
+  wf_typ_in E T ->           (* implies a notin fv_ct T *)
+  a `~in`A env_fv_ct F ->    (* new definition *)
+  typing (F ++ [(a, bind_lab Q)] ++ E) v T ->
+  typing (F ++ E) v T.
+Proof.
+  admit.
+Admitted.
+
+(* a : {*} Return[Unit] ⊢ (λx. ((λy. ()) (λ(z : {a} Top). z))) : {} Unit *)
+Lemma typing_strengthening_lab: forall a Q E v T,
+  ~ a `in`A `cset_fvars` (free_for_cv v) ->
+  wf_typ_in E T ->           (* implies a notin fv_ct T *)
+  typing ([(a, bind_lab Q)] ++ E) v T ->
+  typing E v T.
+Proof.
+  admit.                    (* cannot be shown inductively *)
+Admitted.
+
 Lemma preservation : forall e e',
   typing_state e ->
   step e e' ->
@@ -188,7 +260,6 @@ Proof with simpl_env; eauto using typing_ctx_sub, wf_cset_set_weakening.
     eapply typ_step...
     eapply typing_ctx_reset...
     dependent induction H3...
-    + inv
     + admit.
   - inversion Typ; subst...
     dependent induction H2...
@@ -208,10 +279,20 @@ Proof with simpl_env; eauto using typing_ctx_sub, wf_cset_set_weakening.
     econstructor...
   - inversion Typ; subst...
     admit.
-  - inversion Typ; subst...
+  - inversion Typ; subst.
     dependent induction H2...
+    rename select (binds a _ _) into BndA.
+    assert (binds a (bind_lab (typ_capt {*} (typ_exc T)))
+                  ([(a, bind_lab (typ_capt {*} (typ_exc T)))] ++ E)) as HA by eauto.
+    forwards EQ: binds_unique HA BndA.
+    inversion EQ; subst; clear EQ HA.
     econstructor...
-    admit.
+    rename select (typing _ v _) into TypA.
+    assert (`cset_uvar` (cv Teff) = false) as NonDerivation1 by admit.
+    assert (a `~in`A `cset_fvars` (cv Teff)) as NonDerivation2 by admit.
+    assert (value v) by admit.
+    forwards: non_derivation_implies_absence TypA...
+    rewrite_env (empty ++ [(a, bind_lab (typ_capt {*} (typ_exc Teff)))] ++ E) in TypA.
 Admitted.
 
 (* ********************************************************************** *)
