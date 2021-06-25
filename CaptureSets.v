@@ -38,6 +38,9 @@ Notation "`cset_fvar` a" := (cset_set {a}A {}N false {}L)
 Notation "`cset_bvar` k" := (cset_set {}A {k}N false {}L)
                               (at level 10, k at level 9) : cset_shorthand.
 
+Notation "`cset_lvar` k" := (cset_set {}A {}N false {k}L)
+                              (at level 10, k at level 9) : cset_shorthand.
+
 Notation "{}" := (cset_set {}A {}N false {}L) : cset_shorthand.
 Notation "{*}" := (cset_set {}A {}N true {}L) : cset_shorthand.
 

@@ -1,6 +1,7 @@
 Require Export TaktikZ.
 Require Export Metatheory.
 Require Export CaptureSets.
+Require Export Signatures.
 Require Import Coq.Program.Wf.
 
 (* ********************************************************************** *)
@@ -51,7 +52,7 @@ Inductive exp : Type :=
   (** throw[exp_1/handler] exp_2 *)
   | exp_throw : exp -> exp -> exp
   (** handler value -- generated at runtime *)
-  | exp_handler : atom -> exp
+  | exp_handler : label -> exp
 .
 
 (** We declare the constructors for indices and variables to be
@@ -303,8 +304,10 @@ Inductive expr : exp -> Prop :=
 
 Inductive binding : Type :=
   | bind_sub : typ -> binding
-  | bind_typ : typ -> binding
-  | bind_lab : typ -> binding.
+  | bind_typ : typ -> binding.
+
+Inductive signature : Type :=
+  | bind_sig : typ -> signature.
 
 (** A binding [(X, bind_sub T)] records that a type variable [X] is a
     subtype of [T], and a binding [(x, bind_typ U)] records that an
@@ -324,6 +327,7 @@ Inductive binding : Type :=
     to [nil] explicitly. *)
 
 Notation env := (list (atom * binding)).
+Notation sig := (list (label * signature)).
 Notation empty := (@nil (atom * binding)).
 
 (** We also define a notation that makes it convenient to write one
@@ -385,20 +389,16 @@ Inductive bound (x : atom) (T : typ) (E : env) : Prop :=
     bound x T E
   | bound_sub :
     binds x (bind_sub T) E ->
-    bound x T E
-  | bound_lab :
-    binds x (bind_lab T) E ->
-    bound x T E
-  .
+    bound x T E.
 
 Definition allbound (E : env) (fvars : atoms) : Prop :=
   forall x, x `in`A fvars -> exists T, bound x T E.
 
 Inductive wf_cset : env -> atoms -> cap -> Prop :=
-  | wf_concrete_cset : forall E A fvars univ,
+  | wf_concrete_cset : forall E A fvars univ labels,
     allbound E fvars ->
     fvars `c`A A ->
-    wf_cset E A (cset_set fvars {}N univ)
+    wf_cset E A (cset_set fvars {}N univ labels)
 .
 
 Definition wf_cset_in (E : env) (C : cap) : Prop :=
@@ -468,12 +468,17 @@ Inductive wf_env : env -> Prop :=
       wf_env E ->
       wf_typ_in E T ->
       x `notin` dom E ->
-      wf_env ([(x, bind_typ T)] ++ E)
-  | wf_env_lab : forall (E : env) (x : atom) (T : typ),
-      wf_env E ->
-      wf_typ_in E T ->
-      x `notin` dom E ->
-      wf_env ([(x, bind_lab T)] ++ E).
+      wf_env ([(x, bind_typ T)] ++ E).
+
+Inductive wf_sig : sig -> Prop :=
+| wf_sig_empty :
+    wf_sig nil
+| wf_sig_typ : forall (E : sig) (x : label) (T : typ),
+    wf_sig E ->
+    wf_typ_in empty T ->
+    ~ LabelSet.F.In x (Signatures.dom E) ->
+    wf_sig ([(x, bind_sig T)] ++ E).
+    
 
 (** The definition of "fv" used in typing jdmgnts*)
 Fixpoint free_for_cv (e : exp) : cap :=
@@ -486,44 +491,57 @@ match e with
   | exp_tapp e1 t => (free_for_cv e1)
   | exp_try Targ e1 => (free_for_cv e1)
   | exp_throw e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
-  | exp_handler x => (`cset_fvar` x) (** this is crucial! *)
+  | exp_handler x => (`cset_lvar` x) (** this is crucial! *)
   end.
 
 (* ********************************************************************** *)
 (** * #<a name="sub"></a># Subtyping *)
 
+Reserved Notation "E |-sc C <: D" (at level 70, C at next level).
 Inductive subcapt : env -> cap -> cap -> Prop :=
-  | subcapt_universal : forall E C xs,
-      wf_cset_in E (cset_set xs {}N true) ->
+  | subcapt_universal : forall E C xs ls,
+      wf_cset_in E (cset_set xs {}N true ls) ->
       wf_cset_in E C ->
-      subcapt E C (cset_set xs {}N true)
-  | subcapt_in : forall E x xs b,
+      E |-sc C <: (cset_set xs {}N true ls)
+
+  | subcapt_in_fvar : forall E x xs b ls,
       wf_cset_in E (`cset_fvar` x) ->
-      wf_cset_in E (cset_set xs {}N b) ->
+      wf_cset_in E (cset_set xs {}N b ls) ->
       x `in` xs ->
-      subcapt E (`cset_fvar` x) (cset_set xs {}N b)
+      E |-sc (`cset_fvar` x) <: (cset_set xs {}N b ls)
+  | subcapt_in_lvar : forall E l xs b ls,
+      wf_cset_in E (`cset_lvar` l) ->
+      wf_cset_in E (cset_set xs {}N b ls) ->
+      l `in`L ls ->
+      E |-sc (`cset_lvar` l) <: (cset_set xs {}N b ls)  
+
   | subcapt_in_univ : forall E D,
       wf_cset_in E D ->
       `* in` D ->
-      subcapt E {*} D
+      E |-sc {*} <: D
   | subcapt_var : forall E x T C,
       binds x (bind_typ T) E ->
-      subcapt E (cv T) C ->
-      subcapt E (`cset_fvar` x) C
+      E |-sc (cv T) <: C ->
+      E |-sc (`cset_fvar` x) <: C
   | subcapt_tvar : forall E x T C,
       binds x (bind_sub T) E ->
-      subcapt E (cv T) C ->
-      subcapt E (`cset_fvar` x) C
-  | subcapt_set : forall E xs b D,
+      E |-sc (cv T) <: C ->
+      E |-sc (`cset_fvar` x) <: C
+  | subcapt_set : forall E xs b ls D,
       wf_cset_in E D ->
-      AtomSet.F.For_all (fun x => subcapt E (`cset_fvar` x) D) xs ->
+      AtomSet.F.For_all (fun x => E |-sc (`cset_fvar` x) <: D) xs ->
+      LabelSet.F.For_all (fun l => E |-sc (`cset_lvar` l) <: D) ls ->
       implb b (`* mem` D) = true ->
-      subcapt E (cset_set xs {}N b) D.
+      E |-sc (cset_set xs {}N b ls) <: D
+  where "E |-sc C <: D" := (subcapt E C D).
 
 (** The definition of subtyping is straightforward.  It uses the
     [binds] relation from the [Environment] library (in the
     [sub_trans_tvar] case) and cofinite quantification (in the
     [sub_all] case). *)
+
+Reserved Notation "E |-s S <: T" (at level 70, S at next level).
+Reserved Notation "E |-sp S <: T" (at level 70, S at next level).
 
 Inductive sub : env -> typ -> typ -> Prop :=
 
@@ -533,17 +551,19 @@ Inductive sub : env -> typ -> typ -> Prop :=
   | sub_refl_tvar : forall E X,
       wf_env E ->
       wf_typ_in E (typ_fvar X) ->
-      sub E (typ_fvar X) (typ_fvar X)
+      E |-s (typ_fvar X) <: (typ_fvar X)
 
   | sub_trans_tvar : forall U E T X,
       binds X (bind_sub U) E ->
-      sub E U T ->
-      sub E (typ_fvar X) T
+      E |-s U <: T ->
+      E |-s (typ_fvar X) <: T
 
   | sub_capt : forall E C1 C2 P1 P2,
-      subcapt E C1 C2 ->
-      sub_pre E P1 P2 ->
-      sub E (typ_capt C1 P1) (typ_capt C2 P2)
+      E |-sc C1 <: C2 ->
+      E |-sp P1 <: P2 ->
+      E |-s (typ_capt C1 P1) <: (typ_capt C2 P2)
+
+  where "E |-s S <: T" := (sub E S T)
 
 with sub_pre : env -> pretyp -> pretyp -> Prop :=
   (*
@@ -554,7 +574,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
   | sub_top : forall E S,
       wf_env E ->
       wf_pretyp_in E S ->
-      sub_pre E S typ_top
+      E |-sp S <: typ_top
 
   (*
       E ⊢ T₁ <: S₁    E, x: T₁ ⊢ S₂ <: T₂
@@ -572,8 +592,8 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
       (forall x : atom, x `notin` L ->
           wf_typ ([(x, bind_typ S1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct S2 (`cset_fvar` x))) ->
       (forall x : atom, x `notin` L ->
-          sub ([(x, bind_typ T1)] ++ E) (open_ct S2 (`cset_fvar` x)) (open_ct T2 (`cset_fvar` x))) ->
-      sub_pre E (typ_arrow S1 S2) (typ_arrow T1 T2)
+          ([(x, bind_typ T1)] ++ E) |-s (open_ct S2 (`cset_fvar` x)) <: (open_ct T2 (`cset_fvar` x))) ->
+      E |-sp (typ_arrow S1 S2) <: (typ_arrow T1 T2)
 
   (*
       E ⊢ T₁ <: S₁    E, X<:T₁ ⊢ S₂ <: T₂
@@ -589,70 +609,75 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
       (forall X : atom, X `notin` L ->
           wf_typ ([(X, bind_sub S1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt S2 X)) ->
       (forall X : atom, X `notin` L ->
-          sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
-      sub_pre E (typ_all S1 S2) (typ_all T1 T2)
+          ([(X, bind_sub T1)] ++ E) |-s (open_tt S2 X) <: (open_tt T2 X)) ->
+      E |-sp (typ_all S1 S2) <: (typ_all T1 T2)
 
   | sub_exc : forall E T1 T2,
-      sub E T1 T2 ->
-      sub_pre E (typ_exc T1) (typ_exc T2).
+      E |-s T1 <: T2 ->
+      E |-sp (typ_exc T1) <: (typ_exc T2)
+      
+  where "E |-sp S <: T" := (sub_pre E S T).
 
 
 (* ********************************************************************** *)
 (** * #<a name="typing_doc"></a># Typing *)
 
-
-
-Inductive typing : env -> exp -> typ -> Prop :=
-  | typing_var_tvar : forall E x X,
+Reserved Notation "E @ Q |-t e ~: T" (at level 70, Q at next level, e at next level).
+Inductive typing : env -> sig -> exp -> typ -> Prop :=
+  | typing_var_tvar : forall E Q x X,
       wf_env E ->
+      wf_sig Q ->
       binds x (bind_typ (typ_fvar X)) E ->
-      typing E (exp_fvar x) (typ_fvar X)
-  | typing_var : forall E x C P,
+      E @ Q |-t (exp_fvar x) ~: (typ_fvar X)
+  | typing_var : forall E Q x C P,
       wf_env E ->
+      wf_sig Q ->
       binds x (bind_typ (typ_capt C P)) E ->
-      typing E (exp_fvar x) (typ_capt (`cset_fvar` x) P)
-  | typing_abs : forall L E V e1 T1,
+      E @ Q |-t (exp_fvar x) ~: (typ_capt (`cset_fvar` x) P)
+  | typing_abs : forall L E Q V e1 T1,
       wf_typ_in E V ->
       (forall x : atom, x `notin` L ->
           wf_typ ([(x, bind_typ V)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T1 (`cset_fvar` x))) ->
       (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ V)] ++ E) (open_ee e1 x (`cset_fvar` x)) (open_ct T1 (`cset_fvar` x))) ->
-      typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
-  | typing_app : forall T1 E e1 e2 T2 Cf T1',
-      typing E e1 (typ_capt Cf (typ_arrow T1 T2)) ->
-      typing E e2 T1' -> (** typing E e2 T1 *)
-      sub E T1' T1 -> (** e : S', S' <: S, f : S -> T |- f e : T[x |- cv(S')] *)
-      typing E (exp_app e1 e2) (open_ct T2 (cv T1'))
-  | typing_tabs : forall L E V e1 T1,
+        ([(x, bind_typ V)] ++ E) @ Q |-t (open_ee e1 x (`cset_fvar` x)) ~: (open_ct T1 (`cset_fvar` x))) ->
+      E @ Q  |-t (exp_abs V e1) ~: (typ_capt (free_for_cv e1) (typ_arrow V T1))
+  | typing_app : forall T1 E Q e1 e2 T2 Cf T1',
+      E @ Q |-t e1 ~: (typ_capt Cf (typ_arrow T1 T2)) ->
+      E @ Q |-t e2 ~: T1' -> (** typing E e2 T1 *)
+      E |-s T1' <: T1 -> (** e : S', S' <: S, f : S -> T |- f e : T[x |- cv(S')] *)
+      E @ Q |-t (exp_app e1 e2) ~: (open_ct T2 (cv T1'))
+  | typing_tabs : forall L E Q V e1 T1,
       wf_typ_in E V ->
       (forall x : atom, x `notin` L ->
         wf_typ ([(x, bind_sub V)] ++ E) (dom E `u`A {x}A) (dom E `u`A {x}A) (open_tt T1 x)) ->
       (forall X : atom, X `notin` L ->
-        typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
-      typing E (exp_tabs V e1) (typ_capt (free_for_cv e1) (typ_all V T1))
-  | typing_tapp : forall T1 E e1 T T2 C,
-      typing E e1 (typ_capt C (typ_all T1 T2)) ->
-      sub E T T1 ->
-      typing E (exp_tapp e1 T) (open_tt T2 T)
-  | typing_sub : forall S E e T,
-      typing E e S ->
-      sub E S T ->
-      typing E e T
+        ([(X, bind_sub V)] ++ E) @ Q |-t (open_te e1 X) ~: (open_tt T1 X)) ->
+      E @ Q |-t (exp_tabs V e1) ~: (typ_capt (free_for_cv e1) (typ_all V T1))
+  | typing_tapp : forall T1 E Q e1 T T2 C,
+      E @ Q |-t e1 ~: (typ_capt C (typ_all T1 T2)) ->
+      E |-s T <: T1 ->
+      E @ Q |-t (exp_tapp e1 T) ~: (open_tt T2 T)
+  | typing_sub : forall S E Q e T,
+      E @ Q |-t e ~: S ->
+      E |-s S <: T ->
+      E @ Q |-t e ~: T
 
-  | typing_try : forall L E T1 e,
+  | typing_try : forall L E Q T1 e,
       (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ (typ_capt {*} (typ_exc T1)))] ++ E) (open_ee e x (`cset_fvar` x)) T1) ->
-      typing E (exp_try T1 e) T1
-  | typing_throw : forall E C T1 T2 e1 e2,
-      typing E e1 (typ_capt C (typ_exc T1)) ->
-      typing E e2 T1 ->
-      typing E (exp_throw e1 e2) T2
+        ([(x, bind_typ (typ_capt {*} (typ_exc T1)))] ++ E) @ Q |-t (open_ee e x (`cset_fvar` x)) ~: T1) ->
+      E @ Q |-t (exp_try T1 e) ~: T1
+  | typing_throw : forall E Q C T1 T2 e1 e2,
+      E @ Q |-t e1 ~: (typ_capt C (typ_exc T1)) ->
+      E @ Q |-t e2 ~: T1 ->
+      E @ Q |-t (exp_throw e1 e2) ~: T2
   (* The bind_lab and handler constructs are only used at runtime and not part of the surface language *)
-  | typing_handler : forall E C T x,
+  | typing_handler : forall E Q C T l,
       wf_env E ->
-      binds x (bind_lab (typ_capt C (typ_exc T))) E ->
-      typing E (exp_handler x) (typ_capt (`cset_fvar` x) (typ_exc T))
-  .
+      wf_sig Q ->
+      Signatures.binds l (bind_sig (typ_capt C (typ_exc T))) Q ->
+      E @ Q |-t (exp_handler l) ~: (typ_capt (`cset_lvar` l) (typ_exc T))
+  
+  where "E @ Q |-t e ~: T" := (typing E Q e T).
 
 
 (* ********************************************************************** *)
@@ -682,7 +707,7 @@ Inductive frame : Type :=
   (* [] [T] *)
   | KTyp : typ -> frame
   (* try/reset_a [Targ] {exp} *) (** add reset as an expression when we reify continuations *)
-  | H : atom -> typ -> frame
+  | H : label -> typ -> frame
   (* throw [] (e) *)
   | KThrowHandler : exp -> frame
   (* throw v [] *)
@@ -697,64 +722,64 @@ Notation top := (@nil frame).
 
 
 (* TODO maybe replace the return type with atoms and specialize this function *)
-Fixpoint bound_capabilities (k : ctx) : env :=
+Fixpoint bound_capabilities (k : ctx) : sig :=
   match k with
-  | nil => empty
-  | H x T :: k =>  [(x, bind_lab (typ_capt {*} (typ_exc T)))] ++ (bound_capabilities k)
+  | nil => nil
+  | H x T :: k =>  [(x, bind_sig (typ_capt {*} (typ_exc T)))] ++ (bound_capabilities k)
   | _ :: k => bound_capabilities k
   end.
 
+Reserved Notation "E @ Q |-ctx c ~: T" (at level 70, Q at next level, c at next level).
 
-Reserved Notation "E |-ctx c ~: T" (at level 70).
+(** IN: env sig ctx*)
+Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
+  | typing_ctx_empty : forall T Q,
+      empty @ Q |-ctx top ~: T
 
+  | typing_ctx_fun : forall E Q C T1 T1' T2 k e,
+      E @ Q |-t e ~: T1' ->
+      E |-s T1' <: T1 ->
+      E @ Q |-ctx k ~: (open_ct T2 (cv T1')) ->
+      E @ Q |-ctx KFun e :: k ~: typ_capt C (typ_arrow T1 T2)
 
-Inductive typing_ctx : env -> ctx -> typ -> Prop :=
-  | typing_ctx_empty : forall T,
-      empty |-ctx top ~: T
-
-  | typing_ctx_fun : forall E C T1 T1' T2 k e,
-      typing E e T1' ->
-      sub E T1' T1 ->
-      E |-ctx k ~: (open_ct T2 (cv T1')) ->
-      E |-ctx KFun e :: k ~: typ_capt C (typ_arrow T1 T2)
-
-  | typing_ctx_arg : forall E C T1 T1' T2 k e,
+  | typing_ctx_arg : forall E Q C T1 T1' T2 k e,
       value e ->
-      typing E e (typ_capt C (typ_arrow T1 T2)) ->
-      sub E T1' T1 ->
-      E |-ctx k ~: (open_ct T2 (cv T1')) ->
-      E |-ctx KArg e :: k ~: T1'
+      E @ Q |-t e ~: (typ_capt C (typ_arrow T1 T2)) ->
+      E |-s T1' <: T1 ->
+      E @ Q |-ctx k ~: (open_ct T2 (cv T1')) ->
+      E @ Q |-ctx KArg e :: k ~: T1'
 
-  | typing_ctx_typ : forall E C T T1 T2 k,
-      sub E T T1 ->
-      E |-ctx k ~: (open_tt T2 T) ->
-      E |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
+  | typing_ctx_typ : forall E Q C T T1 T2 k,
+      E |-s T <: T1 ->
+      E @ Q |-ctx k ~: (open_tt T2 T) ->
+      E @ Q |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
 
-  | typing_ctx_reset : forall E a T Targ k,
+  | typing_ctx_reset : forall E Q a T Targ k,
       (** explicit subtyping step here -- do we need it? *)
       (** do not exist in the typing for try. *)
-      E |-ctx k ~: T ->
-      [(a, bind_lab (typ_capt {*} (typ_exc Targ)))] ++ E |-ctx H a Targ :: k ~: Targ
+      E @ Q |-ctx k ~: T ->
+      Signatures.binds a (bind_sig Targ) Q ->
+      E @ Q |-ctx H a Targ :: k ~: Targ
 
-  | typing_ctx_throw_handler : forall E C T Targ k e,
-      E |-ctx k ~: T ->
+  | typing_ctx_throw_handler : forall E Q C T Targ k e,
+      E @ Q |-ctx k ~: T ->
       (** for exceptions: need to make sure the type on the handler matches
           the current answer type T *)
-      typing E e Targ ->
-      E |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
+      E @ Q |-t e ~: Targ ->
+      E @ Q |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
 
-  | typing_ctx_throw_arg : forall E C T Targ k e,
+  | typing_ctx_throw_arg : forall E Q C T Targ k e,
       value e ->
-      E |-ctx k ~: T ->
-      typing E e (typ_capt C (typ_exc Targ)) ->
-      E |-ctx KThrowArg e :: k ~: Targ
+      E @ Q |-ctx k ~: T ->
+      E @ Q |-t e ~: (typ_capt C (typ_exc Targ)) ->
+      E @ Q |-ctx KThrowArg e :: k ~: Targ
 
   (** TODO: might get stuck at inversion // added to simplify 
       proofs around narrowing. *)
-  | typing_ctx_sub : forall E S T k,
-      E |-ctx k ~: T ->
+  | typing_ctx_sub : forall E Q S T k,
+      E @ Q |-ctx k ~: T ->
       sub E S T ->
-      E |-ctx k ~: S
+      E @ Q |-ctx k ~: S
 
   (*
   | typing_ctx_tvar : forall E T (X : atom) k,
@@ -772,89 +797,89 @@ Inductive typing_ctx : env -> ctx -> typ -> Prop :=
       sub E S T ->
       E |-ctx k ~: S *)
 
-where "E |-ctx K ~: T" := (typing_ctx E K T).
+where "E @ Q |-ctx K ~: T" := (typing_ctx E Q K T).
 
 
 Inductive state : Type :=
-  | state_step (e : exp) (c : ctx) : state
-  | state_wind (a : atom) (v : exp) (c : ctx) : state
+  | state_step (e : exp) (c : ctx) (Q : sig) : state
+  | state_wind (a : label) (v : exp) (c : ctx) (Q : sig) : state
 .
 
-Notation "〈 e | k 〉" := (state_step e k).
-Notation "〈throw a # v | k 〉" :=  (state_wind a v k).
+Notation "〈 e | k | Q 〉" := (state_step e k Q ).
+Notation "〈throw a # v | k | Q 〉" :=  (state_wind a v k Q).
 Reserved Notation "st1 --> st2" (at level 69).
 
 Inductive typing_state : state -> Prop :=
-  | typ_step : forall e k T E,
-      E |-ctx k ~: T ->
-      typing E e T ->
-      typing_state〈 e | k 〉
-  | typ_wind : forall a v k C T Teff E,
-      E |-ctx k ~: T ->
-      typing E v Teff ->
-      binds a (bind_lab (typ_capt C (typ_exc Teff))) E ->
-      typing_state〈throw a # v | k 〉
+  | typ_step : forall e k T E Q,
+      E @ Q |-ctx k ~: T ->
+      E @ Q |-t e ~: T ->
+      typing_state〈 e | k | Q 〉
+  | typ_wind : forall a v k C T Teff E Q,
+      E @ Q |-ctx k ~: T ->
+      E @ Q |-t v ~: Teff ->
+      Signatures.binds a (bind_sig (typ_capt C (typ_exc Teff))) Q ->
+      typing_state〈throw a # v | k | Q 〉
   .
 
 Inductive done : state -> Prop :=
-  | done_ret : forall e,
+  | done_ret : forall e Q,
       value e ->
-      done 〈 e | top 〉
+      done 〈 e | top | Q 〉
 .
 
 (* ********************************************************************** *)
 (** * #<a name="reduction"></a># Reduction *)
 
 Inductive step : state -> state -> Prop :=
-  | step_app : forall e1 e2 k,
-      〈 exp_app e1 e2 | k 〉 --> 〈 e1 | KFun e2 :: k 〉
+  | step_app : forall e1 e2 k Q,
+      〈 exp_app e1 e2 | k | Q 〉 --> 〈 e1 | KFun e2 :: k | Q 〉
 
-  | step_tapp : forall e T k,
-      〈 exp_tapp e T | k 〉 --> 〈 e | KTyp T :: k 〉
+  | step_tapp : forall e T k Q,
+      〈 exp_tapp e T | k | Q 〉 --> 〈 e | KTyp T :: k | Q 〉
 
-  | step_pop_app : forall v arg k,
+  | step_pop_app : forall v arg k Q,
       value v ->
-      〈 v | KFun arg :: k 〉 --> 〈 arg | KArg v :: k 〉
+      〈 v | KFun arg :: k | Q 〉 --> 〈 arg | KArg v :: k | Q 〉
 
-  | step_throw : forall e1 e2 k,
-      〈 exp_throw e1 e2 | k 〉 --> 〈 e1 | KThrowHandler e2 :: k 〉   
+  | step_throw : forall e1 e2 k Q,
+      〈 exp_throw e1 e2 | k | Q 〉 --> 〈 e1 | KThrowHandler e2 :: k | Q 〉   
 
-  | step_pop_throw : forall v e2 k,
+  | step_pop_throw : forall v e2 k Q ,
       value v ->
-      〈 v | KThrowHandler e2 :: k 〉 --> 〈 e2 | KThrowArg v :: k 〉
+      〈 v | KThrowHandler e2 :: k | Q 〉 --> 〈 e2 | KThrowArg v :: k | Q 〉
 
-  | step_abs : forall v T e k,
+  | step_abs : forall v T e k Q,
       value v ->
-      〈  v | KArg (exp_abs T e) :: k 〉 --> 〈 (open_ee e v (free_for_cv v)) | k 〉
+      〈  v | KArg (exp_abs T e) :: k | Q 〉 --> 〈 (open_ee e v (free_for_cv v)) | k | Q 〉
 
-  | step_tabs : forall T1 T2 e1 k,
-      〈 exp_tabs T1 e1 | KTyp T2 :: k 〉 --> 〈 (open_te e1 T2) | k 〉
+  | step_tabs : forall T1 T2 e1 k Q,
+      〈 exp_tabs T1 e1 | KTyp T2 :: k | Q 〉 --> 〈 (open_te e1 T2) | k | Q 〉
 
-  | step_try : forall T e a k,
-      a `notin` dom (bound_capabilities k) ->
-      〈 exp_try T e | k 〉-->
-        〈 open_ee e (exp_handler a) (`cset_fvar` a) | H a T :: k 〉
+  | step_try : forall T e a k Q,
+      a `~in`L Signatures.dom (bound_capabilities k) ->
+      〈 exp_try T e | k | Q 〉-->
+        〈 open_ee e (exp_handler a) (`cset_lvar` a) | H a T :: k | ([(a, bind_sig T)]) ++ Q 〉
     
   (** shifting into unwind *)
-  | step_unwind : forall v a k,
+  | step_unwind : forall v a k Q,
     value v ->
-    〈 v | KThrowArg (exp_handler a) :: k 〉--> 
-      〈throw a # v | k 〉
+    〈 v | KThrowArg (exp_handler a) :: k | Q〉--> 
+      〈throw a # v | k | Q 〉
   
-  | step_unwind_skip_fun : forall a v e k,
-    〈throw a # v | KFun e :: k 〉 --> 〈throw a # v | k 〉
-  | step_unwind_skip_arg : forall a v e k,
-    〈throw a # v | KArg e :: k 〉 --> 〈throw a # v | k 〉
-  | step_unwind_skip_throw : forall a v e k,
-    〈throw a # v | KThrowHandler e :: k 〉 --> 〈throw a # v | k 〉
-  | step_unwind_skip_throw_arg : forall a v e k,
-    〈throw a # v | KThrowArg e :: k 〉 --> 〈throw a # v | k 〉
+  | step_unwind_skip_fun : forall a v e k Q,
+    〈throw a # v | KFun e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
+  | step_unwind_skip_arg : forall a v e k Q,
+    〈throw a # v | KArg e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
+  | step_unwind_skip_throw : forall a v e k Q,
+    〈throw a # v | KThrowHandler e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
+  | step_unwind_skip_throw_arg : forall a v e k Q ,
+    〈throw a # v | KThrowArg e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
  
-  | step_unwind_skip_frame : forall a1 v a2 T k,
+  | step_unwind_skip_frame : forall a1 v a2 T k Q ,
     a1 <> a2 ->
-    〈throw a1 # v | H a2 T :: k 〉--> 〈throw a1 # v | k 〉 
-  | step_unwind_match_frame : forall a v T k,
-    〈throw a # v | H a T :: k 〉--> 〈 v | k 〉
+    〈throw a1 # v | H a2 T :: k | Q 〉--> 〈throw a1 # v | k | Q 〉 
+  | step_unwind_match_frame : forall a v T k Q,
+    〈throw a # v | H a T :: k | Q 〉--> 〈 v | k | Q 〉
 
 where "st1 --> st2" := (step st1 st2).
 
@@ -878,9 +903,9 @@ Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound : core.
 
 Local Ltac cset_unfold_union0 :=
   match goal with
-  | _ : _ |- context G [?C `u` (cset_set ?xs ?ns ?us)] =>
+  | _ : _ |- context G [?C `u` (cset_set ?xs ?ns ?us ?ls)] =>
     match C with
-    | cset_set _ _ _ =>
+    | cset_set _ _ _ _ =>
       rewrite cset_concrete_union
     | C =>
       let HA := match goal with
@@ -904,8 +929,8 @@ Ltac cset_unfold_union := repeat cset_unfold_union0.
 
 Ltac _csetsimpl_hook ::= cset_unfold_union.
 
-Local Lemma __test_cset_concrete_unfold : forall C xs us,
+Local Lemma __test_cset_concrete_unfold : forall C xs us ls,
   wf_cset_in nil C ->
-  wf_cset_in nil (C `u` (cset_set xs {}N us)) ->
-  exists xs' us', wf_cset_in nil (cset_set (xs' `u`A xs) {}N (us' || us)).
+  wf_cset_in nil (C `u` (cset_set xs {}N us ls)) ->
+  exists xs' us' ls', wf_cset_in nil (cset_set (xs' `u`A xs) {}N (us' || us) ls').
 Proof. intros * H; csetsimpl; eauto. Qed.
