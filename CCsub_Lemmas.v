@@ -987,13 +987,13 @@ Hint Extern 1 (wf_env ?E) =>
   match goal with
   | H: sub _ _ _ |- _ => apply (proj1 (sub_regular _ _ _ H))
   | H: sub_pre _ _ _ |- _ => apply (proj1 (sub_pre_regular _ _ _ H))
-  | H: typing _ _ _ |- _ => apply (proj1 (typing_regular _ _ _ H))
+  | H: typing _ _ _ _ |- _ => apply (proj1 (typing_regular _ _ _ _ H))
   end
 : core.
 
 Hint Extern 1 (wf_typ ?E _ _ ?T) =>
   match goal with
-  | H: typing E _ T |- _ => apply (proj2 (proj2 (typing_regular _ _ _ H)))
+  | H: typing E _ _ T |- _ => apply (proj2 (proj2 (typing_regular _ _ _ _ H)))
   | H: sub E T _ |- _ => apply (proj1 (proj2 (sub_regular _ _ _ H)))
   | H: sub E _ T |- _ => apply (proj2 (proj2 (sub_regular _ _ _ H)))
   end
@@ -1009,7 +1009,7 @@ Hint Extern 1 (wf_pretyp ?E ?T) =>
 Hint Extern 1 (type ?T) =>
   let go E := eapply (type_from_wf_typ E); eauto in
   match goal with
-  | H: typing ?E _ T |- _ => go E
+  | H: typing ?E _ _ T |- _ => go E
   | H: sub ?E T _ |- _ => go E
   | H: sub ?E _ T |- _ => go E
   | H: wf_typ ?E _ _ T |- _ => go E
@@ -1036,7 +1036,7 @@ Hint Extern 1 (capt ?C) =>
 
 Hint Extern 1 (expr ?e) =>
   match goal with
-  | H: typing _ ?e _ |- _ => apply (proj1 (proj2 (typing_regular _ _ _ H)))
+  | H: typing _ _ ?e _ |- _ => apply (proj1 (proj2 (typing_regular _ _ _ _ H)))
   (* | H: red ?e _ |- _ => apply (proj1 (red_regular _ _ H)) *)
   (* | H: red _ ?e |- _ => apply (proj2 (red_regular _ _ H)) *)
   end

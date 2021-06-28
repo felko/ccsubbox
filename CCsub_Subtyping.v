@@ -104,7 +104,8 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, wf_typ_narro
   intros * PsubQ Ok Hsc.
   dependent induction Hsc...
   - apply subcapt_universal...
-  - apply subcapt_in...
+  - apply subcapt_in_fvar...
+  - apply subcapt_in_lvar...
   - destruct (x0 == x).
     + subst.
       replace T with Q in *.
@@ -126,7 +127,8 @@ Proof with eauto using wf_cset_narrowing_typ, wf_env_narrowing_typ, wf_typ_narro
     }
     eapply subcapt_tvar...
   - econstructor...
-    intros ? ?...
+    + intros ? ?...
+    + intros ? ?...
 Qed.
 
 Lemma subcapt_narrowing : forall F E Z P Q C1 C2,
@@ -158,7 +160,8 @@ Proof with eauto 6 using wf_cset_narrowing, wf_env_narrowing, wf_typ_narrowing.
       }
       eapply subcapt_tvar...
   - econstructor...
-    intros ? ?...
+    + intros ? ?...
+    + intros ? ?...
 Qed.
 
 Definition transitivity_on Q := forall E S T,
@@ -180,7 +183,7 @@ with sub_narrowing_pre_aux : forall Q F E Z P S T,
 Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing,
   wf_pretyp_narrowing, wf_cset_narrowing, subcapt_narrowing.
 ------
-  intros Q F E Z P S T TransQ SsubT PsubQ.
+  intros * TransQ SsubT PsubQ.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
   induction SsubT; intros F EQ; subst.
   - Case "sub_refl_tvar".
@@ -194,17 +197,23 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing,
         eapply fresh_mid_head; apply ok_from_wf_env;
           apply (proj1 (sub_regular (F ++ [(Z, bind_sub Q)] ++ E) U T SsubT)).
       apply TransQ.
-      SSCase "P <: Q".
+      * SSCase "P <: Q".
+        forwards: IHSsubT F.
+        1: { congruence. }
+        simpl_env in *.
         rewrite_env (empty ++ (F ++ [(Z, bind_sub P)]) ++ E).
         apply sub_weakening...
-      SSCase "Q <: T".
+      * SSCase "Q <: T".
         binds_get H.
         inversion H1; subst...
     + SCase "X <> Z".
+      forwards: IHSsubT F.
+      1: { congruence. }
+      simpl_env in *.
       apply (sub_trans_tvar U)...
   - eapply sub_capt...
 ------
-  intros Q F E Z P S T TransQ SsubT PsubQ.
+  intros * TransQ SsubT PsubQ.
   remember (F ++ [(Z, bind_sub Q)] ++ E). generalize dependent F.
   induction SsubT; intros F EQ; subst.
   - Case "sub_top".
@@ -232,7 +241,6 @@ Proof with simpl_env; eauto using wf_typ_narrowing, wf_env_narrowing,
   - Case "sub_exc".
     apply sub_exc...
 Qed.
-
 
 Lemma sub_narrowing_typ_aux : forall Q F E x P S T,
   transitivity_on Q ->

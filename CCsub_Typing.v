@@ -11,10 +11,10 @@ Require Import CCsub_Subtyping.
 (* ********************************************************************** *)
 (** ** Weakening (5) *)
 
-Lemma typing_weakening : forall E F G e T,
-  typing (G ++ E) e T ->
+Lemma typing_weakening : forall E F G Q e T,
+  typing (G ++ E) Q e T ->
   wf_env (G ++ F ++ E) ->
-  typing (G ++ F ++ E) e T.
+  typing (G ++ F ++ E) Q e T.
 Proof with simpl_env;
            eauto using wf_typ_weakening,
                        wf_typ_in_weakening,
@@ -66,19 +66,21 @@ Qed.
 (************************************************************************ *)
 (** ** Narrowing for typing (7) *)
 
-Lemma typing_narrowing : forall Q E F X P e T,
+Lemma typing_narrowing : forall Q E F X P QQ e T,
   sub E P Q ->
-  typing (F ++ [(X, bind_sub Q)] ++ E) e T ->
-  typing (F ++ [(X, bind_sub P)] ++ E) e T.
-Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subcapt_narrowing.
-  intros Q E F X P e T PsubQ Typ.
+  typing (F ++ [(X, bind_sub Q)] ++ E) QQ e T ->
+  typing (F ++ [(X, bind_sub P)] ++ E) QQ e T.
+Proof with eauto using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subcapt_narrowing.
+  intros * PsubQ Typ.
   remember (F ++ [(X, bind_sub Q)] ++ E).
   generalize dependent F.
   induction Typ; intros F EQ; subst...
   - Case "typing_var".
-    binds_cases H0...
+    binds_cases H1...
+    constructor...
   - Case "typing_var".
-    binds_cases H0...
+    binds_cases H1...
+    eapply typing_var...
   - Case "typing_abs".
     assert (wf_env (F ++ [(X, bind_sub P)] ++ E)). {
       pick fresh y for L.
@@ -112,7 +114,6 @@ Proof with eauto 6 using wf_env_narrowing, wf_typ_narrowing, sub_narrowing, subc
     pick fresh y and apply typing_try...
     rewrite_parenthesise_binding.
     simpl_env in H0...
-  - binds_cases H0...
 Qed.
 
 
@@ -134,11 +135,11 @@ Proof.
   * exists X0; trivial.
 Qed.
 
-Lemma typing_narrowing_typ_aux : forall Q E F X P e T,
-  typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
+Lemma typing_narrowing_typ_aux : forall Q E F X P QQ e T,
+  typing (F ++ [(X, bind_typ Q)] ++ E) QQ e T ->
   sub E P Q ->
   syn_cat_agree P Q ->
-  typing (F ++ [(X, bind_typ P)] ++ E) e T.
+  typing (F ++ [(X, bind_typ P)] ++ E) QQ e T.
 Proof with simpl_env; eauto using
     wf_env_narrowing_typ, wf_typ_narrowing_typ, sub_narrowing_typ,
     sub_weakening, type_from_wf_typ.
@@ -147,8 +148,8 @@ Proof with simpl_env; eauto using
   dependent induction HT...
   (* typing_var_tvar *)
   - destruct (x == X) eqn:HX; subst...
-    + binds_cases H0; simpl_env in *; try notin_solve...
-      inversion H1; subst...
+    + binds_cases H1; simpl_env in *; try notin_solve...
+      inversion H2; subst...
       lets (Y & HP): sub_of_tvar HSub; subst... (* lets signifies that all arguments are applied *)
       eapply typing_sub...
       * eapply typing_var_tvar...
@@ -158,7 +159,7 @@ Proof with simpl_env; eauto using
   (* typing_var *)
   - destruct (x == X) eqn:HX; subst...
     + dependent induction P; inversion Htype; subst...
-      * binds_get H0; inversion H2; subst...
+      * binds_get H1; inversion H3; subst...
         eapply typing_sub.
         ** eapply typing_var...
         ** rewrite_env (empty ++ (F ++ [(X, bind_typ (typ_capt c p))]) ++ E).
@@ -169,12 +170,14 @@ Proof with simpl_env; eauto using
               exists (typ_capt c p); constructor...
            ++ apply sub_pre_weakening...
               inversion HSub...
-      * binds_get H0; inversion H2; subst...
+      * rename select (binds X _ _) into HH.
+        binds_get HH; inversion select (bind_typ _ = bind_typ _); subst...
         inversion HAg.
     + eapply typing_var...
   - assert (wf_env (F ++ [(X, bind_typ P)] ++ E)). {
       pick fresh z for L.
-      pose proof (H1 z Fr)...
+      forwards HA: H1 z Fr; simpl_env in HA.
+      forwards (? & ? & ?): typing_regular HA...
     }
     pick fresh y and apply typing_abs...
     + simpl_env in *.
@@ -184,7 +187,8 @@ Proof with simpl_env; eauto using
       eapply H2...
   - assert (wf_env (F ++ [(X, bind_typ P)] ++ E)). {
       pick fresh z for L.
-      pose proof (H1 z Fr)...
+      forwards HA: H1 z Fr; simpl_env in HA.
+      forwards (? & ? & ?): typing_regular HA...
     }
     pick fresh y and apply typing_tabs...
     + simpl_env in *.
@@ -194,32 +198,28 @@ Proof with simpl_env; eauto using
       eapply H2...
   - assert (wf_env (F ++ [(X, bind_typ P)] ++ E)). {
       pick fresh z for L.
-      pose proof (H z Fr)...
+      forwards HA: H z Fr; simpl_env in HA.
+      forwards (? & ? & ?): typing_regular HA...
     }
     pick fresh y and apply typing_try...
     + rewrite_parenthesise_binding.
       eapply H0...
-  - destruct (x == X) eqn:HX; subst...
-    + dependent induction P; inversion Htype; subst...
-      * binds_get H0; inversion H2; subst...
-      * binds_get H0; inversion H2; subst...
-    + eapply typing_handler...
 Qed.
 
-Lemma typing_narrowing_typ_tvars : forall (X Y : atom) E F x e T,
-  typing (F ++ [(x, bind_typ X)] ++ E) e T ->
+Lemma typing_narrowing_typ_tvars : forall (X Y : atom) E F Q x e T,
+  typing (F ++ [(x, bind_typ X)] ++ E) Q e T ->
   sub E Y X ->
-  typing (F ++ [(x, bind_typ Y)] ++ E) e T.
+  typing (F ++ [(x, bind_typ Y)] ++ E) Q e T.
 Proof with eauto.
   intros.
   eapply typing_narrowing_typ_aux...
   constructor.
 Qed.
 
-Lemma typing_narrowing_typ : forall Q E F X C P e T,
-  typing (F ++ [(X, bind_typ Q)] ++ E) e T ->
+Lemma typing_narrowing_typ : forall Q E F X C P QQ e T,
+  typing (F ++ [(X, bind_typ Q)] ++ E) QQ e T ->
   sub E (typ_capt C P) Q ->
-  typing (F ++ [(X, bind_typ (typ_capt C P))] ++ E) e T.
+  typing (F ++ [(X, bind_typ (typ_capt C P))] ++ E) QQ e T.
 Proof with eauto.
   intros* ? Hsub.
   inversion Hsub; subst.
@@ -231,12 +231,12 @@ Qed.
 (* ********************************************************************** *)
 (** ** Inversion of typing (13) *)
 
-Lemma typing_inv_abs : forall E S1 e1 T,
-  typing E (exp_abs S1 e1) T ->
+Lemma typing_inv_abs : forall E Q S1 e1 T,
+  typing E Q (exp_abs S1 e1) T ->
   forall U1 U2 C, sub E T (typ_capt C (typ_arrow U1 U2)) ->
      sub E U1 S1
   /\ exists S2, exists L, forall x, x `notin` L ->
-    typing ([(x, bind_typ S1)] ++ E) (open_ee e1 x (`cset_fvar` x)) (open_ct S2 (`cset_fvar` x)) /\
+    typing ([(x, bind_typ S1)] ++ E) Q (open_ee e1 x (`cset_fvar` x)) (open_ct S2 (`cset_fvar` x)) /\
     wf_typ ([(x, bind_typ S1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct U2 (`cset_fvar` x)) /\
     sub ([(x, bind_typ U1)] ++ E) (open_ct S2 (`cset_fvar` x)) (open_ct U2 (`cset_fvar` x)).
 Proof with auto.
@@ -259,12 +259,12 @@ Proof with auto.
     eauto using (sub_transitivity T).
 Qed.
 
-Lemma typing_inv_tabs : forall E S1 e1 T,
-  typing E (exp_tabs S1 e1) T ->
+Lemma typing_inv_tabs : forall E Q S1 e1 T,
+  typing E Q (exp_tabs S1 e1) T ->
   forall U1 U2 C, sub E T (typ_capt C (typ_all U1 U2)) ->
      sub E U1 S1
   /\ exists S2, exists L, forall X, X `notin` L ->
-     typing ([(X, bind_sub U1)] ++ E) (open_te e1 X) (open_tt S2 X)
+     typing ([(X, bind_sub U1)] ++ E) Q (open_te e1 X) (open_tt S2 X)
      /\ sub ([(X, bind_sub U1)] ++ E) (open_tt S2 X) (open_tt U2 X).
 Proof with simpl_env; auto.
   intros * Htyp.
