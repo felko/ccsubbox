@@ -101,7 +101,7 @@ Notation "k N`in` C" := (NatSet.F.In k (`cset_bvars` C))
                           (at level 69) : cset_shorthand.
 Notation "k N`mem` C" := (NatSet.F.mem k (`cset_bvars` C))
                            (at level 69) : cset_shorthand.
-                      
+
 
 Notation "C L`\` k" := (cset_set ((`cset_fvars` C) ) ((`cset_bvars` C)) ((`cset_uvar` C)) ((`cset_lvars` C) `\`L k))
                           (at level 69) : cset_shorthand.
@@ -114,7 +114,7 @@ Notation "`* mem` C" := (`cset_uvar` C)
                            (at level 10, only parsing) : cset_shorthand.
 Notation "`* in` C" := (`cset_uvar` C = true)
                            (at level 10) : cset_shorthand.
-                  
+
 
 
 Notation "`cset_references_bvar` k c" :=
@@ -153,7 +153,7 @@ Notation "`cset_references_lvar_dec` a c" :=
 Notation "`cset_remove_lvar` a c" :=
   (c L`\` a)
     (at level 10, a at level 9, c at level 9, only parsing) : cset_shorthand.
-    
+
 
 (* Check (fun x =>  fun N => x N`in` N). *)
 (* Check (fun C D x => (cset_union D (cset_remove_fvar x C))). *)
@@ -270,7 +270,7 @@ Section Props.
 
   Lemma uvar_union_1 : `cset_uvar` (cset_union C D) = orb (`cset_uvar` C) (`cset_uvar` D).
   Proof. trivial. Qed.
-  
+
   Lemma lvars_union_1 : `cset_lvars` (cset_union C D) = LabelSet.F.union (`cset_lvars` C) (`cset_lvars` D).
   Proof. trivial. Qed.
 

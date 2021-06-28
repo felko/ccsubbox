@@ -109,7 +109,7 @@ Proof.
   - fsetdec.
 Qed.
 
-Hint Resolve empty_cset_wf.
+Hint Resolve empty_cset_wf : core.
 
 Lemma wf_cset_adapt : forall {A' E A C},
   wf_cset E A' C ->
@@ -209,7 +209,9 @@ Ltac wf_cset_simpl instantiate_ext :=
     let Hexists := fresh "Hexists" in
     let T := fresh "T" in
     let Hbound := fresh "Hbound" in
-    inversion H as [? ? ? ? Hbound ?]; subst; constructor;
+    inversion H;
+    rename select (allbound _ _) into Hbound;
+    subst; constructor;
     [ intros x Hx;
       destruct (Hbound x Hx) as [T Hexists];
       lazymatch instantiate_ext with
@@ -258,6 +260,9 @@ Proof.
   apply wf_cset_weakening with (A := A); auto.
 Qed.
 
+Ltac destruct_bound H :=
+  destruct H as [H|H].
+
 Lemma wf_cset_strengthen : forall x E Ap C,
   x `~in`A (dom E) ->
   wf_cset E Ap C ->
@@ -266,10 +271,10 @@ Proof with eauto.
   intros * ? H.
   inversion H; subst.
   econstructor...
-  enough (fvars `c`A (dom E)) by fsetdec.
+  enough (xs `c`A (dom E)) by fsetdec.
   intros y yIn.
   forwards (? & B): H1 y yIn.
-  destruct B as [B|B|B]; forwards: binds_In B; fsetdec.
+  destruct_bound B; forwards: binds_In B; fsetdec.
 Qed.
 
 (* Type bindings don't matter at all! *)
@@ -281,7 +286,8 @@ Proof with simpl_env; eauto.
   intros *.
   intros Hwf Hok.
   wf_cset_simpl False...
-  destruct Hexists; binds_cases H0...
+  rename Hexists into B;
+  destruct_bound B; binds_cases B...
 Qed.
 
 Lemma wf_cset_narrowing_typ_base : forall C1 C2 C E A F X,
@@ -291,9 +297,9 @@ Lemma wf_cset_narrowing_typ_base : forall C1 C2 C E A F X,
 Proof with simpl_env; eauto.
   intros *. intros Hwf Hok.
   wf_cset_simpl False.
-  destruct Hexists; binds_cases H0...
+  rename Hexists into B;
+  destruct_bound B; binds_cases B...
 Qed.
-
 
 Lemma wf_cset_narrowing : forall F E x Q P C,
   wf_cset_in (F ++ [(x, bind_sub Q)] ++ E) C ->
@@ -327,7 +333,7 @@ Proof with eauto.
   econstructor... unfold allbound in *.
   intros.
   destruct (H x0 H1) as [T Hb].
-  destruct Hb as [Hb|Hb|Hb]; binds_cases Hb...
+  destruct_bound Hb; binds_cases Hb...
 Qed.
 
 Lemma wf_cset_ignores_sub_bindings : forall E F x T1 T2 Ap C,
@@ -342,7 +348,7 @@ Proof with eauto.
   econstructor... unfold allbound in *.
   intros.
   destruct (H x0 H1) as [T Hb].
-  destruct Hb as [Hb|Hb|Hb]; binds_cases Hb...
+  destruct_bound Hb; binds_cases Hb...
 Qed.
 
 
@@ -350,10 +356,10 @@ Create HintDb fsetdec.
 
 Hint Extern 1 (_ `in` _) => fsetdec: fsetdec.
 
-Lemma wf_cset_singleton_by_mem : forall xs b1 E A x b2,
-  wf_cset E A (cset_set xs {}N b1) ->
+Lemma wf_cset_singleton_by_mem : forall xs b1 l1 E A x b2 l2,
+  wf_cset E A (cset_set xs {}N b1 l1) ->
   x `in` xs ->
-  wf_cset E A (cset_set (singleton x) {}N b2).
+  wf_cset E A (cset_set {x}A {}N b2 l2).
 Proof with eauto with fsetdec.
   intros * Wfxs xIn.
   inversion Wfxs; subst...
@@ -362,28 +368,28 @@ Qed.
 (* NOTE: wf_cset precondition in wf_cset_singleton_by_mem0 can be proven by
          constructor, which leaves an uninstantiated evar. This approach avoids the
          problem. *)
-Hint Extern 1 (wf_cset_in ?E (cset_set (singleton ?x) {}N _)) =>
+Hint Extern 1 (wf_cset_in ?E (cset_set {?x}A {}N _ _)) =>
 match goal with
-| H1 : x `in` ?xs , H2 : (wf_cset_in ?E (cset_set ?xs {}N ?b)) |- _ =>
-  apply (wf_cset_singleton_by_mem xs b)
+| H1 : x `in` ?xs , H2 : (wf_cset_in ?E (cset_set ?xs {}N ?b ?ls)) |- _ =>
+  apply (wf_cset_singleton_by_mem xs b ls)
 end : core.
 
-Hint Extern 1 (wf_cset ?E ?A (cset_set (singleton ?x) {}N _)) =>
+Hint Extern 1 (wf_cset ?E ?A (cset_set {?x}A {}N _ _)) =>
 match goal with
-| H1 : x `in` ?xs , H2 : (wf_cset ?E A (cset_set ?xs {}N ?b)) |- _ =>
-  apply (wf_cset_singleton_by_mem xs b)
+| H1 : x `in` ?xs , H2 : (wf_cset ?E A (cset_set ?xs {}N ?b ?ls)) |- _ =>
+  apply (wf_cset_singleton_by_mem xs b ls)
 end : core.
 
-Local Lemma __test_wf_cset_singleton1 : forall xs b1 E x b2,
-  wf_cset_in E (cset_set xs {}N b1) ->
+Local Lemma __test_wf_cset_singleton1 : forall xs b1 l1 E x b2 l2,
+  wf_cset_in E (cset_set xs {}N b1 l1) ->
   x `in` xs ->
-  wf_cset_in E (cset_set (singleton x) {}N b2).
+  wf_cset_in E (cset_set {x}A {}N b2 l2).
 Proof. eauto. Qed.
 
-Local Lemma __test_wf_cset_singleton2 : forall xs b1 E A x b2,
-  wf_cset E A (cset_set xs {}N b1) ->
+Local Lemma __test_wf_cset_singleton2 : forall xs b1 l1 E A x b2 l2,
+  wf_cset E A (cset_set xs {}N b1 l1) ->
   x `in` xs ->
-  wf_cset E A (cset_set (singleton x) {}N b2).
+  wf_cset E A (cset_set {x}A {}N b2 l2).
 Proof. eauto. Qed.
 
 
@@ -818,20 +824,6 @@ Proof with eauto using wf_typ_weaken_head.
   inversion H3; subst...
 Qed.
 
-Lemma wf_typ_from_binds_lab : forall x U E,
-  wf_env E ->
-  binds x (bind_lab U) E ->
-  wf_typ_in E U.
-Proof with eauto using wf_typ_weaken_head.
-  intros x U E Hwf Hbinds.
-  (* remember m; generalize dependent m. *)
-  unfold wf_typ_in.
-  induction Hwf; binds_cases Hbinds...
-  inversion H3; subst...
-Qed.
-
-Hint Resolve wf_typ_from_binds_lab : core.
-
 Lemma wf_typ_from_wf_env_typ : forall x T E,
   wf_env ([(x, bind_typ T)] ++ E) ->
   wf_typ_in E T.
@@ -860,7 +852,6 @@ Proof.
   - apply binds_In in H0.
     fsetdec.
 Qed.
-
 
 Lemma wf_cv_env_bind_typ : forall F x U E,
   wf_env (F ++ [(x, bind_typ U)] ++ E) ->
@@ -899,6 +890,9 @@ Hint Resolve wf_typ_env_bind_sub : core.
 (* ********************************************************************** *)
 (** * #<a name="wfsubst"></a># Lemmas connecting substitution and wellformedness of [wf_cset], [wf_typ], ... *)
 
+Ltac destruct_union_mem H :=
+  rewrite AtomSetFacts.union_iff in H; destruct H as [H|H].
+
 Lemma wf_cset_subst_tb : forall F Q E Ap Am Z P C,
   wf_cset (F ++ [(Z, bind_sub Q)] ++ E) Ap C ->
   wf_typ E Ap Am P ->
@@ -908,7 +902,7 @@ Proof with simpl_env; eauto*.
   intros * HwfC HwfP Hok.
   inversion HwfC; subst.
   unfold subst_cset.
-  destruct_set_mem Z fvars.
+  destruct_set_mem Z xs.
   - destruct HwfP; simpl.
     + unfold cset_union; csetsimpl.
       destruct_set_mem Z Ap; [|exfalso; fsetdec].
@@ -918,18 +912,24 @@ Proof with simpl_env; eauto*.
         fsetdec.
 
       intros y yIn.
-      rewrite AtomSetFacts.union_iff in yIn; destruct yIn. {
-        rewrite AtomSetFacts.singleton_iff in H3; symmetry in H3; subst...
+      destruct_union_mem yIn. {
+        rewrite AtomSetFacts.singleton_iff in yIn; symmetry in yIn; subst...
       }
-      specialize (H y ltac:(fsetdec)).
-      destruct H as [S H].
-      destruct H; binds_cases H...
-      * exists (subst_tt Z X S)...
-      * exfalso; fsetdec.
-      * exists (subst_tt Z X S)...
-      * exists (subst_tt Z X S)...
+      rename H into H'.
+      forwards (S & H): H' y.
+      1: { fsetdec. }
+      assert (y <> Z) by fsetdec.
+      {
+        simpl_env in H.
+        destruct H; binds_cases H.
+        rename select (binds y _ _) into HBnd.
+        - exists S...
+        - exists (subst_tt Z X S)...
+        - exists S...
+        - exists (subst_tt Z X S)...
+      }
     + destruct H1.
-      rename fvars0 into cs, univ0 into b.
+      rename xs0 into cs.
       destruct_set_mem Z A; [|exfalso; fsetdec].
       unfold cset_union; csetsimpl.
       constructor.
@@ -943,30 +943,29 @@ Proof with simpl_env; eauto*.
         fsetdec.
       }
       intros y yIn.
-      rewrite AtomSetFacts.union_iff in yIn; destruct yIn.
+      destruct_union_mem yIn.
       * specialize (H1 y ltac:(fsetdec)).
         destruct H1 as [S H1].
         destruct H1; binds_cases H1...
       * inversion HwfC; subst.
         match goal with
-        | H : allbound _ fvars |- _ =>
+        | H : allbound _ xs |- _ =>
           specialize (H y ltac:(fsetdec));
             destruct H as [S H];
             destruct H; binds_cases H
         end...
-        -- exists (subst_tt Z (typ_capt (cset_set cs {}N b) P) S)...
+        -- exists (subst_tt Z (typ_capt (cset_set cs {}N b0 ls0) P) S)...
         -- exfalso; fsetdec.
-        -- exists (subst_tt Z (typ_capt (cset_set cs {}N b) P) S)...
-        -- exists (subst_tt Z (typ_capt (cset_set cs {}N b) P) S)...
-  - inversion HwfC as [? ? ? ? Hbound ?]; subst; constructor. {
+        -- exists (subst_tt Z (typ_capt (cset_set cs {}N b0 ls0) P) S)...
+  - inversion HwfC; rename select (allbound _ _) into HAllBound; subst; constructor. {
       intros x xIn.
-      destruct (Hbound x xIn) as [T Hexists].
-      destruct Hexists; binds_cases H2...
-      + exists (subst_tt Z P T)...
+      destruct (HAllBound x xIn) as [T HBnd].
+      destruct_bound HBnd; binds_cases HBnd...
       + exists (subst_tt Z P T)...
       + exists (subst_tt Z P T)...
     }
-    destruct HwfP; simpl; destruct_set_mem Z Ap...
+    destruct HwfP; simpl; destruct_set_mem Z Ap.
+    all: fsetdec.               (* automation gets a bit lost here, why? *)
 Qed.
 
 Lemma wf_typ_subst_tb : forall F Q E Ap Am Z P T,
@@ -1041,7 +1040,6 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
         apply ok_tail, ok_tail in Hok...
 Qed.
 
-
 Lemma wf_cset_subst_cb : forall Q Ap' Ap F E x C D,
   wf_cset (F ++ [(x, bind_typ Q)] ++ E) Ap C ->
   wf_env (F ++ [(x, bind_typ Q)] ++ E) ->
@@ -1068,7 +1066,7 @@ Proof with simpl_env; eauto*.
       * forwards (T & B): H4 y.
         ** fsetdec.
         ** simpl_env in B.
-           destruct B as [B|B|B]; binds_cases B; eauto; exists (subst_ct x D T)...
+           destruct_bound B; binds_cases B; eauto; exists (subst_ct x D T)...
   - inversion HwfC; subst.
     constructor...
     unfold allbound in *.
@@ -1076,7 +1074,7 @@ Proof with simpl_env; eauto*.
     forwards (T & B): H4 y.
     { fsetdec. }
     simpl_env in B.
-    destruct B as [B|B|B]; binds_cases B; eauto*; exists (subst_ct x D T)...
+    destruct_bound B; binds_cases B; eauto*; exists (subst_ct x D T)...
 Qed.
 
 Lemma wf_cset_in_subst_cb : forall Q F E x C D,
@@ -1115,8 +1113,8 @@ Proof with eauto*.
         assert (Z `~in`A (dom E)) as HA. {
           eapply fresh_mid_tail...
         }
-        assert (Z `~in`A fvars). {
-          destruct_set_mem Z fvars...
+        assert (Z `~in`A xs). {
+          destruct_set_mem Z xs...
           specialize (H Z ZIn0) as [T H].
           destruct H; apply binds_In in H; exfalso...
         }
@@ -1124,34 +1122,33 @@ Proof with eauto*.
       }
       intros x Hfvx.
 
-      Ltac destruct_union_mem H :=
-        rewrite AtomSetFacts.union_iff in H; destruct H as [H|H].
-
       destruct_union_mem Hfvx. {
         specialize (H x Hfvx) as [T H]...
         destruct H...
       }
 
-      specialize (H4 x ltac:(fsetdec)) as [T H4]...
-      destruct H4 as [H4|H4|H4]; binds_cases H4...
+      rename H4 into H4'.
+      forwards [T H4]: (H4' x)...
+      1: { fsetdec. }
+      simpl_env in H4.
+      destruct_bound H4; binds_cases H4...
       - exfalso; fsetdec.
-      - exists (subst_ct Z (cset_set fvars {}N univ) T)...
-      - exists (subst_ct Z (cset_set fvars {}N univ) T)...
-      - exists (subst_ct Z (cset_set fvars {}N univ) T)...
+      - exists (subst_ct Z (cset_set xs {}N b ls) T)...
+      - exists (subst_ct Z (cset_set xs {}N b ls) T)...
     }
     {
       constructor.
       2: fsetdec.
       intros y yIn.
       assert (y <> Z) by fsetdec.
-      specialize (H4 y ltac:(fsetdec)) as [T H4].
-      destruct H4 as [H4|H4|H4]; binds_cases H4...
-      - exists (subst_ct Z (cset_set fvars {}N univ) T)...
-      - exists (subst_ct Z (cset_set fvars {}N univ) T)...
-      - exists (subst_ct Z (cset_set fvars {}N univ) T)...
+      rename H4 into H4'.
+      forwards [T H4]: (H4' y)...
+      simpl_env in H4.
+      destruct_bound H4; binds_cases H4...
+      - exists (subst_ct Z (cset_set xs {}N b ls) T)...
+      - exists (subst_ct Z (cset_set xs {}N b ls) T)...
     }
 Qed.
-
 
 Lemma wf_cset_in_subst_tb : forall Q F E Z P C,
   ok (F ++ [(Z, bind_sub Q)] ++ E) ->
@@ -1333,15 +1330,13 @@ Proof with simpl_env; eauto.
   pick fresh X.
   rewrite (subst_ct_intro X)...
   rewrite_env (map (subst_cb X C) empty ++ E).
-  (** another lemma needed *)
   eapply wf_typ_subst_cb' with (Q := T1)...
   assert (X `notin` L) by fsetdec.
   specialize (H5 X H).
   unfold wf_typ_in...
 Qed.
 
-(* TODO rename to wf_typ_open_type *)
-Lemma wf_typ_open : forall E U T1 T2,
+Lemma wf_typ_open_type : forall E U T1 T2,
   ok E ->
   wf_pretyp_in E (typ_all T1 T2) ->
   wf_typ_in E U ->
@@ -1471,11 +1466,6 @@ Proof with eauto using wf_typ_subst_cb, wf_cset_extra.
   intros *.
   induction F; intros Hwf HwfC; simpl_env in *;
     inversion Hwf; simpl_env in *; simpl subst_tb...
-  + constructor...
-    unfold wf_typ_in.
-    erewrite dom_x_subst_away...
-    eapply wf_typ_subst_cb...
-    all : simpl_env in *; apply wf_cset_extra...
   + constructor...
     unfold wf_typ_in.
     erewrite dom_x_subst_away...
@@ -1655,30 +1645,38 @@ Lemma wf_env_narrowing : forall V E F U X,
   wf_env (F ++ [(X, bind_sub V)] ++ E) ->
   wf_typ_in E U ->
   wf_env (F ++ [(X, bind_sub U)] ++ E).
-Proof with eauto 6 using wf_typ_narrowing_base.
+Ltac hint ::=
+  eauto using wf_typ_narrowing_base.
+Proof with hint.
   induction F; intros U X Wf_env Wf;
-    inversion Wf_env; subst; simpl_env in *...
-  + econstructor...
-    apply wf_typ_narrowing_base with (V := V)...
-  + econstructor...
-    apply wf_typ_narrowing_base with (V := V)...
-  + econstructor...
-    apply wf_typ_narrowing_base with (V := V)...
+    inversion Wf_env; subst; simpl_env in *.
+  - constructor...
+  - constructor.
+    + eapply IHF...
+    + apply wf_typ_narrowing_base with (V := V)...
+    + simpl_env; fsetdec.
+  - constructor.
+    + eapply IHF...
+    + apply wf_typ_narrowing_base with (V := V)...
+    + simpl_env; fsetdec.
 Qed.
 
 Lemma wf_env_narrowing_typ : forall V E F U X,
   wf_env (F ++ [(X, bind_typ V)] ++ E) ->
   wf_typ_in E U ->
   wf_env (F ++ [(X, bind_typ U)] ++ E).
-Proof with eauto 6 using wf_typ_narrowing_typ_base, wf_cset_narrowing_typ_base.
+Proof with eauto using wf_typ_narrowing_typ_base, wf_cset_narrowing_typ_base.
   induction F; intros U X Wf_env Wf;
-    inversion Wf_env; subst; simpl_env in *...
-  + econstructor...
-    eapply wf_typ_narrowing_typ_base with (V := V)...
-  + econstructor...
-    apply wf_typ_narrowing_typ_base with (V := V)...
-  + econstructor...
-    apply wf_typ_narrowing_typ_base with (V := V)...
+    inversion Wf_env; subst; simpl_env in *.
+  - constructor...
+  - constructor.
+    + eapply IHF...
+    + apply wf_typ_narrowing_typ_base with (V := V)...
+    + simpl_env; fsetdec.
+  - constructor.
+    + eapply IHF...
+    + apply wf_typ_narrowing_typ_base with (V := V)...
+    + simpl_env; fsetdec.
 Qed.
 
 Lemma wf_env_inv : forall F Z b E,

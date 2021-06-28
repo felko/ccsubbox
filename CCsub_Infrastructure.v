@@ -42,6 +42,20 @@ with fv_tpt (T : pretyp) {struct T} : atoms :=
   | typ_exc T => fv_tt T
   end.
 
+Fixpoint fv_lt (T : typ) {struct T} : labels :=
+  match T with
+  | typ_bvar J => {}L
+  | typ_fvar X => {}L
+  | typ_capt C P => `cset_lvars` C `u`L fv_lpt P
+  end
+with fv_lpt (T : pretyp) {struct T} : labels :=
+  match T with
+  | typ_top => {}L
+  | typ_arrow T1 T2 => (fv_lt T1) `u`L (fv_lt T2)
+  | typ_all T1 T2 => (fv_lt T1) `u`L (fv_lt T2)
+  | typ_exc T => fv_lt T
+  end.
+
 Fixpoint fv_ce (e : exp) {struct e} : atoms :=
   match e with
   | exp_bvar i => {}A
@@ -52,7 +66,7 @@ Fixpoint fv_ce (e : exp) {struct e} : atoms :=
   | exp_tapp e1 V => (fv_ct V) `u`A (fv_ce e1)
   | exp_try T e1 => (fv_ct T) `u`A (fv_ce e1)
   | exp_throw e1 e2 => (fv_ce e1) `u`A (fv_ce e2)
-  | exp_handler x => {}A (* TODO is this correct? *)
+  | exp_handler x => {}A
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
@@ -65,23 +79,35 @@ Fixpoint fv_te (e : exp) {struct e} : atoms :=
   | exp_tapp e1 V => (fv_tt V) `u`A (fv_te e1)
   | exp_try T e1 => (fv_tt T) `u`A (fv_te e1)
   | exp_throw e1 e2 => (fv_te e1) `u`A (fv_te e2)
-  | exp_handler x => {}A (* TODO is this correct? *)
+  | exp_handler x => {}A
   end.
+
+Fixpoint fv_le (e : exp) {struct e} : labels :=
+  match e with
+  | exp_bvar i => {}L
+  | exp_fvar x => {}L
+  | exp_abs V e1 => (fv_le e1)
+  | exp_app e1 e2 => (fv_le e1) `u`L (fv_le e2)
+  | exp_tabs V e1 => (fv_le e1)
+  | exp_tapp e1 V => (fv_le e1)
+  | exp_try T e1 => fv_le e1
+  | exp_throw e1 e2 => (fv_le e1) `u`L (fv_le e2)
+  | exp_handler l => {l}L
+  end.
+
 
 Fixpoint fv_ee (e : exp) {struct e} : atoms :=
   match e with
   | exp_bvar i => {}A
-  | exp_fvar x => singleton x
+  | exp_fvar x => {x}A
   | exp_abs V e1 => (fv_ee e1)
   | exp_app e1 e2 => (fv_ee e1) `u`A (fv_ee e2)
   | exp_tabs V e1 => (fv_ee e1)
   | exp_tapp e1 V => (fv_ee e1)
   | exp_try T e1 => fv_ee e1
   | exp_throw e1 e2 => (fv_ee e1) `u`A (fv_ee e2)
-  | exp_handler x => singleton x
+  | exp_handler l => {}A
   end.
-
-
 
 (* ********************************************************************** *)
 (** * #<a name="subst"></a># Substitution *)
@@ -137,7 +163,7 @@ Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
   | exp_tapp e1 V => exp_tapp (subst_te Z U e1) (subst_tt Z U V)
   | exp_try T e1 => exp_try (subst_tt Z U T)  (subst_te Z U e1)
   | exp_throw e1 e2 => exp_throw (subst_te Z U e1) (subst_te Z U e2)
-  | exp_handler x => exp_handler x
+  | exp_handler l => exp_handler l
   end.
 
 Fixpoint subst_ee (z : atom) (u : exp) (c : cap) (e : exp) {struct e} : exp :=
@@ -150,21 +176,19 @@ Fixpoint subst_ee (z : atom) (u : exp) (c : cap) (e : exp) {struct e} : exp :=
   | exp_tapp e1 t => exp_tapp (subst_ee z u c e1) (subst_ct z c t)
   | exp_try T e1 => exp_try (subst_ct z c T)  (subst_ee z u c e1)
   | exp_throw e1 e2 => exp_throw (subst_ee z u c e1) (subst_ee z u c e2)
-  | exp_handler x => exp_handler x
+  | exp_handler l => exp_handler l
   end.
 
 Definition subst_tb (Z : atom) (P : typ) (b : binding) : binding :=
   match b with
   | bind_sub T => bind_sub (subst_tt Z P T)
   | bind_typ T => bind_typ (subst_tt Z P T)
-  | bind_lab T => bind_lab (subst_tt Z P T)
   end.
 
 Definition subst_cb (Z : atom) (c : cap) (b : binding) : binding :=
   match b with
   | bind_sub T => bind_sub (subst_ct Z c T)
   | bind_typ T => bind_typ (subst_ct Z c T)
-  | bind_lab T => bind_lab (subst_ct Z c T)
   end.
 
 (* ********************************************************************** *)
@@ -348,9 +372,9 @@ Proof with eauto*.
 }
 Qed.
 
-Lemma into_typeN : forall t,
+Lemma type_to_type0 : forall t,
   type t -> typeN 0 t
-with into_pretypeN : forall t,
+with pretype_to_pretype0 : forall t,
   pretype t -> pretypeN 0 t.
 Proof with eauto.
 { intros * H.
@@ -462,14 +486,14 @@ Proof with auto*.
     eapply (open_tt_rec_typeN 1).
     2: induction k; auto.
     eapply open_ct_rec_typeN_aux with (S0 := (`cset_fvar` X))...
-    eapply into_typeN ...
+    eapply type_to_type0 ...
   - Case "typ_all".
     unfold open_tt in *.
     pick fresh X.
     eapply (open_tt_rec_typeN 1).
     2: induction k; auto.
     eapply open_tt_rec_typeN_aux with (S0 := X)...
-    eapply into_typeN ...
+    eapply type_to_type0 ...
 Qed.
 
 (** If a name is fresh for a term, then substituting for it is the
@@ -750,7 +774,7 @@ Qed.
 
 Lemma expr_to_expr0 : forall e,
   expr e -> exprN 0 e.
-Proof with eauto using into_typeN, open_ee_rec_exprN_aux, open_te_rec_exprN_aux.
+Proof with eauto using type_to_type0, open_ee_rec_exprN_aux, open_te_rec_exprN_aux.
   intros.
   induction H; constructor...
   * pick fresh x.
@@ -1050,58 +1074,6 @@ Proof with eauto*.
 Qed.
 *)
 
-Hint Unfold disjoint : core.
-
-(** Opening a capture set under some circumstances is the identity *)
-Lemma open_ct_rec_capt_aux : forall T j Df Du i C,
-  i <> j ->
-  (`cset_fvars` C) `disjoint` Df ->
-  (andb Du (`cset_uvar` C)) = false ->
-  open_ct_rec j (cset_set Df {}N Du) T = open_ct_rec i C (open_ct_rec j (cset_set Df {}N Du) T) ->
-  T = open_ct_rec i C T
-with open_cpt_rec_capt_aux : forall T j Df Du i C,
-  i <> j ->
-  (`cset_fvars` C) `disjoint` Df ->
-  (andb Du (`cset_uvar` C)) = false ->
-  open_cpt_rec j (cset_set Df {}N Du) T = open_cpt_rec i C (open_cpt_rec j (cset_set Df {}N Du) T) ->
-  T = open_cpt_rec i C T.
-Proof with eauto*.
-------
-  induction T; intros j Df Du i C Neq; intros HCommon HCommonU H;
-    simpl in *; inversion H; f_equal...
-  apply open_cset_rec_capt_aux with (j := j) (V := cset_set Df {}N Du) ; simpl in *...
-  * autounfold in *. simpl in *; fsetdec.
-------
-  induction T; intros j Df Du i C Neq; intros HCommon HCommonU H;
-    simpl in *; inversion H; f_equal...
-Qed.
-
-Lemma open_ct_rec_capt : forall T j D i C,
-  i <> j ->
-  (* can't change this to `capt D` since then D can be universal. *)
-  capt D ->
-  (`cset_fvars` C) `disjoint` (`cset_fvars` D) ->
-  (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
-  open_ct_rec j D T = open_ct_rec i C (open_ct_rec j D T) ->
-  T = open_ct_rec i C T
-with open_cpt_rec_capt : forall T j D i C,
-  i <> j ->
-  (* can't change this to `capt D` since then D can be universal. *)
-  capt D ->
-  (`cset_fvars` C) `disjoint` (`cset_fvars` D) ->
-  (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
-  open_cpt_rec j D T = open_cpt_rec i C (open_cpt_rec j D T) ->
-  T = open_cpt_rec i C T.
-Proof with eauto using open_cset_rec_capt_aux.
-------
-  induction T; intros j D i C Neq Closed; intros HCommon HcommonU H; simpl in *; inversion H; f_equal...
-    eapply open_cset_rec_capt_aux with (V := D)...
-  * destruct C; destruct D; simpl; destr_bool...
-  * autounfold in *; fsetdec...
-------
-  induction T; intros j D i C Neq Closed; intros HCommon HcommonU H; simpl in *; inversion H; f_equal...
-Qed.
-
 Lemma open_ct_rec_type_aux : forall n T i C,
   typeN n T ->
   i >= n ->
@@ -1130,7 +1102,7 @@ Lemma open_ct_rec_type : forall T C k,
 with open_cpt_rec_type : forall T C k,
   pretype T ->
   T = open_cpt_rec k C T.
-Proof with auto using into_typeN.
+Proof with auto using type_to_type0.
 ------
   intros T C k Htyp. revert k.
   induction Htyp; intros k; simpl; f_equal...
@@ -1145,9 +1117,9 @@ Proof with auto using into_typeN.
     pick fresh X.
     unfold open_ct in *.
     assert (X `notin` L) by fsetdec.
-    apply open_ct_rec_capt_aux with (Du := false) (i := S k) (j := 0) (Df := (AtomSet.F.singleton X)) (C := C) (T := T2)...
-    unfold disjoint.
-    fsetdec.
+    specialize (H0 X).
+    eapply open_ct_rec_type_aux with (n := 1)...
+    eapply open_ct_rec_typeN_aux...
   (* Case typ_all *)
   - pick fresh X.
     unfold open_tt in *.
@@ -1197,22 +1169,6 @@ Qed.
 
 (** This section follows the structure of the previous two sections. *)
 
-Lemma open_ee_rec_expr_aux : forall e j v u C D i,
-  i <> j ->
-  (* Does D _need_ to be a concrete capture set here?
-     open_ct_rec_capt requires this.
-   *)
-  capt D ->
-  (`cset_fvars` C) `disjoint` (`cset_fvars` D) ->
-  (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
-  open_ee_rec j v D e = open_ee_rec i u C (open_ee_rec j v D e) ->
-  e = open_ee_rec i u C e.
-Proof with eauto using open_ct_rec_capt.
-  induction e; intros j v u C D i Neq Closed Disj DisjU H; simpl in *; inversion H; f_equal...
-  - Case "exp_bvar".
-    destruct (j===n)... destruct (i===n)... subst. destruct Neq...
-Qed.
-
 Lemma open_ee_rec_type_aux : forall n e u c i,
   exprN n e ->
   i >= n ->
@@ -1233,9 +1189,13 @@ Proof with auto*.
   - pick fresh x. apply open_ct_rec_type...
   - pick fresh x.
     specialize H1 with (x := x) (k := S k).
-    apply open_ee_rec_expr_aux with (j := 0) (v := x) (D := (`cset_fvar` x));
-      simpl...
-    + autounfold in *. fsetdec.
+    specialize (H0 x).
+    unfold open_ee in H0.
+    eapply open_ee_rec_type_aux...
+    eapply (exprN_weakening 1).
+    2: { lia. }
+    eapply open_ee_rec_exprN_aux.
+    eapply expr_to_expr0...
   - apply open_ct_rec_type...
   - pick fresh X.
     unfold open_te in H0.
@@ -1246,9 +1206,13 @@ Proof with auto*.
   - apply open_ct_rec_type...
   - pick fresh x.
     specialize H1 with (x := x) (k := S k).
-    apply open_ee_rec_expr_aux with (j := 0) (v := x) (D := (`cset_fvar` x));
-      simpl...
-    + autounfold in *. fsetdec.
+    specialize (H0 x).
+    unfold open_ee in H0.
+    eapply open_ee_rec_type_aux...
+    eapply (exprN_weakening 1).
+    2: { lia. }
+    eapply open_ee_rec_exprN_aux.
+    eapply expr_to_expr0...
 Qed.
 
 Lemma subst_ct_fresh : forall (x: atom) c t,

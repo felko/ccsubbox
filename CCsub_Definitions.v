@@ -1,7 +1,7 @@
 Require Export TaktikZ.
+Require Export Signatures.
 Require Export Metatheory.
 Require Export CaptureSets.
-Require Export Signatures.
 Require Import Coq.Program.Wf.
 
 (* ********************************************************************** *)
@@ -391,14 +391,14 @@ Inductive bound (x : atom) (T : typ) (E : env) : Prop :=
     binds x (bind_sub T) E ->
     bound x T E.
 
-Definition allbound (E : env) (fvars : atoms) : Prop :=
-  forall x, x `in`A fvars -> exists T, bound x T E.
+Definition allbound (E : env) (xs : atoms) : Prop :=
+  forall x, x `in`A xs -> exists T, bound x T E.
 
 Inductive wf_cset : env -> atoms -> cap -> Prop :=
-  | wf_concrete_cset : forall E A fvars univ labels,
-    allbound E fvars ->
-    fvars `c`A A ->
-    wf_cset E A (cset_set fvars {}N univ labels)
+  | wf_concrete_cset : forall E A xs b ls,
+    allbound E xs ->
+    xs `c`A A ->
+    wf_cset E A (cset_set xs {}N b ls)
 .
 
 Definition wf_cset_in (E : env) (C : cap) : Prop :=
@@ -478,7 +478,7 @@ Inductive wf_sig : sig -> Prop :=
     wf_typ_in empty T ->
     ~ LabelSet.F.In x (Signatures.dom E) ->
     wf_sig ([(x, bind_sig T)] ++ E).
-    
+
 
 (** The definition of "fv" used in typing jdmgnts*)
 Fixpoint free_for_cv (e : exp) : cap :=
@@ -513,7 +513,7 @@ Inductive subcapt : env -> cap -> cap -> Prop :=
       wf_cset_in E (`cset_lvar` l) ->
       wf_cset_in E (cset_set xs {}N b ls) ->
       l `in`L ls ->
-      E |-sc (`cset_lvar` l) <: (cset_set xs {}N b ls)  
+      E |-sc (`cset_lvar` l) <: (cset_set xs {}N b ls)
 
   | subcapt_in_univ : forall E D,
       wf_cset_in E D ->
@@ -615,7 +615,7 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
   | sub_exc : forall E T1 T2,
       E |-s T1 <: T2 ->
       E |-sp (typ_exc T1) <: (typ_exc T2)
-      
+
   where "E |-sp S <: T" := (sub_pre E S T).
 
 
@@ -676,7 +676,7 @@ Inductive typing : env -> sig -> exp -> typ -> Prop :=
       wf_sig Q ->
       Signatures.binds l (bind_sig (typ_capt C (typ_exc T))) Q ->
       E @ Q |-t (exp_handler l) ~: (typ_capt (`cset_lvar` l) (typ_exc T))
-  
+
   where "E @ Q |-t e ~: T" := (typing E Q e T).
 
 
@@ -774,7 +774,7 @@ Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
       E @ Q |-t e ~: (typ_capt C (typ_exc Targ)) ->
       E @ Q |-ctx KThrowArg e :: k ~: Targ
 
-  (** TODO: might get stuck at inversion // added to simplify 
+  (** TODO: might get stuck at inversion // added to simplify
       proofs around narrowing. *)
   | typing_ctx_sub : forall E Q S T k,
       E @ Q |-ctx k ~: T ->
@@ -790,7 +790,7 @@ Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
     C[t] --> C[v]
     t --> v
     ----------
-    
+
 
   | typing_ctx_sub : forall E S T k,
       E |-ctx k ~: T ->
@@ -842,7 +842,7 @@ Inductive step : state -> state -> Prop :=
       〈 v | KFun arg :: k | Q 〉 --> 〈 arg | KArg v :: k | Q 〉
 
   | step_throw : forall e1 e2 k Q,
-      〈 exp_throw e1 e2 | k | Q 〉 --> 〈 e1 | KThrowHandler e2 :: k | Q 〉   
+      〈 exp_throw e1 e2 | k | Q 〉 --> 〈 e1 | KThrowHandler e2 :: k | Q 〉
 
   | step_pop_throw : forall v e2 k Q ,
       value v ->
@@ -859,13 +859,13 @@ Inductive step : state -> state -> Prop :=
       a `~in`L Signatures.dom (bound_capabilities k) ->
       〈 exp_try T e | k | Q 〉-->
         〈 open_ee e (exp_handler a) (`cset_lvar` a) | H a T :: k | ([(a, bind_sig T)]) ++ Q 〉
-    
+
   (** shifting into unwind *)
   | step_unwind : forall v a k Q,
     value v ->
-    〈 v | KThrowArg (exp_handler a) :: k | Q〉--> 
+    〈 v | KThrowArg (exp_handler a) :: k | Q〉-->
       〈throw a # v | k | Q 〉
-  
+
   | step_unwind_skip_fun : forall a v e k Q,
     〈throw a # v | KFun e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
   | step_unwind_skip_arg : forall a v e k Q,
@@ -874,10 +874,10 @@ Inductive step : state -> state -> Prop :=
     〈throw a # v | KThrowHandler e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
   | step_unwind_skip_throw_arg : forall a v e k Q ,
     〈throw a # v | KThrowArg e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
- 
+
   | step_unwind_skip_frame : forall a1 v a2 T k Q ,
     a1 <> a2 ->
-    〈throw a1 # v | H a2 T :: k | Q 〉--> 〈throw a1 # v | k | Q 〉 
+    〈throw a1 # v | H a2 T :: k | Q 〉--> 〈throw a1 # v | k | Q 〉
   | step_unwind_match_frame : forall a v T k Q,
     〈throw a # v | H a T :: k | Q 〉--> 〈 v | k | Q 〉
 
