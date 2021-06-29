@@ -665,6 +665,7 @@ Inductive typing : env -> sig -> exp -> typ -> Prop :=
   | typing_handle : forall L E Q T1 e,
       (forall x : atom, x `notin` L ->
         ([(x, bind_typ (typ_capt {*} (typ_ret T1)))] ++ E) @ Q |-t (open_ee e x (`cset_fvar` x)) ~: T1) ->
+      ~ (E |-sc {*} <: (cv T1)) ->
       E @ Q |-t (exp_handle T1 e) ~: T1
 
   | typing_do_ret : forall E Q C T1 T2 e1 e2,
