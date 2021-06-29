@@ -25,7 +25,7 @@ with fv_cpt (T : pretyp) {struct T} : atoms :=
   | typ_top => {}A
   | typ_arrow T1 T2 => (fv_ct T1) `u`A (fv_ct T2)
   | typ_all T1 T2 => (fv_ct T1) `u`A (fv_ct T2)
-  | typ_exc T => fv_ct T
+  | typ_ret T => fv_ct T
   end.
 
 Fixpoint fv_tt (T : typ) {struct T} : atoms :=
@@ -39,7 +39,7 @@ with fv_tpt (T : pretyp) {struct T} : atoms :=
   | typ_top => {}A
   | typ_arrow T1 T2 => (fv_tt T1) `u`A (fv_tt T2)
   | typ_all T1 T2 => (fv_tt T1) `u`A (fv_tt T2)
-  | typ_exc T => fv_tt T
+  | typ_ret T => fv_tt T
   end.
 
 Fixpoint fv_lt (T : typ) {struct T} : labels :=
@@ -53,7 +53,7 @@ with fv_lpt (T : pretyp) {struct T} : labels :=
   | typ_top => {}L
   | typ_arrow T1 T2 => (fv_lt T1) `u`L (fv_lt T2)
   | typ_all T1 T2 => (fv_lt T1) `u`L (fv_lt T2)
-  | typ_exc T => fv_lt T
+  | typ_ret T => fv_lt T
   end.
 
 Fixpoint fv_ce (e : exp) {struct e} : atoms :=
@@ -64,9 +64,9 @@ Fixpoint fv_ce (e : exp) {struct e} : atoms :=
   | exp_app e1 e2 => (fv_ce e1) `u`A (fv_ce e2)
   | exp_tabs V e1 => (fv_ct V) `u`A (fv_ce e1)
   | exp_tapp e1 V => (fv_ct V) `u`A (fv_ce e1)
-  | exp_try T e1 => (fv_ct T) `u`A (fv_ce e1)
-  | exp_throw e1 e2 => (fv_ce e1) `u`A (fv_ce e2)
-  | exp_handler x => {}A
+  | exp_handle T e1 => (fv_ct T) `u`A (fv_ce e1)
+  | exp_do_ret e1 e2 => (fv_ce e1) `u`A (fv_ce e2)
+  | exp_lvar x => {}A
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
@@ -77,9 +77,9 @@ Fixpoint fv_te (e : exp) {struct e} : atoms :=
   | exp_app e1 e2 => (fv_te e1) `u`A (fv_te e2)
   | exp_tabs V e1 => (fv_tt V) `u`A (fv_te e1)
   | exp_tapp e1 V => (fv_tt V) `u`A (fv_te e1)
-  | exp_try T e1 => (fv_tt T) `u`A (fv_te e1)
-  | exp_throw e1 e2 => (fv_te e1) `u`A (fv_te e2)
-  | exp_handler x => {}A
+  | exp_handle T e1 => (fv_tt T) `u`A (fv_te e1)
+  | exp_do_ret e1 e2 => (fv_te e1) `u`A (fv_te e2)
+  | exp_lvar x => {}A
   end.
 
 Fixpoint fv_le (e : exp) {struct e} : labels :=
@@ -90,9 +90,9 @@ Fixpoint fv_le (e : exp) {struct e} : labels :=
   | exp_app e1 e2 => (fv_le e1) `u`L (fv_le e2)
   | exp_tabs V e1 => (fv_le e1)
   | exp_tapp e1 V => (fv_le e1)
-  | exp_try T e1 => fv_le e1
-  | exp_throw e1 e2 => (fv_le e1) `u`L (fv_le e2)
-  | exp_handler l => {l}L
+  | exp_handle T e1 => fv_le e1
+  | exp_do_ret e1 e2 => (fv_le e1) `u`L (fv_le e2)
+  | exp_lvar l => {l}L
   end.
 
 
@@ -104,9 +104,9 @@ Fixpoint fv_ee (e : exp) {struct e} : atoms :=
   | exp_app e1 e2 => (fv_ee e1) `u`A (fv_ee e2)
   | exp_tabs V e1 => (fv_ee e1)
   | exp_tapp e1 V => (fv_ee e1)
-  | exp_try T e1 => fv_ee e1
-  | exp_throw e1 e2 => (fv_ee e1) `u`A (fv_ee e2)
-  | exp_handler l => {}A
+  | exp_handle T e1 => fv_ee e1
+  | exp_do_ret e1 e2 => (fv_ee e1) `u`A (fv_ee e2)
+  | exp_lvar l => {}A
   end.
 
 (* ********************************************************************** *)
@@ -136,7 +136,7 @@ with subst_tpt (Z : atom) (U : typ) (T : pretyp) {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (subst_tt Z U T1) (subst_tt Z U T2)
   | typ_all T1 T2 => typ_all (subst_tt Z U T1) (subst_tt Z U T2)
-  | typ_exc T => typ_exc (subst_tt Z U T)
+  | typ_ret T => typ_ret (subst_tt Z U T)
   end.
 
 Fixpoint subst_ct (z : atom) (c : cap) (T : typ) {struct T} : typ :=
@@ -150,7 +150,7 @@ with subst_cpt (z : atom) (c : cap) (T : pretyp) {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (subst_ct z c T1) (subst_ct z c T2)
   | typ_all T1 T2 => typ_all (subst_ct z c T1) (subst_ct z c T2)
-  | typ_exc T => typ_exc (subst_ct z c T)
+  | typ_ret T => typ_ret (subst_ct z c T)
   end.
 
 Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
@@ -161,9 +161,9 @@ Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
   | exp_app e1 e2 => exp_app  (subst_te Z U e1) (subst_te Z U e2)
   | exp_tabs V e1 => exp_tabs (subst_tt Z U V)  (subst_te Z U e1)
   | exp_tapp e1 V => exp_tapp (subst_te Z U e1) (subst_tt Z U V)
-  | exp_try T e1 => exp_try (subst_tt Z U T)  (subst_te Z U e1)
-  | exp_throw e1 e2 => exp_throw (subst_te Z U e1) (subst_te Z U e2)
-  | exp_handler l => exp_handler l
+  | exp_handle T e1 => exp_handle (subst_tt Z U T)  (subst_te Z U e1)
+  | exp_do_ret e1 e2 => exp_do_ret (subst_te Z U e1) (subst_te Z U e2)
+  | exp_lvar l => exp_lvar l
   end.
 
 Fixpoint subst_ee (z : atom) (u : exp) (c : cap) (e : exp) {struct e} : exp :=
@@ -174,9 +174,9 @@ Fixpoint subst_ee (z : atom) (u : exp) (c : cap) (e : exp) {struct e} : exp :=
   | exp_app e1 e2 => exp_app (subst_ee z u c e1) (subst_ee z u c e2)
   | exp_tabs t e1 => exp_tabs (subst_ct z c t) (subst_ee z u c e1)
   | exp_tapp e1 t => exp_tapp (subst_ee z u c e1) (subst_ct z c t)
-  | exp_try T e1 => exp_try (subst_ct z c T)  (subst_ee z u c e1)
-  | exp_throw e1 e2 => exp_throw (subst_ee z u c e1) (subst_ee z u c e2)
-  | exp_handler l => exp_handler l
+  | exp_handle T e1 => exp_handle (subst_ct z c T)  (subst_ee z u c e1)
+  | exp_do_ret e1 e2 => exp_do_ret (subst_ee z u c e1) (subst_ee z u c e2)
+  | exp_lvar l => exp_lvar l
   end.
 
 Definition subst_tb (Z : atom) (P : typ) (b : binding) : binding :=
@@ -311,7 +311,7 @@ with pretypeN : nat -> pretyp -> Prop :=
     pretypeN n (typ_all T1 T2)
   | typeN_exc : forall n T1,
     typeN n T1 ->
-    pretypeN n (typ_exc T1).
+    pretypeN n (typ_ret T1).
 
 Lemma open_tt_rec_typeN_aux : forall n S T,
   typeN n (open_tt_rec n S T) ->
@@ -677,13 +677,13 @@ Inductive exprN : nat -> exp -> Prop :=
   | exprN_try : forall n T e1,
       typeN n T ->
       exprN (S n) e1 ->
-      exprN n (exp_try T e1)
+      exprN n (exp_handle T e1)
   | exprN_throw : forall n e1 e2,
       exprN n e1 ->
       exprN n e2 ->
-      exprN n (exp_throw e1 e2)
+      exprN n (exp_do_ret e1 e2)
   | exprN_handler : forall n a,
-      exprN n (exp_handler a).
+      exprN n (exp_lvar a).
 
 Lemma typeN_weakening_aux : forall n T,
   typeN n T ->

@@ -1616,10 +1616,10 @@ Proof with eauto.
       eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
   - wf_typ_inversion WfT.
     split; intros NotIn WfC.
-    + apply wf_typ_exc; fold subst_ct.
-      unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Ap Am t _ _ _ _) as [ IH1 IH2 ]...
-    + apply wf_typ_exc; fold subst_ct.
-      unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Ap Am t _ _ _ _) as [ IH1 IH2 ]...
+    + apply wf_typ_ret; fold subst_ct.
+      unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Am Ap t _ _ _ _) as [ IH1 IH2 ]...
+    + apply wf_typ_ret; fold subst_ct.
+      unshelve epose proof (wf_typ_preserved_by_subst_wf_cset x C E Am Ap t _ _ _ _) as [ IH1 IH2 ]...
 }
 Qed.
 

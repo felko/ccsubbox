@@ -33,7 +33,7 @@ Hint Unfold E.eq : core.
     operations, lemmas, and tactics that simplify working with
     environments. *)
 
-Notation "[ x ]" := (cons x nil).
+Local Notation "[ x ]" := (cons x nil).
 
 Module Signatures.
 

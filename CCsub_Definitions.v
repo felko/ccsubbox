@@ -35,7 +35,7 @@ with pretyp : Type :=
   | typ_arrow : typ -> typ -> pretyp
   | typ_all : typ -> typ -> pretyp
   (** non-local returns: handlers need to be annotated with their return value *)
-  | typ_exc : typ -> pretyp
+  | typ_ret : typ -> pretyp
   .
 
 
@@ -46,13 +46,13 @@ Inductive exp : Type :=
   | exp_app : exp -> exp -> exp
   | exp_tabs : typ -> exp -> exp
   | exp_tapp : exp -> typ -> exp
-  (** try[Targ] { handler => exp }
+  (** handle [Targ] { handler => exp }
       for non-local returns. *)
-  | exp_try : typ -> exp -> exp
+  | exp_handle : typ -> exp -> exp
   (** throw[exp_1/handler] exp_2 *)
-  | exp_throw : exp -> exp -> exp
-  (** handler value -- generated at runtime *)
-  | exp_handler : label -> exp
+  | exp_do_ret : exp -> exp -> exp
+  (** label -- generated at runtime *)
+  | exp_lvar : label -> exp
 .
 
 (** We declare the constructors for indices and variables to be
@@ -120,7 +120,7 @@ with open_tpt_rec (K : nat) (U : typ) (T : pretyp)  {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
   | typ_all T1 T2 => typ_all (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
-  | typ_exc T1 => typ_exc (open_tt_rec K U T1)
+  | typ_ret T1 => typ_ret (open_tt_rec K U T1)
   end.
 
 Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
@@ -131,9 +131,9 @@ Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
   | exp_app e1 e2 => exp_app  (open_te_rec K U e1) (open_te_rec K U e2)
   | exp_tabs V e1 => exp_tabs (open_tt_rec K U V)  (open_te_rec (S K) U e1)
   | exp_tapp e1 V => exp_tapp (open_te_rec K U e1) (open_tt_rec K U V)
-  | exp_try Targ e1 => exp_try (open_tt_rec K U Targ) (open_te_rec (S K) U e1)
-  | exp_throw e1 e2 => exp_throw (open_te_rec K U e1) (open_te_rec K U e2)
-  | exp_handler a => exp_handler a
+  | exp_handle Targ e1 => exp_handle (open_tt_rec K U Targ) (open_te_rec (S K) U e1)
+  | exp_do_ret e1 e2 => exp_do_ret (open_te_rec K U e1) (open_te_rec K U e2)
+  | exp_lvar a => exp_lvar a
   end.
 
 Fixpoint open_ct_rec (k : nat) (c : cap) (T : typ)  {struct T} : typ :=
@@ -147,7 +147,7 @@ with open_cpt_rec (k : nat) (c : cap) (T : pretyp)  {struct T} : pretyp :=
   | typ_top => typ_top
   | typ_arrow T1 T2 => typ_arrow (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
   | typ_all T1 T2 => typ_all (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
-  | typ_exc T1 => typ_exc (open_ct_rec k c T1)
+  | typ_ret T1 => typ_ret (open_ct_rec k c T1)
   end.
 
 Fixpoint open_ee_rec (k : nat) (f : exp) (c : cap) (e : exp)  {struct e} : exp :=
@@ -158,9 +158,9 @@ Fixpoint open_ee_rec (k : nat) (f : exp) (c : cap) (e : exp)  {struct e} : exp :
   | exp_app e1 e2 => exp_app (open_ee_rec k f c e1) (open_ee_rec k f c e2)
   | exp_tabs t e1 => exp_tabs (open_ct_rec k c t) (open_ee_rec (S k) f c e1)
   | exp_tapp e1 t => exp_tapp (open_ee_rec k f c e1) (open_ct_rec k c t)
-  | exp_try Targ e1 => exp_try (open_ct_rec k c Targ) (open_ee_rec (S k) f c e1)
-  | exp_throw e1 e2 => exp_throw (open_ee_rec k f c e1) (open_ee_rec k f c e2)
-  | exp_handler a => exp_handler a
+  | exp_handle Targ e1 => exp_handle (open_ct_rec k c Targ) (open_ee_rec (S k) f c e1)
+  | exp_do_ret e1 e2 => exp_do_ret (open_ee_rec k f c e1) (open_ee_rec k f c e2)
+  | exp_lvar a => exp_lvar a
   end.
 
 
@@ -250,7 +250,7 @@ with pretype : pretyp -> Prop :=
     pretype (typ_all T1 T2)
   | type_exc : forall T1,
     type T1 ->
-    pretype (typ_exc T1)
+    pretype (typ_ret T1)
 .
 
 Inductive expr : exp -> Prop :=
@@ -275,13 +275,13 @@ Inductive expr : exp -> Prop :=
   | expr_try : forall L Targ e1,
       type Targ ->
       (forall x : atom, x `notin` L -> expr (open_ee e1 x (`cset_fvar` x))) ->
-      expr (exp_try Targ e1)
+      expr (exp_handle Targ e1)
   | expr_throw : forall e1 e2,
       expr e1 ->
       expr e2 ->
-      expr (exp_throw e1 e2)
+      expr (exp_do_ret e1 e2)
   | expr_handler : forall a,
-      expr (exp_handler a)
+      expr (exp_lvar a)
   .
 
 
@@ -433,9 +433,9 @@ with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
                           (Ap `u`A {X}A)
                           (Am `u`A {X}A) (open_tt T2 X)) ->
       wf_pretyp E Ap Am (typ_all T1 T2)
-  | wf_typ_exc : forall E Ap Am T,
+  | wf_typ_ret : forall E Ap Am T,
       wf_typ E Ap Am T ->
-      wf_pretyp E Ap Am (typ_exc T)
+      wf_pretyp E Am Ap (typ_ret T)
   .
 
 Definition wf_typ_in (E : env) (T : typ) : Prop :=
@@ -489,9 +489,9 @@ match e with
   | exp_app e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
   | exp_tabs t e1 => (free_for_cv e1)
   | exp_tapp e1 t => (free_for_cv e1)
-  | exp_try Targ e1 => (free_for_cv e1)
-  | exp_throw e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
-  | exp_handler x => (`cset_lvar` x) (** this is crucial! *)
+  | exp_handle Targ e1 => (free_for_cv e1)
+  | exp_do_ret e1 e2 => (cset_union (free_for_cv e1) (free_for_cv e2))
+  | exp_lvar x => (`cset_lvar` x) (** this is crucial! *)
   end.
 
 (* ********************************************************************** *)
@@ -612,9 +612,9 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
           ([(X, bind_sub T1)] ++ E) |-s (open_tt S2 X) <: (open_tt T2 X)) ->
       E |-sp (typ_all S1 S2) <: (typ_all T1 T2)
 
-  | sub_exc : forall E T1 T2,
-      E |-s T1 <: T2 ->
-      E |-sp (typ_exc T1) <: (typ_exc T2)
+  | sub_ret : forall E T1 T2,
+      E |-s T2 <: T1 ->
+      E |-sp (typ_ret T1) <: (typ_ret T2)
 
   where "E |-sp S <: T" := (sub_pre E S T).
 
@@ -662,20 +662,21 @@ Inductive typing : env -> sig -> exp -> typ -> Prop :=
       E |-s S <: T ->
       E @ Q |-t e ~: T
 
-  | typing_try : forall L E Q T1 e,
+  | typing_handle : forall L E Q T1 e,
       (forall x : atom, x `notin` L ->
-        ([(x, bind_typ (typ_capt {*} (typ_exc T1)))] ++ E) @ Q |-t (open_ee e x (`cset_fvar` x)) ~: T1) ->
-      E @ Q |-t (exp_try T1 e) ~: T1
-  | typing_throw : forall E Q C T1 T2 e1 e2,
-      E @ Q |-t e1 ~: (typ_capt C (typ_exc T1)) ->
+        ([(x, bind_typ (typ_capt {*} (typ_ret T1)))] ++ E) @ Q |-t (open_ee e x (`cset_fvar` x)) ~: T1) ->
+      E @ Q |-t (exp_handle T1 e) ~: T1
+
+  | typing_do_ret : forall E Q C T1 T2 e1 e2,
+      E @ Q |-t e1 ~: (typ_capt C (typ_ret T1)) ->
       E @ Q |-t e2 ~: T1 ->
-      E @ Q |-t (exp_throw e1 e2) ~: T2
-  (* The bind_lab and handler constructs are only used at runtime and not part of the surface language *)
-  | typing_handler : forall E Q C T l,
+      E @ Q |-t (exp_do_ret e1 e2) ~: T2
+
+  | typing_lvar : forall E Q C T l,
       wf_env E ->
       wf_sig Q ->
-      Signatures.binds l (bind_sig (typ_capt C (typ_exc T))) Q ->
-      E @ Q |-t (exp_handler l) ~: (typ_capt (`cset_lvar` l) (typ_exc T))
+      Signatures.binds l (bind_sig (typ_capt C (typ_ret T))) Q ->
+      E @ Q |-t (exp_lvar l) ~: (typ_capt (`cset_lvar` l) (typ_ret T))
 
   where "E @ Q |-t e ~: T" := (typing E Q e T).
 
@@ -690,8 +691,8 @@ Inductive value : exp -> Prop :=
   | value_tabs : forall T e1,
       expr (exp_tabs T e1) ->
       value (exp_tabs T e1)
-  | value_handler : forall x,
-      value (exp_handler x)
+  | value_label : forall x,
+      value (exp_lvar x)
 .
 
 
@@ -725,7 +726,7 @@ Notation top := (@nil frame).
 Fixpoint bound_capabilities (k : ctx) : sig :=
   match k with
   | nil => nil
-  | H x T :: k =>  [(x, bind_sig (typ_capt {*} (typ_exc T)))] ++ (bound_capabilities k)
+  | H x T :: k =>  [(x, bind_sig (typ_capt {*} (typ_ret T)))] ++ (bound_capabilities k)
   | _ :: k => bound_capabilities k
   end.
 
@@ -754,24 +755,22 @@ Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
       E @ Q |-ctx k ~: (open_tt T2 T) ->
       E @ Q |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
 
-  | typing_ctx_reset : forall E Q a T Targ k,
-      (** explicit subtyping step here -- do we need it? *)
-      (** do not exist in the typing for try. *)
+  | typing_ctx_reset : forall E Q a C T k,
       E @ Q |-ctx k ~: T ->
-      Signatures.binds a (bind_sig Targ) Q ->
-      E @ Q |-ctx H a Targ :: k ~: Targ
+      Signatures.binds a (bind_sig (typ_capt C (typ_ret T))) Q ->
+      E @ Q |-ctx H a T :: k ~: T
 
   | typing_ctx_throw_handler : forall E Q C T Targ k e,
       E @ Q |-ctx k ~: T ->
       (** for exceptions: need to make sure the type on the handler matches
           the current answer type T *)
       E @ Q |-t e ~: Targ ->
-      E @ Q |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_exc Targ))
+      E @ Q |-ctx KThrowHandler e :: k ~: (typ_capt C (typ_ret Targ))
 
   | typing_ctx_throw_arg : forall E Q C T Targ k e,
       value e ->
       E @ Q |-ctx k ~: T ->
-      E @ Q |-t e ~: (typ_capt C (typ_exc Targ)) ->
+      E @ Q |-t e ~: (typ_capt C (typ_ret Targ)) ->
       E @ Q |-ctx KThrowArg e :: k ~: Targ
 
   (** TODO: might get stuck at inversion // added to simplify
@@ -814,11 +813,11 @@ Inductive typing_state : state -> Prop :=
       E @ Q |-ctx k ~: T ->
       E @ Q |-t e ~: T ->
       typing_state〈 e | k | Q 〉
-  | typ_wind : forall a v k C T Teff E Q,
+  | typ_wind : forall l v k C T Teff E Q,
       E @ Q |-ctx k ~: T ->
       E @ Q |-t v ~: Teff ->
-      Signatures.binds a (bind_sig (typ_capt C (typ_exc Teff))) Q ->
-      typing_state〈throw a # v | k | Q 〉
+      E @ Q |-t (exp_lvar l) ~: (typ_capt C (typ_ret Teff)) ->
+      typing_state〈throw l # v | k | Q 〉
   .
 
 Inductive done : state -> Prop :=
@@ -842,7 +841,7 @@ Inductive step : state -> state -> Prop :=
       〈 v | KFun arg :: k | Q 〉 --> 〈 arg | KArg v :: k | Q 〉
 
   | step_throw : forall e1 e2 k Q,
-      〈 exp_throw e1 e2 | k | Q 〉 --> 〈 e1 | KThrowHandler e2 :: k | Q 〉
+      〈 exp_do_ret e1 e2 | k | Q 〉 --> 〈 e1 | KThrowHandler e2 :: k | Q 〉
 
   | step_pop_throw : forall v e2 k Q ,
       value v ->
@@ -857,13 +856,15 @@ Inductive step : state -> state -> Prop :=
 
   | step_try : forall T e a k Q,
       a `~in`L Signatures.dom (bound_capabilities k) ->
-      〈 exp_try T e | k | Q 〉-->
-        〈 open_ee e (exp_handler a) (`cset_lvar` a) | H a T :: k | ([(a, bind_sig T)]) ++ Q 〉
+      〈 exp_handle T e | k | Q 〉-->
+                                  〈 open_ee e (exp_lvar a) (`cset_lvar` a)
+                                   | H a T :: k
+                                   | ([(a, bind_sig (typ_capt {*} (typ_ret T)))]) ++ Q 〉
 
   (** shifting into unwind *)
   | step_unwind : forall v a k Q,
     value v ->
-    〈 v | KThrowArg (exp_handler a) :: k | Q〉-->
+    〈 v | KThrowArg (exp_lvar a) :: k | Q〉-->
       〈throw a # v | k | Q 〉
 
   | step_unwind_skip_fun : forall a v e k Q,

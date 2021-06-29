@@ -56,10 +56,10 @@ Proof with hint.
   - forwards (U & HtypU & HsubS): IHHtyp...
     exists U; eauto using (sub_transitivity S).
   - Case "exp_abs".
-    exists (typ_exc T).
+    exists (typ_ret T).
     split.
-    + simpl; eapply typing_handler...
-    + note (wf_typ_in E (typ_capt C (typ_exc T))) by admit. (* NOTE: we need wf_sig Q E, in general *)
+    + simpl; eapply typing_lvar...
+    + note (wf_typ_in E (typ_capt C (typ_ret T))) by admit. (* NOTE: we need wf_sig Q E, in general *)
       eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
 Admitted.
 
@@ -1098,7 +1098,7 @@ Proof with hint.
     + eapply sub_through_subst_ct...
       simpl.
       eapply subcapt_reflexivity...
-  - Case "typing_try".
+  - Case "typing_handle".
     assert (wf_env (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E)) as HwfNarrE. {
       pick fresh z for L.
       pose proof (H z Fr)...
@@ -1114,19 +1114,19 @@ Proof with hint.
     destruct (AtomSet.F.mem x (`cset_fvars` (free_for_cv e))) eqn:EqMem.
     + SCase "x in fv e1".
       assert (x `in` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.mem_iff; assumption).
-      pick fresh y and apply typing_try...
+      pick fresh y and apply typing_handle...
       * assert (y <> x) by fsetdec.
         rewrite subst_ee_open_ee_var...
         rewrite <- (subst_cset_univ_idempotent x (free_for_cv u)).
-        rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
+        rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
         apply H0...
     + SCase "x not in fv e1".
       assert (x `notin` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
-      pick fresh y and apply typing_try...
+      pick fresh y and apply typing_handle...
       * assert (y <> x) by fsetdec.
         rewrite subst_ee_open_ee_var...
         rewrite <- (subst_cset_univ_idempotent x (free_for_cv u)).
-        rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
+        rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
         apply H0...
   - simpl subst_ct in IHHtypT1...
   - binds_cases H1.
@@ -1146,7 +1146,7 @@ Proof with hint.
     simpl.
     rewrite <- (subst_cset_fresh x)...
     replace (subst_ct x (free_for_cv u) T) with T...
-    assert (wf_typ_in E (typ_capt C (typ_exc T))) as WfP0 by admit. (* from wf_sig *)
+    assert (wf_typ_in E (typ_capt C (typ_ret T))) as WfP0 by admit. (* from wf_sig *)
     wf_typ_inversion WfP0.
     apply binding_uniq_from_wf_env in H as ?.
     inversion H8; subst.
@@ -1457,7 +1457,7 @@ Proof with simpl_env;
       apply H2...
   - Case "typing_tapp".
     rewrite subst_tt_open_tt...
-  - Case "typing_try".
+  - Case "typing_handle".
     assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
       pick fresh z for L.
       pose proof (H z Fr)...
@@ -1470,7 +1470,7 @@ Proof with simpl_env;
       unfold subst_cset.
       find_and_destroy_set_mem.
       pick fresh y.
-      forwards HA: H0 y ([(y, bind_typ (typ_capt {*} (typ_exc T1)))] ++ F); [notin_solve|..]...
+      forwards HA: H0 y ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F); [notin_solve|..]...
       forwards (U & Zbnd): free_for_cv_bound_typing Z HA. {
         rewrite subst_te_idempotent_wrt_free_for_cv.
         rewrite subst_te_idempotent_wrt_free_for_cv in ZIn.
@@ -1489,20 +1489,20 @@ Proof with simpl_env;
         forwards: binds_In Err;simpl_env in *.
         exfalso;fsetdec.
     }
-    pick fresh y and apply typing_try.
+    pick fresh y and apply typing_handle.
     + rewrite subst_te_open_ee_var...
       rewrite <- (subst_cset_univ_idempotent Z (cv P)).
-      rewrite_env (map (subst_tb Z P) ([(y,  bind_typ (typ_capt {*} (typ_exc T1)))] ++ F) ++ E).
+      rewrite_env (map (subst_tb Z P) ([(y,  bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
       apply H0...
   - unfold subst_cset.
     find_and_destroy_set_mem; [exfalso;fsetdec|].
     admit.                      (* T wf in empty, therefore subst doesn't affect it *)
-    (* apply typing_handler with (C := (subst_cset Z (cv P) C))... *)
+    (* apply typing_lvar with (C := (subst_cset Z (cv P) C))... *)
     (* rewrite (map_subst_tb_id E Z P); *)
     (*   [ | auto | eapply fresh_mid_tail; eauto ]. *)
     (* binds_cases H0; *)
     (*   replace *)
-    (*     (bind_lab (typ_capt (subst_cset Z (cv P) C) (typ_exc (subst_tt Z P T)))) *)
+    (*     (bind_lab (typ_capt (subst_cset Z (cv P) C) (typ_ret (subst_tt Z P T)))) *)
     (*   with *)
-    (*     (subst_tb Z P (bind_lab (typ_capt C (typ_exc T))))... *)
+    (*     (subst_tb Z P (bind_lab (typ_capt C (typ_ret T))))... *)
 Admitted.
