@@ -477,6 +477,7 @@ Inductive wf_sig : sig -> Prop :=
     wf_sig E ->
     wf_typ_in empty T ->
     ~ LabelSet.F.In x (Signatures.dom E) ->
+    ~ x `in`L fv_lt T ->
     wf_sig ([(x, bind_sig T)] ++ E).
 
 
@@ -735,8 +736,8 @@ Reserved Notation "E @ Q |-ctx c ~: T" (at level 70, Q at next level, c at next 
 
 (** IN: env sig ctx*)
 Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
-  | typing_ctx_empty : forall T Q,
-      empty @ Q |-ctx top ~: T
+  | typing_ctx_empty : forall T,
+      empty @ nil |-ctx top ~: T
 
   | typing_ctx_fun : forall E Q C T1 T1' T2 k e,
       E @ Q |-t e ~: T1' ->
@@ -756,10 +757,9 @@ Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
       E @ Q |-ctx k ~: (open_tt T2 T) ->
       E @ Q |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
 
-  | typing_ctx_reset : forall E Q a C T k,
+  | typing_ctx_reset : forall E Q l C T k,
       E @ Q |-ctx k ~: T ->
-      Signatures.binds a (bind_sig (typ_capt C (typ_ret T))) Q ->
-      E @ Q |-ctx H a T :: k ~: T
+      E @ ([(l, (bind_sig (typ_capt C (typ_ret T))))] ++ Q) |-ctx H l T :: k ~: T
 
   | typing_ctx_throw_handler : forall E Q C T Targ k e,
       E @ Q |-ctx k ~: T ->
@@ -799,89 +799,84 @@ Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
 
 where "E @ Q |-ctx K ~: T" := (typing_ctx E Q K T).
 
-
 Inductive state : Type :=
-  | state_step (e : exp) (c : ctx) (Q : sig) : state
-  | state_wind (a : label) (v : exp) (c : ctx) (Q : sig) : state
+  | state_step (e : exp) (c : ctx) : state
+  | state_wind (a : label) (v : exp) (c : ctx) : state
 .
 
-Notation "〈 e | k | Q 〉" := (state_step e k Q ).
-Notation "〈throw a # v | k | Q 〉" :=  (state_wind a v k Q).
+Notation "〈 e | k 〉" := (state_step e k).
+Notation "〈throw a # v | k 〉" :=  (state_wind a v k).
 Reserved Notation "st1 --> st2" (at level 69).
 
 Inductive typing_state : state -> Prop :=
   | typ_step : forall e k T E Q,
       E @ Q |-ctx k ~: T ->
       E @ Q |-t e ~: T ->
-      typing_state〈 e | k | Q 〉
-  | typ_wind : forall l v k C T Teff E Q,
+      typing_state〈 e | k 〉
+  | typ_wind : forall l v k C T R E Q,
       E @ Q |-ctx k ~: T ->
-      E @ Q |-t v ~: Teff ->
-      E @ Q |-t (exp_lvar l) ~: (typ_capt C (typ_ret Teff)) ->
-      typing_state〈throw l # v | k | Q 〉
+      E @ Q |-t v ~: R ->
+      E @ Q |-t (exp_lvar l) ~: (typ_capt C (typ_ret R)) ->
+      typing_state〈throw l # v | k 〉
   .
 
 Inductive done : state -> Prop :=
-  | done_ret : forall e Q,
+  | done_ret : forall e,
       value e ->
-      done 〈 e | top | Q 〉
+      done 〈 e | top 〉
 .
 
 (* ********************************************************************** *)
 (** * #<a name="reduction"></a># Reduction *)
 
 Inductive step : state -> state -> Prop :=
-  | step_app : forall e1 e2 k Q,
-      〈 exp_app e1 e2 | k | Q 〉 --> 〈 e1 | KFun e2 :: k | Q 〉
+  | step_app : forall e1 e2 k,
+      〈 exp_app e1 e2 | k 〉 --> 〈 e1 | KFun e2 :: k 〉
 
-  | step_tapp : forall e T k Q,
-      〈 exp_tapp e T | k | Q 〉 --> 〈 e | KTyp T :: k | Q 〉
+  | step_tapp : forall e T k,
+      〈 exp_tapp e T | k 〉 --> 〈 e | KTyp T :: k 〉
 
-  | step_pop_app : forall v arg k Q,
+  | step_pop_app : forall v arg k,
       value v ->
-      〈 v | KFun arg :: k | Q 〉 --> 〈 arg | KArg v :: k | Q 〉
+      〈 v | KFun arg :: k 〉 --> 〈 arg | KArg v :: k 〉
 
-  | step_throw : forall e1 e2 k Q,
-      〈 exp_do_ret e1 e2 | k | Q 〉 --> 〈 e1 | KThrowHandler e2 :: k | Q 〉
+  | step_throw : forall e1 e2 k,
+      〈 exp_do_ret e1 e2 | k 〉 --> 〈 e1 | KThrowHandler e2 :: k 〉
 
-  | step_pop_throw : forall v e2 k Q ,
+  | step_pop_throw : forall v e2 k,
       value v ->
-      〈 v | KThrowHandler e2 :: k | Q 〉 --> 〈 e2 | KThrowArg v :: k | Q 〉
+      〈 v | KThrowHandler e2 :: k 〉 --> 〈 e2 | KThrowArg v :: k 〉
 
-  | step_abs : forall v T e k Q,
+  | step_abs : forall v T e k,
       value v ->
-      〈  v | KArg (exp_abs T e) :: k | Q 〉 --> 〈 (open_ee e v (free_for_cv v)) | k | Q 〉
+      〈  v | KArg (exp_abs T e) :: k 〉 --> 〈 (open_ee e v (free_for_cv v)) | k 〉
 
-  | step_tabs : forall T1 T2 e1 k Q,
-      〈 exp_tabs T1 e1 | KTyp T2 :: k | Q 〉 --> 〈 (open_te e1 T2) | k | Q 〉
+  | step_tabs : forall T1 T2 e1 k,
+      〈 exp_tabs T1 e1 | KTyp T2 :: k 〉 --> 〈 (open_te e1 T2) | k 〉
 
-  | step_try : forall T e a k Q,
-      a `~in`L Signatures.dom (bound_capabilities k) ->
-      〈 exp_handle T e | k | Q 〉-->
-                                  〈 open_ee e (exp_lvar a) (`cset_lvar` a)
-                                   | H a T :: k
-                                   | ([(a, bind_sig (typ_capt {*} (typ_ret T)))]) ++ Q 〉
+  | step_try : forall T e l k,
+      l `~in`L Signatures.dom (bound_capabilities k) ->
+      〈 exp_handle T e | k 〉--> 〈 open_ee e (exp_lvar l) (`cset_lvar` l) | H l T :: k〉
 
   (** shifting into unwind *)
-  | step_unwind : forall v a k Q,
+  | step_unwind : forall v a k,
     value v ->
-    〈 v | KThrowArg (exp_lvar a) :: k | Q〉-->
-      〈throw a # v | k | Q 〉
+    〈 v | KThrowArg (exp_lvar a) :: k 〉--> 〈throw a # v | k 〉
 
-  | step_unwind_skip_fun : forall a v e k Q,
-    〈throw a # v | KFun e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
-  | step_unwind_skip_arg : forall a v e k Q,
-    〈throw a # v | KArg e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
-  | step_unwind_skip_throw : forall a v e k Q,
-    〈throw a # v | KThrowHandler e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
-  | step_unwind_skip_throw_arg : forall a v e k Q ,
-    〈throw a # v | KThrowArg e :: k | Q 〉 --> 〈throw a # v | k | Q 〉
+  | step_unwind_skip_fun : forall a v e k,
+    〈throw a # v | KFun e :: k 〉 --> 〈throw a # v | k 〉
+  | step_unwind_skip_arg : forall a v e k,
+    〈throw a # v | KArg e :: k 〉 --> 〈throw a # v | k 〉
+  | step_unwind_skip_throw : forall a v e k,
+    〈throw a # v | KThrowHandler e :: k 〉 --> 〈throw a # v | k 〉
+  | step_unwind_skip_throw_arg : forall a v e k,
+    〈throw a # v | KThrowArg e :: k 〉 --> 〈throw a # v | k 〉
 
-  | step_unwind_skip_frame : forall a1 v a2 T k Q ,
+  | step_unwind_skip_frame : forall a1 v a2 T k,
     a1 <> a2 ->
-    〈throw a1 # v | H a2 T :: k | Q 〉--> 〈throw a1 # v | k | Q 〉
-  | step_unwind_match_frame : forall a v T k Q,
-    〈throw a # v | H a T :: k | Q 〉--> 〈 v | k | Q 〉
+    〈throw a1 # v | H a2 T :: k 〉--> 〈throw a1 # v | k 〉
+  | step_unwind_match_frame : forall a v T k,
+    〈throw a # v | H a T :: k 〉--> 〈 v | k 〉
 
 where "st1 --> st2" := (step st1 st2).
 
