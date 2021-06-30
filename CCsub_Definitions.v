@@ -906,6 +906,8 @@ Inductive step : state -> state -> Prop :=
   | step_unwind_skip_arg : forall l v e k,
     〈throw l # v | KArg e :: k 〉 --> 〈throw l # v | k 〉
   | step_unwind_skip_throw : forall l v e k,
+  | step_unwind_skip_typ : forall l v T k,
+    〈throw l # v | KTyp T :: k 〉 --> 〈throw l # v | k 〉
     〈throw l # v | KThrowHandler e :: k 〉 --> 〈throw l # v | k 〉
   | step_unwind_skip_throw_arg : forall l v e k,
     〈throw l # v | KThrowArg e :: k 〉 --> 〈throw l # v | k 〉
