@@ -123,15 +123,12 @@ Proof.
 Qed.
 
 Lemma fv_le_vs_free_for_cv: forall v,
-  value v ->
   fv_le v `c`L `cset_lvars` (free_for_cv v).
 Proof.
-  intros * Val.
-  dependent induction v; try solve [inversion Val]; simpl in *.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  intros *.
+  dependent induction v; simpl in *; trivial.
+  all: lsetdec.
+Qed.
 
 Lemma foo : forall l T v E Q,
   ~ l L`in` cv T ->
@@ -213,6 +210,7 @@ Proof with eauto.
     assert (l <> l0) by lsetdec.
     Signatures.binds_cases H1...
 Admitted.
+
 Lemma preservation : forall e e',
   typing_state e ->
   step e e' ->
@@ -415,6 +413,26 @@ Proof with eauto.
   inversion Typ; subst.
   2: {
     dependent induction H...
+    - dependent induction H1...
+      2: {
+        inversion H1.
+      }
+      inversion select (sub _ S _); subst.
+      1: {
+        rename select (typing _ _ (exp_lvar l) _) into HH.
+        forwards (? & ? & ?): typing_inversion_lvar HH.
+        congruence.
+      }
+      inversion select (sub_pre _ _ (typ_ret R)); subst.
+      applys IHtyping l C1 T1...
+    - forwards: IHtyping_ctx H1 H2.
+      1: { econstructor... }
+      destruct H3.
+      1: { inversion H3. }
+      destruct H3 as (S2 & H3).
+      right.
+      eexists.
+      admit.                    (* missing constructor *)
     -
   }
   (* all is borked below *)

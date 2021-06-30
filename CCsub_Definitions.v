@@ -477,7 +477,6 @@ Inductive wf_sig : sig -> Prop :=
     wf_sig E ->
     wf_typ_in empty T ->
     ~ LabelSet.F.In x (Signatures.dom E) ->
-    ~ x `in`L fv_lt T ->
     wf_sig ([(x, bind_sig T)] ++ E).
 
 
