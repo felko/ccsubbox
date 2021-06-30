@@ -42,20 +42,6 @@ with fv_tpt (T : pretyp) {struct T} : atoms :=
   | typ_ret T => fv_tt T
   end.
 
-Fixpoint fv_lt (T : typ) {struct T} : labels :=
-  match T with
-  | typ_bvar J => {}L
-  | typ_fvar X => {}L
-  | typ_capt C P => `cset_lvars` C `u`L fv_lpt P
-  end
-with fv_lpt (T : pretyp) {struct T} : labels :=
-  match T with
-  | typ_top => {}L
-  | typ_arrow T1 T2 => (fv_lt T1) `u`L (fv_lt T2)
-  | typ_all T1 T2 => (fv_lt T1) `u`L (fv_lt T2)
-  | typ_ret T => fv_lt T
-  end.
-
 Fixpoint fv_ce (e : exp) {struct e} : atoms :=
   match e with
   | exp_bvar i => {}A
@@ -81,20 +67,6 @@ Fixpoint fv_te (e : exp) {struct e} : atoms :=
   | exp_do_ret e1 e2 => (fv_te e1) `u`A (fv_te e2)
   | exp_lvar x => {}A
   end.
-
-Fixpoint fv_le (e : exp) {struct e} : labels :=
-  match e with
-  | exp_bvar i => {}L
-  | exp_fvar x => {}L
-  | exp_abs V e1 => (fv_le e1)
-  | exp_app e1 e2 => (fv_le e1) `u`L (fv_le e2)
-  | exp_tabs V e1 => (fv_le e1)
-  | exp_tapp e1 V => (fv_le e1)
-  | exp_handle T e1 => fv_le e1
-  | exp_do_ret e1 e2 => (fv_le e1) `u`L (fv_le e2)
-  | exp_lvar l => {l}L
-  end.
-
 
 Fixpoint fv_ee (e : exp) {struct e} : atoms :=
   match e with

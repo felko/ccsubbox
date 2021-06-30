@@ -731,6 +731,40 @@ Fixpoint bound_capabilities (k : ctx) : sig :=
   | _ :: k => bound_capabilities k
   end.
 
+Fixpoint fv_le (e : exp) {struct e} : labels :=
+  match e with
+  | exp_bvar i => {}L
+  | exp_fvar x => {}L
+  | exp_abs V e1 => (fv_le e1)
+  | exp_app e1 e2 => (fv_le e1) `u`L (fv_le e2)
+  | exp_tabs V e1 => (fv_le e1)
+  | exp_tapp e1 V => (fv_le e1)
+  | exp_handle T e1 => fv_le e1
+  | exp_do_ret e1 e2 => (fv_le e1) `u`L (fv_le e2)
+  | exp_lvar l => {l}L
+  end.
+
+Fixpoint fv_lt (T : typ) {struct T} : labels :=
+  match T with
+  | typ_bvar J => {}L
+  | typ_fvar X => {}L
+  | typ_capt C P => `cset_lvars` C `u`L fv_lpt P
+  end
+with fv_lpt (T : pretyp) {struct T} : labels :=
+  match T with
+  | typ_top => {}L
+  | typ_arrow T1 T2 => (fv_lt T1) `u`L (fv_lt T2)
+  | typ_all T1 T2 => (fv_lt T1) `u`L (fv_lt T2)
+  | typ_ret T => fv_lt T
+  end.
+
+Fixpoint fv_ld (Q : sig) {struct Q} : labels :=
+  match Q with
+  | nil => {}L
+  | (a, bind_sig T) :: Q' =>
+    fv_lt T `u`L fv_ld Q'
+  end.
+
 Reserved Notation "E @ Q |-ctx c ~: T" (at level 70, Q at next level, c at next level).
 
 (** IN: env sig ctx*)
@@ -756,9 +790,12 @@ Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
       E @ Q |-ctx k ~: (open_tt T2 T) ->
       E @ Q |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
 
-  | typing_ctx_reset : forall E Q l C T k,
+  | typing_ctx_reset : forall E Q l T k,
       E @ Q |-ctx k ~: T ->
-      E @ ([(l, (bind_sig (typ_capt C (typ_ret T))))] ++ Q) |-ctx H l T :: k ~: T
+      ~ `* in` (cv T) ->
+      ~ l L`in` cv T ->
+      ~ l `in`L fv_ld Q ->
+      E @ ([(l, (bind_sig (typ_capt {*} (typ_ret T))))] ++ Q) |-ctx H l T :: k ~: T
 
   | typing_ctx_throw_handler : forall E Q C T Targ k e,
       E @ Q |-ctx k ~: T ->
@@ -816,6 +853,7 @@ Inductive typing_state : state -> Prop :=
       E @ Q |-ctx k ~: T ->
       E @ Q |-t v ~: R ->
       E @ Q |-t (exp_lvar l) ~: (typ_capt C (typ_ret R)) ->
+      value v ->
       typing_state〈throw l # v | k 〉
   .
 
@@ -854,28 +892,29 @@ Inductive step : state -> state -> Prop :=
       〈 exp_tabs T1 e1 | KTyp T2 :: k 〉 --> 〈 (open_te e1 T2) | k 〉
 
   | step_try : forall T e l k,
-      l `~in`L Signatures.dom (bound_capabilities k) ->
+      l `~in`L (Signatures.dom (bound_capabilities k) `u`L fv_ld (bound_capabilities k))->
+      ~ l L`in` cv T ->
       〈 exp_handle T e | k 〉--> 〈 open_ee e (exp_lvar l) (`cset_lvar` l) | H l T :: k〉
 
   (** shifting into unwind *)
-  | step_unwind : forall v a k,
+  | step_unwind : forall v l k,
     value v ->
-    〈 v | KThrowArg (exp_lvar a) :: k 〉--> 〈throw a # v | k 〉
+    〈 v | KThrowArg (exp_lvar l) :: k 〉--> 〈throw l # v | k 〉
 
-  | step_unwind_skip_fun : forall a v e k,
-    〈throw a # v | KFun e :: k 〉 --> 〈throw a # v | k 〉
-  | step_unwind_skip_arg : forall a v e k,
-    〈throw a # v | KArg e :: k 〉 --> 〈throw a # v | k 〉
-  | step_unwind_skip_throw : forall a v e k,
-    〈throw a # v | KThrowHandler e :: k 〉 --> 〈throw a # v | k 〉
-  | step_unwind_skip_throw_arg : forall a v e k,
-    〈throw a # v | KThrowArg e :: k 〉 --> 〈throw a # v | k 〉
+  | step_unwind_skip_fun : forall l v e k,
+    〈throw l # v | KFun e :: k 〉 --> 〈throw l # v | k 〉
+  | step_unwind_skip_arg : forall l v e k,
+    〈throw l # v | KArg e :: k 〉 --> 〈throw l # v | k 〉
+  | step_unwind_skip_throw : forall l v e k,
+    〈throw l # v | KThrowHandler e :: k 〉 --> 〈throw l # v | k 〉
+  | step_unwind_skip_throw_arg : forall l v e k,
+    〈throw l # v | KThrowArg e :: k 〉 --> 〈throw l # v | k 〉
 
-  | step_unwind_skip_frame : forall a1 v a2 T k,
-    a1 <> a2 ->
-    〈throw a1 # v | H a2 T :: k 〉--> 〈throw a1 # v | k 〉
-  | step_unwind_match_frame : forall a v T k,
-    〈throw a # v | H a T :: k 〉--> 〈 v | k 〉
+  | step_unwind_skip_frame : forall l1 v l2 T k,
+    l1 <> l2 ->
+    〈throw l1 # v | H l2 T :: k 〉--> 〈throw l1 # v | k 〉
+  | step_unwind_match_frame : forall l v T k,
+    〈throw l # v | H l T :: k 〉--> 〈 v | k 〉
 
 where "st1 --> st2" := (step st1 st2).
 

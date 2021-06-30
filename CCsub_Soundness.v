@@ -130,18 +130,56 @@ Proof.
   all: lsetdec.
 Qed.
 
-Lemma foo : forall l T v E Q,
+Lemma subcapt_is_label_subset : forall E C D,
+  ~ `* in` D ->
+  E |-sc C <: D ->
+  `cset_lvars` C `c`L `cset_lvars` D.
+Proof with eauto.
+  intros * Notin Hsc.
+  dependent induction Hsc.
+  - congruence.
+  - lsetdec.
+  - lsetdec.
+  - lsetdec.
+  - lsetdec.
+  - lsetdec.
+  - intros l lIn.
+    specialize (H2 l lIn); simpl in H2.
+    clear H0 H1 H3.
+    dependent induction H2; try congruence.
+    + assert (l `in`L {l}L) as HA by lsetdec.
+      rewrite <- x1 in HA.
+      exfalso; lsetdec.
+    + assert (l `in`L {l}L) as HA by lsetdec.
+      rewrite <- x in HA.
+      assert (l0 = l) by lsetdec; subst; clear HA.
+      destruct b0; congruence.
+    + assert (l `in`L {l}L) as HA by lsetdec.
+      rewrite <- x1 in HA.
+      exfalso; lsetdec.
+    + assert (l `in`L {l}L) as HA by lsetdec.
+      rewrite <- x1 in HA.
+      exfalso; lsetdec.
+    + eapply (H3 l)...
+      lsetdec.
+Qed.
+
+Lemma label_absent_from_cv_is_absent_from_fv : forall l T v E Q,
+  ~ `* in` (cv T) ->
   ~ l L`in` cv T ->
   value v ->
   E @ Q |-t v ~: T ->
   l `~in`L fv_le v.
 Proof with eauto.
-  intros * Notin Val Typ.
+  intros * NotUniv Notin Val Typ.
   forwards (U & TypU & SubU): values_have_precise_captures Val Typ.
-  assert (fv_le v `c`L `cset_lvars` (free_for_cv v)) by admit.
-  assert (`cset_lvars` (free_for_cv v) `c`L `cset_lvars` (cv T)) by admit.
+  assert (fv_le v `c`L `cset_lvars` (free_for_cv v)) by (apply fv_le_vs_free_for_cv).
+  assert (`cset_lvars` (free_for_cv v) `c`L `cset_lvars` (cv T)). {
+    inversion SubU; subst.
+    eapply subcapt_is_label_subset...
+  }
   lsetdec.
-Admitted.
+Qed.
 
 Lemma typing_strengthening_sig_absent_label : forall l S E Q v T,
   E @ [(l, bind_sig S)] ++ Q |-t v ~: T ->
@@ -210,6 +248,53 @@ Proof with eauto.
     assert (l <> l0) by lsetdec.
     Signatures.binds_cases H1...
 Admitted.
+
+Lemma typing_ctx_calculates_bound_capabilities : forall E Q k T,
+  E @ Q |-ctx k ~: T ->
+  Q = bound_capabilities k.
+Proof with eauto.
+  intros * TypCtx.
+  dependent induction TypCtx; simpl; Signatures.simpl_env...
+  - rewrite IHTypCtx.
+    repeat f_equal.
+    admit.
+Admitted.
+
+Lemma notin_fv_ld_is_notin_fv_lt_of_bind_sig : forall l1 l2 Q T,
+  l1 `~in`L fv_ld Q ->
+  Signatures.binds l2 (bind_sig T) Q ->
+  l1 `~in`L fv_lt T.
+Proof with eauto.
+  intros * Notin Bnd.
+  dependent induction Q.
+  - inversion Bnd.
+  - destruct a as (l3 & B).
+    inversion Bnd.
+    destruct (l2 ==== l3).
+    + inversion H0; subst.
+      simpl in Notin.
+      lsetdec.
+    + apply IHQ...
+      simpl in Notin; destruct B.
+      lsetdec.
+Qed.
+
+Lemma extract_nontopness : forall l C R Q E k T,
+  Signatures.binds l (bind_sig (typ_capt C (typ_ret R))) Q ->
+  E @ Q |-ctx k ~: T ->
+  ~ `* in` (cv R).
+Proof with eauto.
+  intros * Bnd TypCtx.
+  dependent induction TypCtx...
+  - inversion Bnd.
+  - destruct (l ==== l0).
+    + assert (Signatures.binds l0 (bind_sig (typ_capt C0 (typ_ret T)))
+                               ([(l0, bind_sig (typ_capt C0 (typ_ret T)))] ++ Q)) as Bnd' by eauto.
+      subst.
+      forwards EQ: binds_sig_unique Bnd Bnd'.
+      inversion EQ; subst; clear EQ...
+    + Signatures.binds_cases Bnd...
+Qed.
 
 Lemma preservation : forall e e',
   typing_state e ->
@@ -304,14 +389,15 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
     Notation "#H" := CCsub_Definitions.H.
     dependent induction Typ...
     unfold Signatures.singleton_list.
-    pick fresh x for L.
+    pick fresh x.
     rename H2 into HH.
-    specialize (HH x Fr).
+    rename HH into HH'.
+    forwards HH: HH' x. 1: { notin_solve. }
     assert (wf_pretyp_in E (typ_ret T)) by admit. (* come on *)
     rewrite_env (empty ++ [(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ E) in HH.
     replace Q with ([(l, bind_sig (typ_capt {*} (typ_ret T)))] ++ Q) in HH by admit. (* needs a simple lemma *)
-    rename HH into HH'.
-    forwards HH: typing_narrowing_typ (`cset_lvar` l) (typ_ret T) HH'. 1: {
+    rename HH into HH''.
+    forwards HH: typing_narrowing_typ (`cset_lvar` l) (typ_ret T) HH''. 1: {
       constructor.
       - apply subcapt_universal...
       - eapply sub_pre_reflexivity...
@@ -323,22 +409,41 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
       eapply typing_lvar...
       admit.                  (* wf_sig, needs more preconditions *)
     }
-    simpl_env in HH; unfold Signatures.singleton_list in HH.
+    simpl in HH; simpl_env in HH; unfold Signatures.singleton_list in HH.
+    rewrite <- subst_ee_intro in HH by notin_solve.
+    rewrite <- subst_ct_fresh in HH. 2: {
+      assert (wf_typ_in E T) as WfT by admit. (* from regularity of typing we're doing induction on *)
+      assert (x `~in`A dom E). {
+        assert (wf_env ([(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ E)) as HA by eauto.
+        inversion HA; trivial.
+      }
+      enough (x `~in`A (fv_tt T `u`A fv_ct T)) by notin_solve.
+      applys notin_fv_wf_typ WfT; trivial.
+    }
+
     eapply typ_step.
     + eapply typing_ctx_reset...
-    + admit.
-    (* eapply typ_step. *)
+      * destruct (`cset_uvar` (cv T)) eqn:EQ...
+        enough (E |-sc {*} <: cv T) by contradiction.
+        constructor.
+        2: exact EQ.
+        assert (wf_typ_in E T) by eauto.
+        eapply cv_wf...
+      * forwards EQ: typing_ctx_calculates_bound_capabilities TypCtx.
+        rewrite EQ.
+        lsetdec.
+    + exact HH.
   - dependent induction TypCtx...
     clear IHTypCtx.
     dependent induction H0.
     + inversion H; subst.
       1: {
-        rename select (typing _ _ (exp_lvar a) _) into HH.
+        rename select (typing _ _ (exp_lvar l) _) into HH.
         forwards (? & ? & ?): typing_inversion_lvar HH.
         congruence.
        }
       inversion select (sub_pre _ _ (typ_ret Targ)); subst.
-      applys IHtyping a T1 C1...
+      applys IHtyping l T1 C1...
     + econstructor...
   - dependent induction TypCtx...
     econstructor...
@@ -349,54 +454,59 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
   - dependent induction TypCtx...
     econstructor...
   - dependent induction TypCtx...
-    rename select (typing _ _ (exp_lvar a1) _) into TypLvar.
+    rename select (typing _ _ (exp_lvar l1) _) into TypLvar.
     clear IHTypCtx.
-    dependent induction TypLvar...
-    admit.
-    assert (Signatures.binds a1 (bind_sig (typ_capt C1 (typ_ret R))) Q). {
-      Signatures.binds_cases H1...
-    }
-    assert (a2 `~in`L fv_lt R). {
-     admit.
-    }
-    econstructor...
-    + admit.                    (* by a lemma *)
-    + eapply typing_lvar...
-      inversion H0...
-  - dependent induction TypCtx...
-    clear IHTypCtx.
-
-    (* rewrite <- subst_ct_fresh in HH. 2: { *)
-    (*   assert (wf_typ_in E T) as WfT by admit. (* from regularity of typing we're doing induction on *) *)
-    (*   assert (x `~in`A dom E). { *)
-    (*     assert (wf_env ([(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ E)) as HA by eauto. *)
-    (*     inversion HA; trivial. *)
-    (*   } *)
-    (*   enough (x `~in`A (fv_tt T `u`A fv_ct T)) by notin_solve. *)
-    (*   applys notin_fv_wf_typ WfT; trivial. *)
-    (* } *)
-
-    (* assert (l `~in`L fv_lt T). { *)
-
-    (* } *)
-
-    rename select (typing _ _ (exp_lvar a) _) into TypLvar.
-    dependent induction TypLvar...
-    + inversion select (sub _ S _); subst.
+    dependent induction TypLvar.
+    1: {
+      inversion select (sub _ S _); subst.
       1: {
-        rename select (typing _ _ (exp_lvar a) _) into HH.
+        rename select (typing _ _ (exp_lvar l1) _) into HH.
         forwards (? & ? & ?): typing_inversion_lvar HH.
         congruence.
       }
       inversion select (sub_pre _ _ (typ_ret R)); subst.
-      applys IHTypLvar C1 T1 a...
-    + assert (Signatures.binds a (bind_sig (typ_capt C0 (typ_ret T)))
-                               ([(a, bind_sig (typ_capt C0 (typ_ret T)))] ++ Q)) as BndA by eauto.
-      forwards EQ: binds_sig_unique BndA H1.
-      inversion EQ; subst; clear EQ H1.
-      assert (a `~in`L fv_lt R) by admit. (* from H0 *)
+      applys IHTypLvar T C0 l2 T1...
+    }
+    assert (Signatures.binds l1 (bind_sig (typ_capt C1 (typ_ret R))) Q) as BndL1. {
+      rename select (Signatures.binds l1 _ _) into HA.
+      Signatures.binds_cases HA...
+    }
+    econstructor...
+    + applys typing_strengthening_sig_absent_label H4.
+      applys label_absent_from_cv_is_absent_from_fv H4; trivial.
+      * applys extract_nontopness BndL1...
+      * assert (l2 `~in`L fv_lt (typ_capt C1 (typ_ret R))). {
+          applys notin_fv_ld_is_notin_fv_lt_of_bind_sig BndL1...
+        }
+        simpl in *.
+        destruct R; simpl in *; lsetdec.
+    + eapply typing_lvar...
+      inversion select (wf_sig _)...
+  - dependent induction TypCtx...
+    clear IHTypCtx.
+
+    rename select (typing _ _ (exp_lvar l) _) into TypLvar.
+    dependent induction TypLvar.
+    + inversion select (sub _ S _); subst.
+      1: {
+        rename select (typing _ _ (exp_lvar l) _) into HH.
+        forwards (? & ? & ?): typing_inversion_lvar HH.
+        congruence.
+      }
+      inversion select (sub_pre _ _ (typ_ret R)); subst.
+      applys IHTypLvar T C0 l TypCtx; trivial.
+      rename select (typing _ _ v R) into TypV.
+      applys typing_sub TypV...
+    + rename select (Signatures.binds _ _ _) into BndA.
+      assert (Signatures.binds l (bind_sig (typ_capt C0 (typ_ret T)))
+                               ([(l, bind_sig (typ_capt C0 (typ_ret T)))] ++ Q)) as BndA' by eauto.
+      forwards EQ: binds_sig_unique BndA BndA'.
+      inversion EQ; subst; clear EQ BndA'.
+      forwards: typing_strengthening_sig_absent_label H3.
+      1: {
+        applys label_absent_from_cv_is_absent_from_fv H3...
+      }
       econstructor...
-      admit.                    (* by lemma *)
 Admitted.
 
 (* ********************************************************************** *)
@@ -425,23 +535,55 @@ Proof with eauto.
       }
       inversion select (sub_pre _ _ (typ_ret R)); subst.
       applys IHtyping l C1 T1...
-    - forwards: IHtyping_ctx H1 H2.
+    - forwards IH: IHtyping_ctx H1 H2...
       1: { econstructor... }
-      destruct H3.
-      1: { inversion H3. }
-      destruct H3 as (S2 & H3).
+      destruct IH as [IH|IH].
+      1: { inversion IH. }
+      destruct IH as (S2 & IH).
       right.
       eexists.
       admit.                    (* missing constructor *)
-    -
+    - right.
+      destruct (l0 ==== l); subst.
+      + eexists.
+        apply step_unwind_match_frame.
+      + eexists...
   }
   (* all is borked below *)
-  remember E. generalize dependent Heql.
-  rename select (typing _ _ e T) into Typ'.
-  dependent induction Typ'; intros EQ; subst...
+  replace E with empty in * by admit. (* definitions need to be tweaked *)
+  dependent induction H0.
   - inversion select (binds _ _ _).
   - inversion select (binds _ _ _).
-  - inversion Typ; subst.
+  - assert (value (exp_abs V e1)). {
+      assert (empty @ Q |-t (exp_abs V e1) ~: (typ_capt (free_for_cv e1) (typ_arrow V T1))). {
+        econstructor...
+      }
+      eauto.
+    }
+    clear Typ H1 H2 H3.
+    induction H.
+    + left...
+      constructor...
+    + right...
+    + rename select (typing _ _ e _) into TypE.
+      forwards (? & ? & ?): canonical_form_abs TypE...
+      subst.
+      right; eexists.
+      eapply step_abs...
+    + right.
+      admit.                    (* missing constructor *)
+    + right.
+      admit.                    (* need canonical form of ret *)
+    + eapply IHtyping_ctx...
+      admit.
+
+
+      eexists.
+      eapply step_pop_throw.
+      constructor...
+      typing_regular
+      admit.
+    inversion Typ; subst.
     assert (value (exp_abs V e1))...
     inversion H; subst...
     + left...
