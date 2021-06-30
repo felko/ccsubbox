@@ -257,8 +257,7 @@ Proof with eauto.
   dependent induction TypCtx; simpl; Signatures.simpl_env...
   - rewrite IHTypCtx.
     repeat f_equal.
-    admit.
-Admitted.
+Qed.
 
 Lemma notin_fv_ld_is_notin_fv_lt_of_bind_sig : forall l1 l2 Q T,
   l1 `~in`L fv_ld Q ->
@@ -288,8 +287,8 @@ Proof with eauto.
   dependent induction TypCtx...
   - inversion Bnd.
   - destruct (l ==== l0).
-    + assert (Signatures.binds l0 (bind_sig (typ_capt C0 (typ_ret T)))
-                               ([(l0, bind_sig (typ_capt C0 (typ_ret T)))] ++ Q)) as Bnd' by eauto.
+    + assert (Signatures.binds l0 (bind_sig (typ_capt {*} (typ_ret T)))
+                               ([(l0, bind_sig (typ_capt {*} (typ_ret T)))] ++ Q)) as Bnd' by eauto.
       subst.
       forwards EQ: binds_sig_unique Bnd Bnd'.
       inversion EQ; subst; clear EQ...
@@ -465,9 +464,9 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
         congruence.
       }
       inversion select (sub_pre _ _ (typ_ret R)); subst.
-      applys IHTypLvar T C0 l2 T1...
+      applys IHTypLvar T l2 T1...
     }
-    assert (Signatures.binds l1 (bind_sig (typ_capt C1 (typ_ret R))) Q) as BndL1. {
+    assert (Signatures.binds l1 (bind_sig (typ_capt C0 (typ_ret R))) Q) as BndL1. {
       rename select (Signatures.binds l1 _ _) into HA.
       Signatures.binds_cases HA...
     }
@@ -475,7 +474,7 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
     + applys typing_strengthening_sig_absent_label H4.
       applys label_absent_from_cv_is_absent_from_fv H4; trivial.
       * applys extract_nontopness BndL1...
-      * assert (l2 `~in`L fv_lt (typ_capt C1 (typ_ret R))). {
+      * assert (l2 `~in`L fv_lt (typ_capt C0 (typ_ret R))). {
           applys notin_fv_ld_is_notin_fv_lt_of_bind_sig BndL1...
         }
         simpl in *.
@@ -494,12 +493,10 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
         congruence.
       }
       inversion select (sub_pre _ _ (typ_ret R)); subst.
-      applys IHTypLvar T C0 l TypCtx; trivial.
-      rename select (typing _ _ v R) into TypV.
-      applys typing_sub TypV...
+      applys IHTypLvar T l TypCtx T1...
     + rename select (Signatures.binds _ _ _) into BndA.
-      assert (Signatures.binds l (bind_sig (typ_capt C0 (typ_ret T)))
-                               ([(l, bind_sig (typ_capt C0 (typ_ret T)))] ++ Q)) as BndA' by eauto.
+      assert (Signatures.binds l (bind_sig (typ_capt {*} (typ_ret T)))
+                               ([(l, bind_sig (typ_capt {*} (typ_ret T)))] ++ Q)) as BndA' by eauto.
       forwards EQ: binds_sig_unique BndA BndA'.
       inversion EQ; subst; clear EQ BndA'.
       forwards: typing_strengthening_sig_absent_label H3.
