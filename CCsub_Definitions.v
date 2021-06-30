@@ -656,6 +656,7 @@ Inductive typing : env -> sig -> exp -> typ -> Prop :=
   | typing_tapp : forall T1 E Q e1 T T2 C,
       E @ Q |-t e1 ~: (typ_capt C (typ_all T1 T2)) ->
       E |-s T <: T1 ->
+      ~ (`* in` (cv T1)) ->
       E @ Q |-t (exp_tapp e1 T) ~: (open_tt T2 T)
   | typing_sub : forall S E Q e T,
       E @ Q |-t e ~: S ->
