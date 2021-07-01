@@ -899,6 +899,10 @@ Inductive step : state -> state -> Prop :=
       ~ l L`in` cv T ->
       〈 exp_handle T e | k 〉--> 〈 open_ee e (exp_lvar l) (`cset_lvar` l) | H l T :: k〉
 
+  | step_pop_try : forall l v T k,
+      value v ->
+      〈 v | H l T :: k 〉--> 〈 v | k 〉
+
   (** shifting into unwind *)
   | step_unwind : forall v l k,
     value v ->
