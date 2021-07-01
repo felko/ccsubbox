@@ -223,6 +223,7 @@ Proof with eauto.
     eapply IHTyp.
     + reflexivity.
     + lsetdec.
+    + eauto.
   - applys typing_sub H.
     eapply IHTyp.
     + reflexivity.
@@ -295,37 +296,33 @@ Proof with eauto.
     + Signatures.binds_cases Bnd...
 Qed.
 
+Ltac hint := eauto using typing_ctx_sub, wf_cset_set_weakening.
+
 Lemma preservation : forall e e',
   typing_state e ->
   step e e' ->
   typing_state e'.
-Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
+Proof with hint.
   intros * TypState Step.
   inversion Step; subst; inversion TypState; subst.
   all: try rename select (typing _ _ _ T) into Typ.
   all: try rename select (typing _ _ _ T0) into Typ.
   all: try rename select (typing_ctx _ _ _ T) into TypCtx.
   all: try rename select (typing_ctx _ _ _ T0) into TypCtx.
+
+  Local Ltac solve_it_ctx := dependent induction TypCtx; hint; repeat (econstructor; hint).
+  Local Ltac solve_it_typ := dependent induction Typ; hint; repeat (econstructor; hint).
+
   - Case "step-app".
-    dependent induction Typ...
-    econstructor...
-    econstructor...
+    solve_it_typ.
   - Case "step-tapp".
-    dependent induction Typ...
-    econstructor...
-    econstructor...
+    solve_it_typ.
   - Case "step-fun->arg".
-    dependent induction TypCtx...
-    econstructor...
-    econstructor...
+    solve_it_ctx.
   - Case "step-throw".
-    dependent induction Typ...
-    econstructor...
-    econstructor...
+    solve_it_typ.
   - Case "step-handler->arg".
-    dependent induction TypCtx...
-    econstructor...
-    econstructor...
+    solve_it_ctx.
   - Case "step-app".
     assert (no_type_bindings E) by (eauto using typing_ctx_free_tvar).
     dependent induction TypCtx...
@@ -366,10 +363,9 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
     + (* wf_cset free_for_cv *)
       rename select (typing E _ v _) into TypV.
       forwards WfFvV: typing_cv TypV...
-    + (* wf_cset C *)
-      assert (wf_cset_in E C') as WfC by admit; simpl.
+    + inversion WfTypV. (* wf_cset C *)
+      rename select (wf_cset E _ C') into WfC.
       applys wf_cset_set_weakening WfC...
-
   - Case "step-tapp".
     dependent induction TypCtx...
     econstructor...
@@ -392,7 +388,9 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
     rename H2 into HH.
     rename HH into HH'.
     forwards HH: HH' x. 1: { notin_solve. }
-    assert (wf_pretyp_in E (typ_ret T)) by admit. (* come on *)
+    note (wf_env ((x, bind_typ (typ_capt {*} (typ_ret T))) :: E)).
+    note (wf_typ_in E (typ_capt {*} (typ_ret T))) as WfTypRet.
+    rename select (wf_pretyp E _ _ (typ_ret T)) into WfT.
     rewrite_env (empty ++ [(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ E) in HH.
     replace Q with ([(l, bind_sig (typ_capt {*} (typ_ret T)))] ++ Q) in HH by admit. (* needs a simple lemma *)
     rename HH into HH''.
@@ -411,13 +409,13 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
     simpl in HH; simpl_env in HH; unfold Signatures.singleton_list in HH.
     rewrite <- subst_ee_intro in HH by notin_solve.
     rewrite <- subst_ct_fresh in HH. 2: {
-      assert (wf_typ_in E T) as WfT by admit. (* from regularity of typing we're doing induction on *)
+      (* inversion WfTypRet. *)
       assert (x `~in`A dom E). {
         assert (wf_env ([(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ E)) as HA by eauto.
         inversion HA; trivial.
       }
       enough (x `~in`A (fv_tt T `u`A fv_ct T)) by notin_solve.
-      applys notin_fv_wf_typ WfT; trivial.
+      applys notin_fv_wf_pretyp WfT; trivial.
     }
 
     eapply typ_step.
@@ -444,14 +442,11 @@ Proof with eauto using typing_ctx_sub, wf_cset_set_weakening.
       inversion select (sub_pre _ _ (typ_ret Targ)); subst.
       applys IHtyping l T1 C1...
     + econstructor...
-  - dependent induction TypCtx...
-    econstructor...
-  - dependent induction TypCtx...
-    econstructor...
-  - dependent induction TypCtx...
-    econstructor...
-  - dependent induction TypCtx...
-    econstructor...
+  - solve_it_ctx.
+  - solve_it_ctx.
+  - solve_it_ctx.
+  - solve_it_ctx.
+  - solve_it_ctx.
   - dependent induction TypCtx...
     rename select (typing _ _ (exp_lvar l1) _) into TypLvar.
     clear IHTypCtx.
