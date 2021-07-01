@@ -318,7 +318,15 @@ Proof with eauto.
     + Signatures.binds_cases Bnd...
 Qed.
 
-Ltac hint := eauto using typing_ctx_sub, wf_cset_set_weakening.
+Lemma wf_sig_weaken_head : forall l S Q,
+  wf_sig ([(l, S)] ++ Q) ->
+  wf_sig Q.
+Proof with eauto.
+  intros.
+  dependent induction H...
+Qed.
+
+Ltac hint := eauto using typing_ctx_sub, wf_cset_set_weakening, wf_sig_weaken_head.
 
 
 Lemma preservation : forall e e',
@@ -408,7 +416,7 @@ Proof with hint.
     dependent induction Typ...
     unfold Signatures.singleton_list.
     pick fresh x.
-    rename H3 into HH'.
+    rename H2 into HH'.
     forwards HH: HH' x. 1: { notin_solve. }
     note (wf_env ((x, bind_typ (typ_capt {*} (typ_ret T))) :: E)).
     note (wf_typ_in E (typ_capt {*} (typ_ret T))) as WfTypRet.
@@ -464,6 +472,11 @@ Proof with hint.
         lsetdec.
   - dependent induction TypCtx...
     clear IHTypCtx.
+    econstructor...
+    (** needs lemma *)
+    admit.
+  - dependent induction TypCtx...
+    clear IHTypCtx.
     dependent induction H0.
     + inversion H; subst.
       1: {
@@ -506,8 +519,6 @@ Proof with hint.
         }
         simpl in *.
         destruct R; simpl in *; lsetdec.
-    + eapply typing_lvar...
-      inversion select (wf_sig _)...
   - dependent induction TypCtx...
     clear IHTypCtx.
 
