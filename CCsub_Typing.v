@@ -11,6 +11,7 @@ Require Import CCsub_Subtyping.
 (* ********************************************************************** *)
 (** ** Weakening (5) *)
 
+
 Lemma typing_weakening : forall E F G Q e T,
   typing (G ++ E) Q e T ->
   wf_env (G ++ F ++ E) ->
@@ -293,3 +294,17 @@ Proof with simpl_env; auto.
   - Case "typing_sub".
     eauto using (sub_transitivity T).
 Qed.
+
+
+Lemma typing_weakening_sig : forall Q2 E Q1 Q3 e T,
+  typing E (Q1 ++ Q3) e T ->
+  wf_sig (Q1 ++ Q2 ++ Q3) ->
+  typing E (Q1 ++ Q2 ++ Q3) e T.
+Proof with eauto.
+  intros * Typ Wf.
+  dependent induction Typ; solve_obvious.
+  - eapply typing_lvar with (C := C)...
+    apply Signatures.binds_weaken...
+    (* ok from wf_sig *)
+    admit.
+Admitted.

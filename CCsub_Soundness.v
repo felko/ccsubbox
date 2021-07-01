@@ -298,6 +298,7 @@ Qed.
 
 Ltac hint := eauto using typing_ctx_sub, wf_cset_set_weakening.
 
+
 Lemma preservation : forall e e',
   typing_state e ->
   step e e' ->
@@ -392,7 +393,16 @@ Proof with hint.
     note (wf_typ_in E (typ_capt {*} (typ_ret T))) as WfTypRet.
     rename select (wf_pretyp E _ _ (typ_ret T)) into WfT.
     rewrite_env (empty ++ [(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ E) in HH.
-    replace Q with ([(l, bind_sig (typ_capt {*} (typ_ret T)))] ++ Q) in HH by admit. (* needs a simple lemma *)
+    replace Q with (nil ++ Q) in HH...
+    apply (typing_weakening_sig [(l, bind_sig (typ_capt {*} (typ_ret T)))]) in HH.
+    2: {
+      Signatures.simpl_env.
+      econstructor; simpl.
+      admit.
+      (* here we need to know that T is wellformed in the empty environment. *)
+      admit.
+      admit.
+    }
     rename HH into HH''.
     forwards HH: typing_narrowing_typ (`cset_lvar` l) (typ_ret T) HH''. 1: {
       constructor.
@@ -418,7 +428,7 @@ Proof with hint.
       applys notin_fv_wf_pretyp WfT; trivial.
     }
 
-    eapply typ_step.
+    eapply typ_step...
     + eapply typing_ctx_reset...
       * destruct (`cset_uvar` (cv T)) eqn:EQ...
         enough (E |-sc {*} <: cv T) by contradiction.
@@ -429,7 +439,6 @@ Proof with hint.
       * forwards EQ: typing_ctx_calculates_bound_capabilities TypCtx.
         rewrite EQ.
         lsetdec.
-    + exact HH.
   - dependent induction TypCtx...
     clear IHTypCtx.
     dependent induction H0.
