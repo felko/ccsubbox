@@ -1121,13 +1121,6 @@ Proof with hint.
         rewrite <- (subst_cset_univ_idempotent x (free_for_cv u)).
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
         apply H0...
-      * assert (wf_cset E (dom F `u`A {x}A `u`A dom E) (free_for_cv u)). {
-          forwards WfCvU: typing_cv HtypU.
-          applys wf_cset_set_weakening WfCvU.
-          fsetdec.
-        }
-        forwards WfT1: wf_typ_subst_cb (free_for_cv u) H1; simpl_env...
-        apply (wf_typ_adapt WfT1); simpl_env; fsetdec.
       * intro ScUniv. eapply subcapt_univ_through_subst_cb in ScUniv...
     + SCase "x not in fv e1".
       assert (x `notin` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
@@ -1137,13 +1130,6 @@ Proof with hint.
         rewrite <- (subst_cset_univ_idempotent x (free_for_cv u)).
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
         apply H0...
-      * assert (wf_cset E (dom F `u`A {x}A `u`A dom E) (free_for_cv u)). {
-          forwards WfCvU: typing_cv HtypU.
-          applys wf_cset_set_weakening WfCvU.
-          fsetdec.
-        }
-        forwards WfT1: wf_typ_subst_cb (free_for_cv u) H1; simpl_env...
-        apply (wf_typ_adapt WfT1); simpl_env; fsetdec.
       * intro ScUniv. eapply subcapt_univ_through_subst_cb in ScUniv...
   - simpl subst_ct in IHHtypT1.
     eapply typing_do_ret...
@@ -1530,14 +1516,9 @@ Proof with simpl_env;
       rewrite <- (subst_cset_univ_idempotent Z (cv P)).
       rewrite_env (map (subst_tb Z P) ([(y,  bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
       apply H0...
-    + assert (wf_typ E (dom F `u`A {Z}A `u`A dom E) (dom F `u`A {Z}A `u`A dom E) P) as WfP. {
-        forwards (? & WfP & ?): sub_regular PsubQ.
-        applys wf_typ_set_weakening WfP...
-      }
-      forwards WfP': wf_typ_subst_tb Q H1; simpl_env...
     + intro ScUniv.
-      eapply subcapt_univ_through_subst_tb in ScUniv.
-      * apply H2.
+      eapply subcapt_univ_through_subst_tb in ScUniv...
+      * apply H1.
         destruct ScUniv as [ScUniv|ScUniv].
         1: { eapply subcapt_widening_univ... }
         admit. (** need substitution requirement *)
