@@ -796,6 +796,7 @@ Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
       E @ Q |-ctx k ~: T ->
       ~ `* in` (cv T) ->
       ~ l L`in` cv T ->
+      (* This is a weaker condition than l being fresh during current evaluation. *)
       ~ l `in`L fv_ld Q ->
       E @ ([(l, (bind_sig (typ_capt {*} (typ_ret T))))] ++ Q) |-ctx H l T :: k ~: T
 

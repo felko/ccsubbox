@@ -573,7 +573,6 @@ Proof with eauto.
         apply step_unwind_match_frame.
       + eexists...
   }
-  (* all is borked below *)
   replace E with empty in * by admit. (* definitions need to be tweaked *)
   dependent induction H0.
   - inversion select (binds _ _ _).
