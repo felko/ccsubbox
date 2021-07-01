@@ -645,7 +645,8 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     destruct (x == y). {
       csetdec.
     }
-    forwards (T & B): H8 x. {
+    rename select (allbound _ _) into HH.
+    forwards (T & B): HH x. {
       fsetdec.
     }
     simpl_env in *.
@@ -953,10 +954,36 @@ Proof with simpl_env; auto*.
       inversion Hwf; subst...
   - repeat split...
     forwards: sub_regular H0...
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  - pick fresh x for L.
+    forwards (Henv & Hexpr & Hwf): H0 x Fr.
+    simpl_env in *.
+    repeat split; trivial.
+    + inversion Henv...
+    + econstructor.
+      * applys type_from_wf_typ Hwf...
+      * intros y yFr.
+        forwards (? & ? & ?): H0 y yFr...
+  - repeat split...
+    constructor.
+    + constructor...
+      intros x xIn.
+      exfalso; fsetdec.
+    + assert (wf_pretyp_in (empty ++ empty) (typ_ret T)). {
+        enough (wf_typ_in empty (typ_capt C (typ_ret T))) as HA by (inversion HA; eauto).
+        applys wf_typ_from_binds_sig H1...
+      }
+      rewrite_env (empty ++ E ++ empty).
+      applys wf_pretyp_weakening H2; simpl_env...
+Qed.
+
+Lemma typing_regular_sig : forall E Q e T,
+  typing E Q e T ->
+  wf_sig Q.
+Proof with eauto.
+  intros * Typ.
+  dependent induction Typ; trivial.
+  all: pick fresh x for L...
+Qed.
 
 Lemma value_regular : forall e,
   value e ->

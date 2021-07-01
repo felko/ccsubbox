@@ -1115,12 +1115,19 @@ Proof with hint.
     destruct (AtomSet.F.mem x (`cset_fvars` (free_for_cv e))) eqn:EqMem.
     + SCase "x in fv e1".
       assert (x `in` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.mem_iff; assumption).
-      pick fresh y and apply typing_handle...
+      pick fresh y and apply typing_handle.
       * assert (y <> x) by fsetdec.
         rewrite subst_ee_open_ee_var...
         rewrite <- (subst_cset_univ_idempotent x (free_for_cv u)).
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
         apply H0...
+      * assert (wf_cset E (dom F `u`A {x}A `u`A dom E) (free_for_cv u)). {
+          forwards WfCvU: typing_cv HtypU.
+          applys wf_cset_set_weakening WfCvU.
+          fsetdec.
+        }
+        forwards WfT1: wf_typ_subst_cb (free_for_cv u) H1; simpl_env...
+        apply (wf_typ_adapt WfT1); simpl_env; fsetdec.
       * intro ScUniv. eapply subcapt_univ_through_subst_cb in ScUniv...
     + SCase "x not in fv e1".
       assert (x `notin` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
@@ -1130,8 +1137,26 @@ Proof with hint.
         rewrite <- (subst_cset_univ_idempotent x (free_for_cv u)).
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
         apply H0...
+      * assert (wf_cset E (dom F `u`A {x}A `u`A dom E) (free_for_cv u)). {
+          forwards WfCvU: typing_cv HtypU.
+          applys wf_cset_set_weakening WfCvU.
+          fsetdec.
+        }
+        forwards WfT1: wf_typ_subst_cb (free_for_cv u) H1; simpl_env...
+        apply (wf_typ_adapt WfT1); simpl_env; fsetdec.
       * intro ScUniv. eapply subcapt_univ_through_subst_cb in ScUniv...
-  - simpl subst_ct in IHHtypT1...
+  - simpl subst_ct in IHHtypT1.
+    eapply typing_do_ret...
+    assert (wf_cset E (dom F `u`A {x}A `u`A dom E) (free_for_cv u)). {
+      forwards WfCvU: typing_cv HtypU.
+      applys wf_cset_set_weakening WfCvU.
+      fsetdec.
+    }
+    rename select (wf_typ_in _ T2) into HH.
+    forwards WfT1: wf_typ_subst_cb (free_for_cv u) HH; simpl_env...
+    assert (wf_env (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E)) as HA by auto.
+    forwards: binding_uniq_from_wf_env HA.
+    apply (wf_typ_adapt WfT1); simpl_env; fsetdec.
   - binds_cases H1.
     replace (subst_ct x C (typ_capt (`cset_lvar` l) P)) with (typ_capt (`cset_lvar` l) P).
     2: {
@@ -1149,7 +1174,13 @@ Proof with hint.
     simpl.
     rewrite <- (subst_cset_fresh x)...
     replace (subst_ct x (free_for_cv u) T) with T...
-    assert (wf_typ_in E (typ_capt C (typ_ret T))) as WfP0 by admit. (* from wf_sig *)
+    assert (wf_typ_in E (typ_capt C (typ_ret T))) as WfP0. {
+      assert (wf_typ_in empty (typ_capt C (typ_ret T))). {
+        eapply wf_typ_from_binds_sig...
+      }
+      rewrite_env (empty ++ E ++ empty).
+      eapply wf_typ_in_weakening; simpl_env...
+    }
     wf_typ_inversion WfP0.
     apply binding_uniq_from_wf_env in H as ?.
     inversion H8; subst.
@@ -1499,10 +1530,27 @@ Proof with simpl_env;
       rewrite <- (subst_cset_univ_idempotent Z (cv P)).
       rewrite_env (map (subst_tb Z P) ([(y,  bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
       apply H0...
-    + intro ScUniv. eapply subcapt_univ_through_subst_tb in ScUniv...
-      * apply H1... eapply subcapt_widening_univ...
+    + assert (wf_typ E (dom F `u`A {Z}A `u`A dom E) (dom F `u`A {Z}A `u`A dom E) P) as WfP. {
+        forwards (? & WfP & ?): sub_regular PsubQ.
+        applys wf_typ_set_weakening WfP...
+      }
+      forwards WfP': wf_typ_subst_tb Q H1; simpl_env...
+    + intro ScUniv.
+      eapply subcapt_univ_through_subst_tb in ScUniv.
+      * apply H2.
+        destruct ScUniv as [ScUniv|ScUniv].
+        1: { eapply subcapt_widening_univ... }
         admit. (** need substitution requirement *)
       * eapply wf_env_narrowing...
+  - eapply typing_do_ret.
+    + eapply IHTyp1...
+    + eapply IHTyp2...
+    + assert (wf_typ E (dom F `u`A {Z}A `u`A dom E) (dom F `u`A {Z}A `u`A dom E) P) as WfP. {
+        forwards (? & WfP & ?): sub_regular PsubQ.
+        applys wf_typ_set_weakening WfP...
+      }
+      rename select (wf_typ_in _ T2) into HH.
+      forwards WfP': wf_typ_subst_tb Q HH; simpl_env...
   - unfold subst_cset.
     find_and_destroy_set_mem; [exfalso;fsetdec|].
     admit.                      (* T wf in empty, therefore subst doesn't affect it *)

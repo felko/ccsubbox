@@ -824,6 +824,17 @@ Proof with eauto using wf_typ_weaken_head.
   inversion H3; subst...
 Qed.
 
+Lemma wf_typ_from_binds_sig : forall x U Q,
+  wf_sig Q ->
+  Signatures.binds x (bind_sig U) Q ->
+  wf_typ_in empty U.
+Proof with eauto using wf_typ_weaken_head.
+  intros * Hwf Hbinds.
+  unfold wf_typ_in.
+  induction Hwf; Signatures.binds_cases Hbinds...
+  inversion select (_ = _); subst...
+Qed.
+
 Lemma wf_typ_from_wf_env_typ : forall x T E,
   wf_env ([(x, bind_typ T)] ++ E) ->
   wf_typ_in E T.

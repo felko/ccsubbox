@@ -196,53 +196,43 @@ Proof with eauto.
     + trivial.
     + apply H0.
       notin_solve.
-    + eapply H2.
+    + eapply H2; trivial.
       * notin_solve.
-      * easy.
       * simpl in Notin.
         admit.                  (* need a lemma *)
   - simpl in Notin.
     applys typing_app H.
-    + eapply IHTyp1.
-      * reflexivity.
-      * lsetdec.
-    + eapply IHTyp2.
-      * reflexivity.
-      * lsetdec.
+    + eapply IHTyp1; trivial.
+      lsetdec.
+    + eapply IHTyp2; trivial.
+      lsetdec.
   - pick fresh X and apply typing_tabs.
     + trivial.
     + apply H0.
       notin_solve.
-    + eapply H2.
+    + eapply H2; trivial.
       * notin_solve.
-      * reflexivity.
       * simpl in Notin.
         admit.                  (* need a lemma *)
   - simpl in Notin.
     applys typing_tapp H.
-    eapply IHTyp.
-    + reflexivity.
+    eapply IHTyp; trivial.
     + lsetdec.
-    + eauto.
   - applys typing_sub H.
-    eapply IHTyp.
-    + reflexivity.
-    + lsetdec.
+    eapply IHTyp; trivial.
   - simpl in Notin.
     pick fresh x and apply typing_handle.
     2: { trivial. }
-    eapply H0.
+    eapply H0; trivial.
     + notin_solve.
-    + reflexivity.
     + admit.                    (* needs a lemma *)
+    + trivial.                  (* ...what? how come this wasn't solve before? *)
   - simpl in Notin.
-    eapply typing_do_ret.
-    + eapply IHTyp1.
-      * reflexivity.
-      * lsetdec.
-    + eapply IHTyp2.
-      * reflexivity.
-      * lsetdec.
+    eapply typing_do_ret; trivial.
+    + eapply IHTyp1; trivial.
+      lsetdec.
+    + eapply IHTyp2; trivial.
+      lsetdec.
   - inversion H0; subst.
     simpl in Notin.
     eapply typing_lvar...
@@ -386,8 +376,7 @@ Proof with hint.
     dependent induction Typ...
     unfold Signatures.singleton_list.
     pick fresh x.
-    rename H2 into HH.
-    rename HH into HH'.
+    rename H3 into HH'.
     forwards HH: HH' x. 1: { notin_solve. }
     note (wf_env ((x, bind_typ (typ_capt {*} (typ_ret T))) :: E)).
     note (wf_typ_in E (typ_capt {*} (typ_ret T))) as WfTypRet.
@@ -398,10 +387,12 @@ Proof with hint.
     2: {
       Signatures.simpl_env.
       econstructor; simpl.
-      admit.
-      (* here we need to know that T is wellformed in the empty environment. *)
-      admit.
-      admit.
+      - admit.
+      - (* here we need to know that T is wellformed in the empty environment. *)
+        admit.
+      - forwards EQ: typing_ctx_calculates_bound_capabilities TypCtx.
+        rewrite EQ.
+        lsetdec.
     }
     rename HH into HH''.
     forwards HH: typing_narrowing_typ (`cset_lvar` l) (typ_ret T) HH''. 1: {
@@ -576,14 +567,6 @@ Proof with eauto.
       }
       inversion select (sub_pre _ _ (typ_ret R)); subst.
       applys IHtyping l C1 T1...
-    - forwards IH: IHtyping_ctx H1 H2...
-      1: { econstructor... }
-      destruct IH as [IH|IH].
-      1: { inversion IH. }
-      destruct IH as (S2 & IH).
-      right.
-      eexists.
-      admit.                    (* missing constructor *)
     - right.
       destruct (l0 ==== l); subst.
       + eexists.
