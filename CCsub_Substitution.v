@@ -1122,6 +1122,16 @@ Proof with hint.
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
         apply H0...
       * intro ScUniv. eapply subcapt_univ_through_subst_cb in ScUniv...
+        assert (wf_typ_in (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) T1). {
+          pick fresh y for L.
+          specialize (H y Fr).
+          assert (wf_env ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F ++
+                            [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E)) as HA by eauto.
+          inversion HA; subst.
+          inversion select (wf_typ_in _ (typ_capt {*} (typ_ret T1))); subst.
+          inversion select (wf_pretyp _ _ _ (typ_ret T1)); subst...
+        }
+        eapply cv_wf...
     + SCase "x not in fv e1".
       assert (x `notin` `cset_fvars` (free_for_cv e)) by (rewrite AtomSetFacts.not_mem_iff; assumption).
       pick fresh y and apply typing_handle...
@@ -1131,6 +1141,16 @@ Proof with hint.
         rewrite_env (map (subst_cb x (free_for_cv u)) ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
         apply H0...
       * intro ScUniv. eapply subcapt_univ_through_subst_cb in ScUniv...
+        assert (wf_typ_in (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) T1). {
+          pick fresh y for L.
+          specialize (H y Fr).
+          assert (wf_env ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F ++
+                            [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E)) as HA by eauto.
+          inversion HA; subst.
+          inversion select (wf_typ_in _ (typ_capt {*} (typ_ret T1))); subst.
+          inversion select (wf_pretyp _ _ _ (typ_ret T1)); subst...
+        }
+        eapply cv_wf...
   - simpl subst_ct in IHHtypT1.
     eapply typing_do_ret...
     assert (wf_cset E (dom F `u`A {x}A `u`A dom E) (free_for_cv u)). {
@@ -1522,7 +1542,16 @@ Proof with simpl_env;
         destruct ScUniv as [ScUniv|ScUniv].
         1: { eapply subcapt_widening_univ... }
         admit. (** need substitution requirement *)
-      * eapply wf_env_narrowing...
+      * assert (wf_typ_in (F ++ [(Z, bind_sub Q)] ++ E) T1). {
+          pick fresh y for L.
+          specialize (H y Fr).
+          assert (wf_env ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F ++
+                            [(Z, bind_sub Q)] ++ E)) as HA by eauto.
+          inversion HA; subst.
+          inversion select (wf_typ_in _ (typ_capt {*} (typ_ret T1))); subst.
+          inversion select (wf_pretyp _ _ _ (typ_ret T1)); subst...
+        }
+        eapply wf_typ_ignores_sub_bindings...
   - eapply typing_do_ret.
     + eapply IHTyp1...
     + eapply IHTyp2...
