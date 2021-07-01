@@ -328,6 +328,24 @@ Qed.
 
 Ltac hint := eauto using typing_ctx_sub, wf_cset_set_weakening, wf_sig_weaken_head.
 
+Lemma handler_return_value : forall E Q e l B T,
+  l `~in`L (`cset_lvars` (free_for_cv e)) ->
+  E @ [(l, B)] ++ Q |-t e ~: T ->
+  E @ Q |-t e ~: T.
+Proof with hint.
+  intros * Hfree Typ.
+  dependent induction Typ.
+  - econstructor...
+  - econstructor...
+  - econstructor...
+    intros x Hfresh.
+    forwards : H2 x Hfresh Q.
+    * instantiate (1 := l)...
+      admit.
+    * reflexivity.
+    * assumption.
+  - econstructor... 
+Admitted.
 
 Lemma preservation : forall e e',
   typing_state e ->
@@ -473,6 +491,7 @@ Proof with hint.
   - dependent induction TypCtx...
     clear IHTypCtx.
     econstructor...
+    apply handler_return_value.
     (** needs lemma *)
     admit.
   - dependent induction TypCtx...
