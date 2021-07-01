@@ -618,10 +618,42 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     }
     simpl_env in *.
     exists T. destruct_bound B; binds_cases B...
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  - pick fresh y.
+    assert (y `notin` L) by fsetdec.
+    assert (~ y A`in` (free_for_cv e)). {
+      pose proof (free_for_cv_is_free_ee e) as P...
+      inversion P; subst.
+      simpl in *.
+      csetdec.
+    }
+    forwards SpH0: H0 y...
+    pose proof (free_for_cv_open e 0 y)...
+    pose proof (cv_free_never_universal).
+    pose proof (cv_free_is_bvar_free e).
+    destruct (free_for_cv e) eqn:Hfcv1; subst...
+    unfold open_ee in *.
+    inversion SpH0; subst...
+    rename select (_ = _) into EQ.
+    rename select (cset_subset_prop _ _) into HH.
+    destruct HH as (HA1 & HA2 & HA3).
+    rewrite <- EQ in *.
+    simpl in *.
+    assert (t0 = {}N) by fnsetdec; subst...
+    constructor.
+    2: clear Fr; fsetdec.
+    intros x ?.
+    destruct (x == y). {
+      csetdec.
+    }
+    forwards (T & B): H8 x. {
+      fsetdec.
+    }
+    simpl_env in *.
+    exists T. destruct_bound B; binds_cases B...
+  - apply wf_cset_over_union...
+  - econstructor...
+    intros x xInE. fsetdec.
+Qed.
 
 
 Lemma subst_cset_fresh_for_cv : forall z t C,
