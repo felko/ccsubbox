@@ -181,6 +181,39 @@ Proof with eauto.
   lsetdec.
 Qed.
 
+Lemma notin_fv_le_open_ee_rec : forall k x C l e,
+  l `~in`L `cset_lvars` C ->
+  l `~in`L fv_le e ->
+  l `~in`L fv_le (open_ee_rec k (exp_fvar x) C e).
+Proof with eauto.
+  intros * NotinC NotinE.
+  generalize dependent k.
+  dependent induction e; intro k; simpl in *...
+  - destruct (k === n); simpl; lsetdec.
+  - lets: IHe1 NotinC __. 1: { lsetdec. }
+    lets: IHe2 NotinC __. 1: { lsetdec. }
+    trivial...
+  - lets: IHe1 NotinC __. 1: { lsetdec. }
+    lets: IHe2 NotinC __. 1: { lsetdec. }
+    trivial...
+Qed.
+
+Lemma notin_fv_le_open_te_rec : forall k T l e,
+  l `~in`L fv_lt T ->
+  l `~in`L fv_le e ->
+  l `~in`L fv_le (open_te_rec k T e).
+Proof with eauto.
+  intros * NotinC NotinE.
+  generalize dependent k.
+  dependent induction e; intro k; simpl in *...
+  - lets: IHe1 NotinC __. 1: { lsetdec. }
+    lets: IHe2 NotinC __. 1: { lsetdec. }
+    trivial...
+  - lets: IHe1 NotinC __. 1: { lsetdec. }
+    lets: IHe2 NotinC __. 1: { lsetdec. }
+    trivial...
+Qed.
+
 Lemma typing_strengthening_sig_absent_label : forall l S E Q v T,
   E @ [(l, bind_sig S)] ++ Q |-t v ~: T ->
   l `~in`L fv_le v ->
@@ -199,7 +232,7 @@ Proof with eauto.
     + eapply H2; trivial.
       * notin_solve.
       * simpl in Notin.
-        admit.                  (* need a lemma *)
+        unfold open_ee; eapply notin_fv_le_open_ee_rec...
   - simpl in Notin.
     applys typing_app H.
     + eapply IHTyp1; trivial.
@@ -213,7 +246,7 @@ Proof with eauto.
     + eapply H2; trivial.
       * notin_solve.
       * simpl in Notin.
-        admit.                  (* need a lemma *)
+        unfold open_te; eapply notin_fv_le_open_te_rec...
   - simpl in Notin.
     applys typing_tapp H.
     eapply IHTyp; trivial.
@@ -225,8 +258,7 @@ Proof with eauto.
     2: { trivial. }
     eapply H0; trivial.
     + notin_solve.
-    + admit.                    (* needs a lemma *)
-    + trivial.                  (* ...what? how come this wasn't solve before? *)
+    + unfold open_ee; eapply notin_fv_le_open_ee_rec...
   - simpl in Notin.
     eapply typing_do_ret; trivial.
     + eapply IHTyp1; trivial.
@@ -238,7 +270,7 @@ Proof with eauto.
     eapply typing_lvar...
     assert (l <> l0) by lsetdec.
     Signatures.binds_cases H1...
-Admitted.
+Qed.
 
 Lemma typing_ctx_calculates_bound_capabilities : forall E Q k T,
   E @ Q |-ctx k ~: T ->
