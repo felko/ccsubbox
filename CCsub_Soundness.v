@@ -347,6 +347,7 @@ Proof with hint.
     solve_it_typ.
   - Case "step-tapp".
     solve_it_typ.
+    admit. (* T1 not universal, T <: T1 --> T not universal *)
   - Case "step-fun->arg".
     solve_it_ctx.
   - Case "step-throw".
@@ -410,7 +411,6 @@ Proof with hint.
     rewrite (subst_tt_intro x)...
     rewrite_env (map (subst_tb x T2) empty ++ empty).
     apply (typing_through_subst_te T0)...
-    admit.                      (* need a premise on the constructor *)
   - assert (no_type_bindings empty) by (eauto using typing_ctx_free_tvar).
     Notation "#H" := CCsub_Definitions.H.
     dependent induction Typ...
