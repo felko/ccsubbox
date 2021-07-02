@@ -67,14 +67,14 @@ Lemma dom_x_subst_away : forall x f b F E,
   wf_env (F ++ [(x, b)] ++ E) ->
   dom (map f F ++ E) = dom (F ++ [(x, b)] ++ E) `remove` x.
 Proof with eauto*.
-  (* intros * Hwf.
+  intros * Hwf.
   simpl_env in *.
   assert (x `notin` (dom F `union` dom E)). {
     pose proof (binding_uniq_from_ok _ F E x _ ltac:(eauto)).
     fsetdec.
   }
-  fsetdec. *)
-Admitted.
+  fsetdec.
+Qed.
 
 Lemma binding_uniq_from_wf_env : forall F E x b,
   wf_env (F ++ ([(x, b)]) ++ E) ->

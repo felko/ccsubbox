@@ -326,31 +326,12 @@ Proof with eauto.
   dependent induction H...
 Qed.
 
-Ltac hint := eauto using typing_ctx_sub, wf_cset_set_weakening, wf_sig_weaken_head.
-
-Lemma handler_return_value : forall E Q e l B T,
-  l `~in`L (`cset_lvars` (free_for_cv e)) ->
-  E @ [(l, B)] ++ Q |-t e ~: T ->
-  E @ Q |-t e ~: T.
-Proof with hint.
-  intros * Hfree Typ.
-  dependent induction Typ.
-  - econstructor...
-  - econstructor...
-  - econstructor...
-    intros x Hfresh.
-    forwards : H2 x Hfresh Q.
-    * instantiate (1 := l)...
-      admit.
-    * reflexivity.
-    * assumption.
-  - econstructor... 
-Admitted.
-
 Lemma preservation : forall e e',
-  typing_state e ->
+  typing_state empty e ->
   step e e' ->
-  typing_state e'.
+  typing_state empty e'.
+Ltac hint :=
+    eauto using typing_ctx_sub, wf_cset_set_weakening, wf_sig_weaken_head.
 Proof with hint.
   intros * TypState Step.
   inversion Step; subst; inversion TypState; subst.
@@ -373,7 +354,7 @@ Proof with hint.
   - Case "step-handler->arg".
     solve_it_ctx.
   - Case "step-app".
-    assert (no_type_bindings E) by (eauto using typing_ctx_free_tvar).
+    assert (no_type_bindings empty) by (eauto using typing_ctx_free_tvar).
     dependent induction TypCtx...
 
     rename select (typing _ _ (exp_abs _ _) _) into TypAbs.
@@ -387,8 +368,8 @@ Proof with hint.
     eapply typ_step...
     rewrite (subst_ee_intro x) by notin_solve.
     rewrite (subst_ct_intro x) by notin_solve.
-    assert (wf_typ_in E T1') as WfTypV by eauto.
-    assert (wf_typ_in E T1)  as WfTypT by eauto.
+    assert (wf_typ_in empty T1') as WfTypV by eauto.
+    assert (wf_typ_in empty T1)  as WfTypT by eauto.
     (**
       E - environment
       x - fresh atom
@@ -398,9 +379,9 @@ Proof with hint.
     forwards (C' & P' & ?): inversion_toplevel_type WfTypV; subst...
     forwards (C'' & P'' & ?): inversion_toplevel_type WfTypT; subst...
 
-    eapply typing_through_subst_ee' with (Ap := dom E `union` singleton x) (Am := dom E); trivial.
-    4,5: simpl_env; clear_frees; fsetdec.
-    3: notin_solve.
+    eapply typing_through_subst_ee' with (Ap := dom empty `union` singleton x) (Am := dom empty); trivial.
+    3,4: simpl_env; clear_frees; fsetdec.
+    (* 3: notin_solve. *)
     + (* typing *)
       rewrite_nil_concat.
       eapply typing_narrowing_typ...
@@ -410,10 +391,10 @@ Proof with hint.
     + rewrite_nil_concat.
       eapply wf_typ_narrowing_typ_base with (V := T); simpl_env...
     + (* wf_cset free_for_cv *)
-      rename select (typing E _ v _) into TypV.
+      rename select (typing empty _ v _) into TypV.
       forwards WfFvV: typing_cv TypV...
     + inversion WfTypV. (* wf_cset C *)
-      rename select (wf_cset E _ C') into WfC.
+      rename select (wf_cset empty _ C') into WfC.
       applys wf_cset_set_weakening WfC...
   - Case "step-tapp".
     dependent induction TypCtx...
@@ -427,27 +408,32 @@ Proof with hint.
     destruct (TypingX x) as [Typ' SubS2]...
     rewrite (subst_te_intro x)...
     rewrite (subst_tt_intro x)...
-    rewrite_env (map (subst_tb x T2) empty ++ E).
+    rewrite_env (map (subst_tb x T2) empty ++ empty).
     apply (typing_through_subst_te T0)...
-  - assert (no_type_bindings E) by (eauto using typing_ctx_free_tvar).
+    admit.                      (* need a premise on the constructor *)
+  - assert (no_type_bindings empty) by (eauto using typing_ctx_free_tvar).
     Notation "#H" := CCsub_Definitions.H.
     dependent induction Typ...
     unfold Signatures.singleton_list.
     pick fresh x.
     rename H2 into HH'.
     forwards HH: HH' x. 1: { notin_solve. }
-    note (wf_env ((x, bind_typ (typ_capt {*} (typ_ret T))) :: E)).
-    note (wf_typ_in E (typ_capt {*} (typ_ret T))) as WfTypRet.
-    rename select (wf_pretyp E _ _ (typ_ret T)) into WfT.
-    rewrite_env (empty ++ [(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ E) in HH.
+    note (wf_env ((x, bind_typ (typ_capt {*} (typ_ret T))) :: empty)).
+    note (wf_typ_in empty (typ_capt {*} (typ_ret T))) as WfTypRet.
+    rename select (wf_pretyp empty _ _ (typ_ret T)) into WfT.
+    rewrite_env (empty ++ [(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ empty) in HH.
     replace Q with (nil ++ Q) in HH...
     apply (typing_weakening_sig [(l, bind_sig (typ_capt {*} (typ_ret T)))]) in HH.
     2: {
       Signatures.simpl_env.
-      econstructor; simpl.
-      - admit.
-      - (* here we need to know that T is wellformed in the empty environment. *)
-        admit.
+      assert (wf_sig Q). {
+        pick fresh y for L.
+        eapply typing_regular_sig.
+        applys HH' y; trivial.
+      }
+      econstructor; simpl; trivial.
+      (* - (* here we need to know that T is wellformed in the empty environment. *) *)
+      (*   admit. *)
       - forwards EQ: typing_ctx_calculates_bound_capabilities TypCtx.
         rewrite EQ.
         lsetdec.
@@ -463,14 +449,25 @@ Proof with hint.
     2: {
       simpl free_for_cv.
       eapply typing_lvar...
-      admit.                  (* wf_sig, needs more preconditions *)
+      Signatures.simpl_env.
+      assert (wf_sig Q). {
+        pick fresh y for L.
+        eapply typing_regular_sig.
+        applys HH' y; trivial.
+      }
+      econstructor; simpl; trivial.
+      (* - (* here we need to know that T is wellformed in the empty environment. *) *)
+      (*   admit. *)
+      - forwards EQ: typing_ctx_calculates_bound_capabilities TypCtx.
+        rewrite EQ.
+        lsetdec.
     }
     simpl in HH; simpl_env in HH; unfold Signatures.singleton_list in HH.
     rewrite <- subst_ee_intro in HH by notin_solve.
     rewrite <- subst_ct_fresh in HH. 2: {
       (* inversion WfTypRet. *)
-      assert (x `~in`A dom E). {
-        assert (wf_env ([(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ E)) as HA by eauto.
+      assert (x `~in`A dom empty). {
+        assert (wf_env ([(x, bind_typ (typ_capt {*} (typ_ret T)))] ++ empty)) as HA by eauto.
         inversion HA; trivial.
       }
       enough (x `~in`A (fv_tt T `u`A fv_ct T)) by notin_solve.
@@ -480,10 +477,10 @@ Proof with hint.
     eapply typ_step...
     + eapply typing_ctx_reset...
       * destruct (`cset_uvar` (cv T)) eqn:EQ...
-        enough (E |-sc {*} <: cv T) by contradiction.
+        enough (empty |-sc {*} <: cv T) by contradiction.
         constructor.
         2: exact EQ.
-        assert (wf_typ_in E T) by eauto.
+        assert (wf_typ_in empty T) by eauto.
         eapply cv_wf...
       * forwards EQ: typing_ctx_calculates_bound_capabilities TypCtx.
         rewrite EQ.
@@ -491,9 +488,8 @@ Proof with hint.
   - dependent induction TypCtx...
     clear IHTypCtx.
     econstructor...
-    apply handler_return_value.
-    (** needs lemma *)
-    admit.
+    applys typing_strengthening_sig_absent_label Typ.
+    applys label_absent_from_cv_is_absent_from_fv Typ; trivial.
   - dependent induction TypCtx...
     clear IHTypCtx.
     dependent induction H0.
@@ -530,8 +526,9 @@ Proof with hint.
       Signatures.binds_cases HA...
     }
     econstructor...
-    + applys typing_strengthening_sig_absent_label H4.
-      applys label_absent_from_cv_is_absent_from_fv H4; trivial.
+    + rename select (typing _ _ v R) into TypV.
+      applys typing_strengthening_sig_absent_label TypV.
+      applys label_absent_from_cv_is_absent_from_fv TypV; trivial.
       * applys extract_nontopness BndL1...
       * assert (l2 `~in`L fv_lt (typ_capt C0 (typ_ret R))). {
           applys notin_fv_ld_is_notin_fv_lt_of_bind_sig BndL1...
@@ -556,9 +553,10 @@ Proof with hint.
                                ([(l, bind_sig (typ_capt {*} (typ_ret T)))] ++ Q)) as BndA' by eauto.
       forwards EQ: binds_sig_unique BndA BndA'.
       inversion EQ; subst; clear EQ BndA'.
-      forwards: typing_strengthening_sig_absent_label H3.
+      rename select (typing _ _ v T) into TypV.
+      forwards: typing_strengthening_sig_absent_label TypV.
       1: {
-        applys label_absent_from_cv_is_absent_from_fv H3...
+        applys label_absent_from_cv_is_absent_from_fv TypV...
       }
       econstructor...
 Admitted.
@@ -586,31 +584,30 @@ Qed.
 
 Lemma progress_value_step : forall v k,
   value v ->
-  typing_state 〈 v | k 〉 ->
+  typing_state empty 〈 v | k 〉 ->
   done 〈 v | k 〉 \/ exists s2, 〈 v | k 〉 --> s2.
 Proof with eauto.
   intros * Val Typ.
   inversion Typ; subst.
-  replace E with empty in * by admit. (* definitions/lemma need adjusting *)
-  dependent induction H1.
+  dependent induction H2.
   - left; constructor...
   - right...
   - forwards (V & e1 & ?): canonical_form_abs H0...
     subst.
     right...
-  - forwards (V & e1 & ?): canonical_form_tabs H2...
+  - forwards (V & e1 & ?): canonical_form_tabs H3...
     subst.
     right...
-  - admit.                      (* missing constructor *)
-  - forwards (? & ?): canonical_form_lvar H2...
+  - right...
+  - forwards (? & ?): canonical_form_lvar H3...
   - forwards (? & ?): canonical_form_lvar H0...
     subst.
     right...
   - eauto.
-Admitted.
+Qed.
 
 Lemma progress_step : forall s1,
-  typing_state s1 ->
+  typing_state empty s1 ->
   done s1 \/ exists s2, s1 --> s2.
 Proof with eauto.
   intros * Typ.
@@ -635,7 +632,6 @@ Proof with eauto.
         apply step_unwind_match_frame.
       + eexists...
   }
-  replace E with empty in * by admit. (* definitions need to be tweaked *)
   dependent induction H0.
   - inversion select (binds _ _ _).
   - inversion select (binds _ _ _).
@@ -666,4 +662,4 @@ Proof with eauto.
   - right...
   - assert (value (exp_lvar l)) by eauto.
     eapply progress_value_step...
-Admitted.
+Qed.

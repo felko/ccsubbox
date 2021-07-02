@@ -790,6 +790,7 @@ Inductive typing_ctx : env -> sig -> ctx -> typ -> Prop :=
   | typing_ctx_typ : forall E Q C T T1 T2 k,
       E |-s T <: T1 ->
       E @ Q |-ctx k ~: (open_tt T2 T) ->
+      ~ `* in` (cv T) ->
       E @ Q |-ctx KTyp T :: k ~: (typ_capt C (typ_all T1 T2))
 
   | typing_ctx_reset : forall E Q l T k,
@@ -847,17 +848,17 @@ Notation "〈 e | k 〉" := (state_step e k).
 Notation "〈throw a # v | k 〉" :=  (state_wind a v k).
 Reserved Notation "st1 --> st2" (at level 69).
 
-Inductive typing_state : state -> Prop :=
+Inductive typing_state : env -> state -> Prop :=
   | typ_step : forall e k T E Q,
       E @ Q |-ctx k ~: T ->
       E @ Q |-t e ~: T ->
-      typing_state〈 e | k 〉
+      typing_state E〈 e | k 〉
   | typ_wind : forall l v k C T R E Q,
       E @ Q |-ctx k ~: T ->
       E @ Q |-t v ~: R ->
       E @ Q |-t (exp_lvar l) ~: (typ_capt C (typ_ret R)) ->
       value v ->
-      typing_state〈throw l # v | k 〉
+      typing_state E〈throw l # v | k 〉
   .
 
 Inductive done : state -> Prop :=

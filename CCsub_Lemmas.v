@@ -795,10 +795,9 @@ Proof with auto.
     forwards: notin_fv_tt_open_tt HA.
     notin_solve.
   - inversion WfT; subst.
-    eapply bind_typ_notin_fv_tt...
-    admit.
+    applys bind_typ_notin_fv_tt Hbnd; eauto.
 }
-Admitted.
+Qed.
 
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)

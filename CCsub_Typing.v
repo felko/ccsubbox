@@ -322,6 +322,8 @@ Proof with simpl_env; auto.
     eauto using (sub_transitivity T).
 Qed.
 
+Lemma ok_from_wf_sig : forall Q, wf_sig Q -> Signatures.ok Q.
+Proof. intros* H. dependent induction H; eauto. Qed.
 
 Lemma typing_weakening_sig : forall Q2 E Q1 Q3 e T,
   typing E (Q1 ++ Q3) e T ->
@@ -332,6 +334,5 @@ Proof with eauto.
   dependent induction Typ; solve_obvious.
   - eapply typing_lvar with (C := C)...
     apply Signatures.binds_weaken...
-    (* ok from wf_sig *)
-    admit.
-Admitted.
+    eapply ok_from_wf_sig...
+Qed.

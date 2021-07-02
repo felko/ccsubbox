@@ -59,9 +59,16 @@ Proof with hint.
     exists (typ_ret T).
     split.
     + simpl; eapply typing_lvar...
-    + note (wf_typ_in E (typ_capt C (typ_ret T))) by admit. (* NOTE: we need wf_sig Q E, in general *)
+    + assert (wf_typ_in E (typ_capt C (typ_ret T))) as HA. {
+        enough (wf_typ_in empty (typ_capt C (typ_ret T))). {
+          rewrite_env (empty ++ E ++ empty).
+          eapply wf_typ_in_weakening; simpl_env...
+        }
+        eapply wf_typ_from_binds_sig...
+      }
+      inversion HA; subst.
       eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-Admitted.
+Qed.
 
 
 (************************************************************************ *)
@@ -266,10 +273,10 @@ Proof with simpl_env; eauto; fold subst_cpt.
            apply subcapt_weakening...
         -- apply H4...
            ++ rewrite_nil_concat.
-              eapply wf_cset_ignores_typ_bindings.
+              applys wf_cset_ignores_typ_bindings T1.
               eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
            ++ rewrite_nil_concat.
-              eapply wf_cset_ignores_typ_bindings.
+              applys wf_cset_ignores_typ_bindings T1.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
     + specialize (H1 H3 WfC WfD).
       pick fresh y and apply sub_arrow; fold subst_ct...
@@ -319,10 +326,10 @@ Proof with simpl_env; eauto; fold subst_cpt.
            apply subcapt_weakening...
         -- apply H5...
            ++ rewrite_nil_concat.
-              eapply wf_cset_ignores_typ_bindings.
+              applys wf_cset_ignores_typ_bindings T1.
               eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
            ++ rewrite_nil_concat.
-              eapply wf_cset_ignores_typ_bindings.
+              applys wf_cset_ignores_typ_bindings T1.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
   - (* specializing the hypothesis to the argument type of arrow *)
     destruct (subst_ct_monotonicity E Am Ap x C D T1 HwfE H SubAm SubAp H6 Hsc).
@@ -374,10 +381,10 @@ Proof with simpl_env; eauto; fold subst_cpt.
            apply subcapt_weakening...
         -- apply H4...
            ++ rewrite_nil_concat.
-              eapply wf_cset_ignores_sub_bindings.
+              applys wf_cset_ignores_sub_bindings T1.
               eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
            ++ rewrite_nil_concat.
-              eapply wf_cset_ignores_sub_bindings.
+              applys wf_cset_ignores_sub_bindings T1.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
     + specialize (H1 H3 WfC WfD).
       pick fresh y and apply sub_all; fold subst_ct...
@@ -425,17 +432,17 @@ Proof with simpl_env; eauto; fold subst_cpt.
            apply subcapt_weakening...
         -- apply H5...
            ++ rewrite_nil_concat.
-              eapply wf_cset_ignores_sub_bindings.
+              applys wf_cset_ignores_sub_bindings T1.
               eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
            ++ rewrite_nil_concat.
-              eapply wf_cset_ignores_sub_bindings.
+              applys wf_cset_ignores_sub_bindings T1.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
   - simpl. split; intros.
     + constructor.
       forwards (Sub1 & Sub2) : subst_ct_monotonicity x H4 Hsc...
     + constructor.
       forwards (Sub1 & Sub2) : subst_ct_monotonicity x H4 Hsc...
-Admitted.                       (* argh, some existential variables remain *)
+Qed.
 
 Lemma plain_subst_ct_monotonicity : forall E Ap Am x C D T,
   wf_env E ->
@@ -1090,7 +1097,12 @@ Proof with hint.
     + eapply sub_through_subst_ct...
       simpl.
       eapply subcapt_reflexivity...
-    + admit.
+    + forwards: cv_free_never_universal u.
+      destruct T1; simpl in *; try congruence.
+      unfold subst_cset.
+      find_and_destroy_set_mem.
+      unfold cset_union.
+      destruct (`cset_uvar` (free_for_cv u)); easy.
     + assert (wf_typ_in (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) T) as HA by auto.
       applys bind_typ_notin_fv_tt HA...
   - Case "typing_sub".
@@ -1286,6 +1298,7 @@ Qed.
 Lemma typing_through_subst_te : forall Q E F Z QQ e T P,
   typing (F ++ [(Z, bind_sub Q)] ++ E) QQ e T ->
   sub E P Q ->
+  ~ (`* in` (cv P)) ->
   typing (map (subst_tb Z P) F ++ E) QQ (subst_te Z P e) (subst_tt Z P T).
 Proof with simpl_env;
            eauto 6 using wf_env_subst_tb,
@@ -1295,8 +1308,7 @@ Proof with simpl_env;
                          wf_typ_from_binds_typ,
                          wf_pretyp_weakening,
                          wf_typ_set_weakening.
-  intros *.
-  intros Typ PsubQ.
+  intros * Typ PsubQ Notin.
   remember (F ++ [(Z, bind_sub Q)] ++ E).
   generalize dependent F.
   induction Typ; intros F EQ; subst;
@@ -1498,7 +1510,11 @@ Proof with simpl_env;
   - Case "typing_tapp".
     rewrite subst_tt_open_tt...
     econstructor...
-    admit.
+    destruct T1; simpl cv in *; try congruence.
+    + unfold subst_cset; destruct_if; trivial.
+      unfold cset_union.
+      destruct (`cset_uvar` (cv P)); easy.
+    + destruct_if; trivial.
   - Case "typing_handle".
     assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
       pick fresh z for L.
@@ -1541,7 +1557,9 @@ Proof with simpl_env;
       * apply H1.
         destruct ScUniv as [ScUniv|ScUniv].
         1: { eapply subcapt_widening_univ... }
-        admit. (** need substitution requirement *)
+        destruct ScUniv as [_ ScUniv].
+        forwards: univ_supercapt_inversion ScUniv.
+        destruct (cv P); easy.
       * assert (wf_typ_in (F ++ [(Z, bind_sub Q)] ++ E) T1). {
           pick fresh y for L.
           specialize (H y Fr).
@@ -1563,13 +1581,15 @@ Proof with simpl_env;
       forwards WfP': wf_typ_subst_tb Q HH; simpl_env...
   - unfold subst_cset.
     find_and_destroy_set_mem; [exfalso;fsetdec|].
-    admit.                      (* T wf in empty, therefore subst doesn't affect it *)
-    (* apply typing_lvar with (C := (subst_cset Z (cv P) C))... *)
-    (* rewrite (map_subst_tb_id E Z P); *)
-    (*   [ | auto | eapply fresh_mid_tail; eauto ]. *)
-    (* binds_cases H0; *)
-    (*   replace *)
-    (*     (bind_lab (typ_capt (subst_cset Z (cv P) C) (typ_ret (subst_tt Z P T)))) *)
-    (*   with *)
-    (*     (subst_tb Z P (bind_lab (typ_capt C (typ_ret T))))... *)
-Admitted.
+    assert (~ Z `in`A (fv_tt T `u`A fv_ct T)). {
+      eapply (notin_fv_wf_typ empty).
+      - assert (wf_typ_in empty (typ_capt C (typ_ret T))) as HA. {
+          eapply wf_typ_from_binds_sig...
+        }
+        inversion HA; subst.
+        inversion select (wf_pretyp empty _ _ (typ_ret T))...
+      - simpl; fsetdec.
+    }
+    rewrite <- (subst_tt_fresh Z) by trivial.
+    eapply typing_lvar...
+Qed.
