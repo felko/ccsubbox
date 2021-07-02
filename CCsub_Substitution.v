@@ -869,6 +869,24 @@ Proof.
 Qed.
 
 
+Lemma wf_pretyp_from_wf_env_typ : forall x C P E,
+  wf_env ([(x, bind_typ (typ_capt C P))] ++ E) ->
+  wf_pretyp_in E P.
+Proof.
+  intros x C P E H. inversion H; auto; subst.
+  inversion H4; subst...
+  apply H9.
+Qed.
+Lemma wf_pretyp_dom_from_wf_env_typ : forall x C P E,
+  wf_env ([(x, bind_typ (typ_capt C P))] ++ E) ->
+  wf_pretyp E (dom E) (dom E) P.
+Proof.
+  intros x C P E H. inversion H; auto; subst.
+  inversion H4; subst...
+  apply H9.
+Qed.
+Hint Resolve wf_pretyp_from_wf_env_typ wf_pretyp_dom_from_wf_env_typ : core.
+
 Lemma typing_through_subst_ee : forall P E F x T Q e u,
   typing (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) Q e T ->
   value u ->
@@ -913,13 +931,12 @@ Proof with hint.
       replace (subst_cpt x (free_for_cv u) P) with P...
       forwards: binding_uniq_from_wf_env H.
       forwards: notin_fv_wf_pretyp E (dom E) (dom E) x P...
-      admit.                    (* missing hint *)
     + SCase "x0 <> x".
       binds_cases H1.
       * assert (x `notin` fv_cpt P). {
           assert (x `notin` dom E) as HA1. { eapply fresh_mid_tail... }
           forwards: wf_typ_from_binds_typ H1...
-          assert (wf_pretyp_in E P) as HA2 by admit... (* missing hint *)
+          assert (wf_pretyp_in E P) as HA2... (* missing hint *)
           forwards: notin_fv_wf_pretyp HA2 HA1...
         }
         replace (subst_ct x C (typ_capt (`cset_fvar` x0) P)) with (typ_capt (`cset_fvar` x0) P)...
@@ -1011,7 +1028,7 @@ Proof with hint.
   - Case "typing_app".
     rewrite subst_ct_open_ct...
     2: {
-      note (wf_pretyp_in (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) (typ_arrow T1 T2)) as HA0 by admit. (* missing hint *)
+      note (wf_pretyp_in (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) (typ_arrow T1 T2)) as HA0... (* missing hint *)
       forwards HA: bind_typ_notin_fv_tpt x HA0. 1: {
         trivial...
       }
@@ -1182,7 +1199,7 @@ Proof with hint.
         assert (x `notin` dom E) as HA1. {
           eapply fresh_mid_tail...
         }
-        assert (wf_pretyp_in E P) as HA2 by admit... (* missing hint *)
+        assert (wf_pretyp_in E P) as HA2... (* missing hint *)
         forwards: notin_fv_wf_pretyp HA2 HA1...
       }
       apply subst_ct_fresh; simpl_env...
@@ -1203,7 +1220,7 @@ Proof with hint.
     apply binding_uniq_from_wf_env in H as ?.
     inversion H8; subst.
     forwards : notin_fv_wf_typ x T...
-Admitted.
+Qed.
 
 Lemma typing_through_subst_ee' : forall U E Ap Am x T Q e u,
   typing ([(x, bind_typ U)] ++ E) Q e T ->
