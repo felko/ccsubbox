@@ -1028,7 +1028,11 @@ Proof with hint.
   - Case "typing_app".
     rewrite subst_ct_open_ct...
     2: {
-      note (wf_pretyp_in (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) (typ_arrow T1 T2)) as HA0... (* missing hint *)
+      assert (wf_pretyp_in (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) (typ_arrow T1 T2)) as HA0. {
+        forwards [_ [_ WfTyp]] : typing_regular HtypT1.
+        inversion WfTyp; subst...
+      }
+
       forwards HA: bind_typ_notin_fv_tpt x HA0. 1: {
         trivial...
       }
