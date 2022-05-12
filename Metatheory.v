@@ -9,10 +9,17 @@ Require Export Atom.
 Require Export Nat.
 Require Export Bool.
 Require Export Environment.
-Require Export Label.
 
 Declare Scope metatheory_scope.
 Declare Scope set_scope.
+
+(* Variables *)
+Inductive var : Set :=
+  | var_f : atom -> var
+  | var_b : nat -> var.
+
+Coercion var_f : atom >-> var.
+Coercion var_b : nat >-> var.
 
 (* ********************************************************************** *)
 (** * Notations *)
@@ -24,8 +31,6 @@ Notation "x == y" :=
   (eq_atom_dec x y) (at level 67) : metatheory_scope.
 Notation "i === j" :=
   (Peano_dec.eq_nat_dec i j) (at level 67) : metatheory_scope.
-Notation "l ==== m" :=
-  (eq_label_dec l m) (at level 67) : metatheory_scope.
 
 (** Common set operations may be written using infix notation. *)
 
@@ -76,23 +81,11 @@ Notation "E `\`N x" := (NatSet.F.remove x E) (at level 69, right associativity) 
 Notation "x `in`N F" := (NatSet.F.In x F) (at level 69) : set_scope.
 Notation "x `~in`N F" := (~ NatSet.F.In x F) (at level 69) : set_scope.
 
-Notation "E `u`L F" :=
-  (LabelSet.F.union E F) (at level 69, right associativity, format "E  `u`L  '/' F") : set_scope.
-Notation "E `c`L F" := (LabelSet.F.Subset E F) (at level 68) : set_scope.
-Notation "E `\`L x" := (LabelSet.F.remove x E) (at level 69, right associativity) : set_scope.
-Notation "x `in`L F" := (LabelSet.F.In x F) (at level 69) : set_scope.
-Notation "x `~in`L F" := (~ LabelSet.F.In x F) (at level 69) : set_scope.
-
-
 Notation "{ x }A" := (AtomSet.F.singleton x) (at level 0, format "{ x }A") : set_scope.
 Notation "{}A" := (AtomSet.F.empty) (at level 0) : set_scope.
 
 Notation "{ x }N" := (NatSet.F.singleton x) (at level 0, format "{ x }N") : set_scope.
 Notation "{}N" := (NatSet.F.empty) (at level 0) : set_scope.
-
-Notation "{ x }L" := (LabelSet.F.singleton x) (at level 0, format "{ x }L") : set_scope.
-Notation "{}L" := (LabelSet.F.empty) (at level 0) : set_scope.
-
 
 (* Open Scope set_scope. *)
 (* Open Scope metatheory_scope. *)
@@ -103,7 +96,6 @@ Notation "{}L" := (LabelSet.F.empty) (at level 0) : set_scope.
 (** Hints *)
 Hint Extern 1 (~ AtomSet.F.In _ _) => simpl_env in *; try notin_solve : core.
 Hint Extern 1 (~ NatSet.F.In _ _) => simpl_env in *; try nnotin_solve : core.
-Hint Extern 1 (~ LabelSet.F.In _ _) => simpl_env in *; try lnotin_solve : core.
 
 
 (** Open the notation scopes declared above. *)
@@ -147,6 +139,31 @@ Tactic Notation
             idtac
     end.
 
+Tactic Notation
+    "pick" "fresh" ident(atom_name)
+    "excluding" constr(L)
+    "and" "destruct" constr(H) :=
+  let L := beautify_fset L in
+  pick fresh atom_name for L;
+  first [ destruct (@H atom_name ltac:(fsetdec))
+        | edestruct (@H atom_name ltac:(fsetdec))].
+
+Tactic Notation
+    "pick" "fresh" ident(atom_name)
+    "excluding" constr(L)
+    "and" "destruct" constr(H) "as" intropattern(pat) :=
+  let L := beautify_fset L in
+  pick fresh atom_name for L;
+  first [ destruct (@H atom_name ltac:(fsetdec)) as pat
+        | edestruct (@H atom_name ltac:(fsetdec)) as pat].
+
+Tactic Notation
+    "pick" "fresh" ident(atom_name)
+    "excluding" constr(L)
+    "and" "specialize" constr(H) :=
+  let L := beautify_fset L in
+  pick fresh atom_name for L;
+  specialize (@H atom_name ltac:(fsetdec)).
 
 (* ********************************************************************** *)
 (** * Automation *)
@@ -158,20 +175,3 @@ Tactic Notation
 Hint Resolve notin_empty notin_singleton notin_union : core.
 Hint Extern 4 (_ `notin` _) => simpl_env; notin_solve : core.
 Hint Extern 4 (_ <> _ :> atom) => simpl_env; notin_solve : core.
-
-
-(* Tactics in relation to fsetdec  *)
-Ltac clear_frees :=
-  repeat match goal with
-         | H : _ `notin` _ |- _ =>
-           clear H
-         end.
-
-Ltac prepare_for_fsetdec :=
-  clear_frees; simpl_env in *.
-
-Hint Extern 10 (AtomSet.F.Subset _ _) =>
-(* idtac "go fsetdec go" ; *)
-(* NOTE: "free" hypothesis are unlikely to help with subsets and they can cause fsetdec to hang *)
-try solve [prepare_for_fsetdec; fsetdec]
-: core.
