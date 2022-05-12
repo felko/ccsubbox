@@ -49,15 +49,26 @@ Ltac apply_first_hyp :=
 Tactic Notation "auto" "*" :=
   try solve [ congruence | auto | intuition auto ].
 
+Tactic Notation "auto" "*" "using" tactic_list(tacs) :=
+  try solve [ congruence | auto using tacs | intuition (auto using tacs) ].
+
 Tactic Notation "auto" "*" integer(n) :=
   try solve [ congruence | auto n | intuition (auto n) ].
+
+Tactic Notation "auto" "*" integer(n) "using" tactic_list(tacs) :=
+  try solve [ congruence | auto n using tacs | intuition (auto n using tacs) ].
 
 Tactic Notation "eauto" "*" :=
   try solve [ congruence | eauto | intuition eauto ].
 
+Tactic Notation "eauto" "*" "using" tactic_list(tacs) :=
+  try solve [ congruence | eauto using tacs | intuition (eauto using tacs) ].
+
 Tactic Notation "eauto" "*" integer(n) :=
   try solve [ congruence | eauto n | intuition (eauto n) ].
 
+Tactic Notation "eauto" "*" integer(n) "using" tactic_list(tacs) :=
+  try solve [ congruence | eauto n using tacs | intuition (eauto n using tacs) ].
 
 (* *********************************************************************** *)
 (** * Delineating cases in proofs *)
