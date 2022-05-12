@@ -1,11 +1,9 @@
 -R . Top
 
 AdditionalTactics.v
-Label.v
 Atom.v
 Nat.v
 Environment.v
-Signatures.v
 Metatheory.v
 CCsub_Definitions.v
 CCsub_Hints.v
