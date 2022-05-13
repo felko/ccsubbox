@@ -9,7 +9,7 @@ Require Import Lia.
 (** In this section, we define free variable functions.  The functions
     [fv_tt] and [fv_te] calculate the set of atoms used as free type
     variables in a type or expression, respectively.  The function
-    [fv_ee] calculates the set of atoms used as free expression
+    [fv_ve] calculates the set of atoms used as free expression
     variables in an expression.  Cases involving binders are
     straightforward since bound variables are indices, not names, in
     locally nameless representation. *)
@@ -74,6 +74,13 @@ Fixpoint fv_ve (e : exp) {struct e} : atoms :=
   | exp_let e C => (fv_ve e) `u`A (fv_ve C)
   | exp_tabs V e1 => fv_ve e1
   | exp_tapp x V => fv_vv x
+  end.
+
+Fixpoint fv_cctx (E : env) {struct E} : atoms :=
+  match E with
+  | nil => {}A
+  | (_, bind_typ T) :: F => fv_ct T `u`A fv_cctx F
+  | (_, bind_sub T) :: F => fv_ct T `u`A fv_cctx F
   end.
 
 (* ********************************************************************** *)
@@ -187,7 +194,8 @@ Ltac gather_atoms :=
   let G := gather_atoms_with (fun x : cap => `cset_fvars` x) in
   let H := gather_atoms_with (fun x : typ => fv_ct x) in
   let I := gather_atoms_with (fun x : exp => fv_ce x) in
-  constr:(A `union` B `union` C `union` D `union` E `union` F `union` G `union` H `union` I).
+  let J := gather_atoms_with (fun x : env => fv_cctx x) in
+  constr:(A `union` B `union` C `union` D `union` E `union` F `union` G `union` H `union` I `union` J).
 
 (** The second step in defining "[pick fresh]" is to define the tactic
     itself.  It is based on the [(pick fresh ... for ...)] tactic

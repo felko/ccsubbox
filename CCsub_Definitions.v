@@ -386,7 +386,7 @@ with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
   | wf_typ_arrow : forall L E Ap Am T1 T2,
       wf_typ E Am Ap T1 ->
       (forall X : atom, X `notin` L ->
-                   wf_typ ([(X, bind_typ T1)] ++ E)
+                  wf_typ ([(X, bind_typ T1)] ++ E)
                           (Ap `union` singleton X)
                           Am
                           (open_ct T2 (`cset_fvar` X))) ->
@@ -394,7 +394,9 @@ with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
   | wf_typ_all : forall L E Ap Am T1 T2,
       wf_typ E Am Ap T1 ->
       (forall X : atom, X `notin` L ->
-      wf_typ ([(X, bind_sub T1)] ++ E) Ap Am (open_tt T2 X)) ->
+                  wf_typ ([(X, bind_sub T1)] ++ E)
+                          (Ap `u`A {X}A)
+                          (Am `u`A {X}A) (open_tt T2 X)) ->
       wf_pretyp E Ap Am (typ_all T1 T2).
 
 Definition wf_typ_in (E : env) (T : typ) : Prop :=

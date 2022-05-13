@@ -262,6 +262,14 @@ Proof.
 Qed.
 (* end show *)
 
+Lemma atomset_subset_union : forall A1 A2 B1 B2,
+  AtomSet.F.Subset A1 A2 ->
+  AtomSet.F.Subset B1 B2 ->
+  AtomSet.F.Subset (AtomSet.F.union A1 B1) (AtomSet.F.union A2 B2).
+Proof.
+  intros.
+  fsetdec.
+Qed.
 
 Lemma atomset_union_right : forall A B C,
   AtomSet.F.Subset A B ->

@@ -15,9 +15,9 @@ Metatheory.v
 CaptureSets.v
 CCsub_Definitions.v
 CCsub_Infrastructure.v
+CCsub_Wellformedness.v
 CCsub_Lemmas.v
 CCsub_Hints.v
-CCsub_Wellformedness.v
 CCsub_Subcapt.v
 CCsub_Subtyping.v
 CCsub_Typing.v
