@@ -874,16 +874,6 @@ Proof with simpl_env; eauto*.
   - Case "sub_all".
     pose proof (sub_regular E _ _ H).
     repeat split...
-    + apply wf_typ_all with (L := L `u`A dom E)...
-      intros X NotIn.
-      rewrite_env (empty ++ empty ++ [(X, bind_sub S1)] ++ E).
-      apply wf_typ_weakening with (Ap := dom E) (Am := dom E)...
-      all: fsetdec.
-    + apply wf_typ_all with (L := L `u`A dom E)...
-      intros X NotIn.
-      rewrite_env (empty ++ empty ++ [(X, bind_sub T1)] ++ E).
-      apply wf_typ_weakening with (Ap := dom E) (Am := dom E)...
-      all: fsetdec.
 Qed.
 
 Lemma typing_regular : forall E e T,

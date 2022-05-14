@@ -526,9 +526,10 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
       wf_typ_in E T1 ->
       wf_typ_in E S1 ->
       (forall X : atom, X `notin` L ->
-          wf_typ ([(X, bind_sub T1)] ++ E) (dom E) (dom E) (open_tt T2 X)) ->
+          (* REVIEW: difference between dom E and dom E `u`A {X}A? *)
+          wf_typ ([(X, bind_sub T1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt T2 X)) ->
       (forall X : atom, X `notin` L ->
-          wf_typ ([(X, bind_sub S1)] ++ E) (dom E) (dom E) (open_tt S2 X)) ->
+          wf_typ ([(X, bind_sub S1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt S2 X)) ->
       (forall X : atom, X `notin` L ->
           sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
       sub_pre E (typ_all S1 S2) (typ_all T1 T2).
