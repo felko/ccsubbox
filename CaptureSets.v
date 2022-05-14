@@ -364,6 +364,21 @@ Proof.
     destr_bool.
 Qed.
 
+Lemma subset_union : forall C1 C2 D1 D2,
+  cset_subset_prop C1 D1 ->
+  cset_subset_prop C2 D2 ->
+  cset_subset_prop (cset_union C1 C2) (cset_union D1 D2).
+Proof.
+  intros.
+  destruct C1. destruct C2.
+  destruct H as [H1C1 [H2C1 H3C1]]. destruct H0 as [H1C2 [H2C2 H3C2]].
+  repeat split.
+  - apply AtomSetProperties.union_subset_3; fsetdec.
+  - apply NatSetProperties.union_subset_3; fnsetdec.
+  - unfold cset_union.
+    destruct b, b0; simpl; intuition.
+Qed.
+
 Lemma subset_trans : forall A B C,
   cset_subset_prop A B -> cset_subset_prop B C -> cset_subset_prop A C.
 Proof.
@@ -371,6 +386,15 @@ Proof.
   inversion AB as [ABF [ABN ABU]]; subst; inversion BC as [BCF [BCN BCU]]; subst...
   repeat (econstructor; try fsetdec; try fnsetdec)...
   destruct A; destruct B; destruct C; destr_bool...
+Qed.
+
+Lemma subset_in : forall A B x,
+  cset_subset_prop A B -> x A`in` A -> x A`in` B.
+Proof.
+  intros * AB xA.
+  inversion AB as [ABF _]; subst...
+  destruct A; destruct B; simpl.
+  fsetdec.
 Qed.
 
 Hint Immediate subset_union_left subset_union_right  subset_refl: core.

@@ -363,8 +363,7 @@ Inductive wf_cset : env -> atoms -> cap -> Prop :=
   | wf_concrete_cset : forall E A fvars univ,
     allbound E fvars ->
     fvars `c`A A ->
-    wf_cset E A (cset_set fvars {}N univ)
-.
+    wf_cset E A (cset_set fvars {}N univ).
 
 Definition wf_cset_in (E : env) (C : cap) : Prop :=
   wf_cset E (dom E) C.

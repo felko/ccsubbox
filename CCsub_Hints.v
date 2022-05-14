@@ -4,7 +4,6 @@ Require Export CCsub_Lemmas.
 Ltac destruct_union_mem H :=
   match type of H with
   | _ `in`A _ => rewrite AtomSetFacts.union_iff in H; destruct H as [H|H]
-  | _ `in`L _ => rewrite LabelSetFacts.union_iff in H; destruct H as [H|H]
   end.
 
 Hint Extern 1 (wf_typ_in ?E ?T) =>
