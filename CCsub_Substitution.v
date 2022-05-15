@@ -10,9 +10,9 @@ Set Nested Proofs Allowed.
 (************************************************************************ *)
 (** ** Properties of values *)
 
-Lemma capture_prediction : forall E Q t T,
+Lemma capture_prediction : forall E t T,
   value t ->
-  typing E Q t T ->
+  typing E t T ->
   subcapt E (free_for_cv t) (cv T).
 Proof with subst; simpl; eauto.
   intros *.
@@ -21,25 +21,25 @@ Proof with subst; simpl; eauto.
   induction Htyp; cbn [free_for_cv]; try solve [ inversion Hv ].
   - inversion P3; subst.
     apply subcapt_reflexivity with (A := dom E)...
+    fsetdec.
   - inversion P3; subst.
     apply subcapt_reflexivity with (A := dom E)...
+    fsetdec.
   - forwards: IHHtyp...
     apply (subcapt_transitivity (cv S))...
     eapply sub_implies_subcapt with (S := S) (T := T)...
-  - inversion P3; subst.
-    apply subcapt_reflexivity with (A := dom E)...
 Qed.
 
-Lemma values_have_precise_captures : forall E Q u T,
+Lemma values_have_precise_captures : forall E u T,
   value u ->
-  typing E Q u T ->
-  exists U, typing E Q u (typ_capt (free_for_cv u) U) /\ sub E (typ_capt (free_for_cv u) U) T.
+  typing E u T ->
+  exists U, typing E u (typ_capt (free_for_cv u) U) /\ sub E (typ_capt (free_for_cv u) U) T.
 Local Ltac hint ::=
   simpl; eauto.
 Proof with hint.
   intros * Hv Htyp.
   assert (wf_cset_in E (free_for_cv u)) by eauto using typing_cv.
-  assert (wf_env E) by auto.
+  assert (wf_env E) by applys typing_regular Htyp.
   induction Htyp; try solve [inversion Hv; subst].
   - Case "exp_abs".
     exists (typ_arrow V T1).
@@ -47,29 +47,21 @@ Proof with hint.
     + simpl; eapply typing_abs...
     + simpl.
       eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+      all: clear; fsetdec.
   - Case "exp_tabs".
     exists (typ_all V T1).
     split.
     + simpl; eapply typing_tabs...
     + simpl.
       eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
+      simpl in H.
+      apply wf_typ_capt, wf_typ_all with (L := L `u`A dom E)...
+      intros x NotIn.
+      apply wf_typ_set_weakening with (Ap := dom E) (Am := dom E)...
+      all: clear; fsetdec.
   - forwards (U & HtypU & HsubS): IHHtyp...
     exists U; eauto using (sub_transitivity S).
-  - Case "exp_abs".
-    exists (typ_ret T).
-    split.
-    + simpl; eapply typing_lvar...
-    + assert (wf_typ_in E (typ_capt C (typ_ret T))) as HA. {
-        enough (wf_typ_in empty (typ_capt C (typ_ret T))). {
-          rewrite_env (empty ++ E ++ empty).
-          eapply wf_typ_in_weakening; simpl_env...
-        }
-        eapply wf_typ_from_binds_sig...
-      }
-      inversion HA; subst.
-      eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
 Qed.
-
 
 (************************************************************************ *)
 (** ** Other helpers *)
@@ -86,51 +78,64 @@ Proof.
     csetdec.
 Qed.
 
-Lemma subst_contratrivia2 : forall u x C e,
-  x `notin` (`cset_fvars` (free_for_cv e)) ->
-  (free_for_cv e) = (free_for_cv (subst_ee x u C e)).
-Proof with eauto using cv_free_never_universal.
-  intros * Hin.
-  induction e; simpl in *...
-  - destruct_if; fsetdec.
-  - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
-    rewrite <- IHe1...
-    rewrite <- IHe2...
-  - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
-    rewrite <- IHe1...
-    rewrite <- IHe2...
+Lemma subst_contratrivia2_var : forall u x v,
+  x `notin` (`cset_fvars` (free_for_cv_var v)) ->
+  (free_for_cv_var v) = (free_for_cv_var (subst_vv x u v)).
+Proof with eauto*.
+  intros.
+  destruct v...
+  simpl in *.
+  destruct (a == x); subst...
+  clear - H; fsetdec.
 Qed.
 
+Lemma subst_contratrivia2 : forall u x C e,
+  x `notin` (`cset_fvars` (free_for_cv e)) ->
+  (free_for_cv e) = (free_for_cv (subst_ve x u C e)).
+Proof with eauto using cv_free_never_universal, subst_contratrivia2_var.
+  intros * Hin.
+  induction e; simpl in *...
+  - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
+    f_equal...
+  - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
+    f_equal...
+Qed.
+
+Lemma subst_trivia2_var : forall x v (u : atom),
+  AtomSet.F.In x (`cset_fvars` (free_for_cv_var v)) ->
+  (cset_union (free_for_cv_var u) ((free_for_cv_var v) A`\` x)) =
+        (free_for_cv_var (subst_vv x u v)).
+Proof with eauto*.
+  intros.
+  destruct v; simpl in *.
+  - destruct (a == x); csetdec.
+  - csetdec.
+Qed.   
 
 (* x in (fv e) ->
   (fv u) union (fv e remove x) = fv (e[x !-> u][x !-> fv u])
 *)
 
-Lemma subst_trivia2 : forall x e u,
+(*
+Lemma subst_trivia2 : forall x e (u : atom),
   AtomSet.F.In x (`cset_fvars` (free_for_cv e)) ->
   (cset_union (free_for_cv u) ((free_for_cv e) A`\` x)) =
-        (free_for_cv (subst_ee x u (free_for_cv u) e)).
-Proof with eauto using cv_free_never_universal.
+        (free_for_cv (subst_ve x u (free_for_cv u) e)).
+Proof with eauto using cv_free_never_universal, subst_trivia2_var.
   intros * Hin.
   induction e; simpl in *...
-  - csetdec.
-  - destruct (a == x) eqn:HX.
-    + subst.
-      csetdec.
-      destruct (free_for_cv u)...
-      csetdec.
-    + exfalso. apply n. fsetdec.
-  - destruct (free_for_cv e1) eqn:?; destruct (free_for_cv e2) eqn:?; destruct (free_for_cv u) eqn:?;
+  - destruct (free_for_cv_var v) eqn:?; destruct (free_for_cv_var v0) eqn:?;
       simpl in *; try fsetdec.
     + (* there are three cases... we also need to know that it is NOT in the other sets... then we might be able to prove it... *)
       rewrite (AtomSetFacts.mem_iff) in Hin.
       rewrite (AtomSetFacts.union_b) in Hin.
       destruct (AtomSet.F.mem x t) eqn:InT;
-        destruct (AtomSet.F.mem x t2) eqn:InT2;
+        destruct (AtomSet.F.mem x t1) eqn:InT2;
         rewrite_set_facts_in InT;
         rewrite_set_facts_in InT2;
         inversion Hin; subst...
-      * rewrite <- IHe1...
+      * apply cset_concrete_union.
+         rewrite <- IHe1...
         rewrite <- IHe2...
         cbn [cset_union].
         csetdec.
@@ -174,15 +179,17 @@ Proof with eauto using cv_free_never_universal.
         csetdec.
   - fsetdec.
 Qed.
+*)
 
 Lemma fvar_open_inversion : forall (x : atom) e y C,
-  exp_fvar x = open_ee e y C ->
+  exp_var x = open_ve e y C ->
   e = x \/ exists (n : nat), e = n.
 Proof with eauto*.
   intros. induction e;
-    try solve [exfalso; cbv [open_ee open_ee_rec] in H; fold open_ee_rec in H; discriminate].
-  - right. exists n...
+    try solve [exfalso; cbv [open_ve open_ve_rec] in H; fold open_ve_rec in H; discriminate].
+  destruct v.
   - left...
+  - right. exists n...
 Qed.
 
 Lemma subst_ct_monotonicity : forall E Ap Am x C D T,
@@ -239,6 +246,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
         all : trivial...
         rewrite_nil_concat.
         eapply wf_cset_weakening; [ apply WfD | simpl_env; auto .. ].
+        all: clear - SubAp SubAm; fsetdec.
       }
       {
         rewrite subst_ct_open_ct_var...
@@ -252,6 +260,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
         all : trivial...
         rewrite_nil_concat.
         eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+        all: clear - SubAp SubAm; fsetdec.
       }
       rewrite subst_ct_open_ct_var...
       rewrite subst_ct_open_ct_var...
@@ -275,9 +284,11 @@ Proof with simpl_env; eauto; fold subst_cpt.
            ++ rewrite_nil_concat.
               applys wf_cset_ignores_typ_bindings T1.
               eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
+              clear; fsetdec.
            ++ rewrite_nil_concat.
               applys wf_cset_ignores_typ_bindings T1.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
+              clear; fsetdec.
     + specialize (H1 H3 WfC WfD).
       pick fresh y and apply sub_arrow; fold subst_ct...
       {
@@ -292,6 +303,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
         all : trivial...
         rewrite_nil_concat.
         eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+        all: clear - SubAp SubAm; fsetdec.
       }
       {
         rewrite subst_ct_open_ct_var...
@@ -305,6 +317,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
         all : trivial...
         rewrite_nil_concat.
         eapply wf_cset_weakening; [ apply WfD | simpl_env; auto .. ].
+        all: clear - SubAp SubAm; fsetdec.
       }
       rewrite subst_ct_open_ct_var...
       rewrite subst_ct_open_ct_var...
@@ -328,9 +341,11 @@ Proof with simpl_env; eauto; fold subst_cpt.
            ++ rewrite_nil_concat.
               applys wf_cset_ignores_typ_bindings T1.
               eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
+              clear; fsetdec.
            ++ rewrite_nil_concat.
               applys wf_cset_ignores_typ_bindings T1.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
+              clear; fsetdec.
   - (* specializing the hypothesis to the argument type of arrow *)
     destruct (subst_ct_monotonicity E Am Ap x C D T1 HwfE H SubAm SubAp H6 Hsc).
     split; intros ? WfC WfD.
@@ -347,6 +362,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
         all : trivial...
         rewrite_nil_concat.
         eapply wf_cset_weakening; [ apply WfD | simpl_env; auto .. ].
+        all: clear - SubAp SubAm; fsetdec.
       }
       { rewrite subst_ct_open_tt_var...
         specialize (H7 y ltac:(notin_solve)).
@@ -359,6 +375,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
         all : trivial...
         rewrite_nil_concat.
         eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+        all: clear - SubAp SubAm; fsetdec.
       }
       rewrite subst_ct_open_tt_var...
       rewrite subst_ct_open_tt_var...
@@ -383,9 +400,11 @@ Proof with simpl_env; eauto; fold subst_cpt.
            ++ rewrite_nil_concat.
               applys wf_cset_ignores_sub_bindings T1.
               eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
+              clear; fsetdec.
            ++ rewrite_nil_concat.
               applys wf_cset_ignores_sub_bindings T1.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
+              clear; fsetdec.
     + specialize (H1 H3 WfC WfD).
       pick fresh y and apply sub_all; fold subst_ct...
       { rewrite subst_ct_open_tt_var...
@@ -399,6 +418,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
         all : trivial...
         rewrite_nil_concat.
         eapply wf_cset_weakening; [ apply WfC | simpl_env; auto .. ].
+        all: clear - SubAp SubAm; fsetdec.
       }
       { rewrite subst_ct_open_tt_var...
         specialize (H7 y ltac:(notin_solve)).
@@ -411,6 +431,7 @@ Proof with simpl_env; eauto; fold subst_cpt.
         all : trivial...
         rewrite_nil_concat.
         eapply wf_cset_weakening; [ apply WfD | simpl_env; auto .. ].
+        all: clear - SubAp SubAm; fsetdec.
       }
       rewrite subst_ct_open_tt_var...
       rewrite subst_ct_open_tt_var...
@@ -434,14 +455,11 @@ Proof with simpl_env; eauto; fold subst_cpt.
            ++ rewrite_nil_concat.
               applys wf_cset_ignores_sub_bindings T1.
               eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
+              clear; fsetdec.
            ++ rewrite_nil_concat.
               applys wf_cset_ignores_sub_bindings T1.
               eapply wf_cset_weakening ; [ apply WfD | simpl_env; auto .. ].
-  - simpl. split; intros.
-    + constructor.
-      forwards (Sub1 & Sub2) : subst_ct_monotonicity x H4 Hsc...
-    + constructor.
-      forwards (Sub1 & Sub2) : subst_ct_monotonicity x H4 Hsc...
+              clear; fsetdec.
 Qed.
 
 Lemma plain_subst_ct_monotonicity : forall E Ap Am x C D T,
@@ -465,18 +483,18 @@ Qed.
     NOTE: Right now it can't be moved to lemmas, since it depends on regularity.
     So maybe refactor this to use wf_typ_in E T as a premise and drop the dependency on regularity.
 **)
-Lemma notin_dom_is_notin_fv_ee : forall x E Q e T,
+Lemma notin_dom_is_notin_fv_ve : forall x E e T,
   x `notin` dom E ->
-  typing E Q e T ->
-  x `notin` fv_ee e.
+  typing E e T ->
+  x `notin` fv_ve e.
 Proof with eauto.
   intros * NotIn Typ.
-  assert (wf_typ_in E T) as WfTyp by auto.
+  assert (wf_typ_in E T) as WfTyp by applys typing_regular Typ.
   induction Typ.
-  - assert (x <> x0) by (apply binds_In in H1; fsetdec).
-    unfold fv_ee. notin_solve.
-  - assert (x <> x0) by (apply binds_In in H1; fsetdec).
-    unfold fv_ee. notin_solve.
+  - assert (x <> x0) by (apply binds_In in H0; fsetdec).
+    unfold fv_ve. notin_solve.
+  - assert (x <> x0) by (apply binds_In in H0; fsetdec).
+    unfold fv_ve. notin_solve.
   - simpl.
     apply notin_fv_wf_typ with (X := x) in H as ?.
     2: fsetdec.
@@ -488,33 +506,48 @@ Proof with eauto.
       specialize (H1 y ltac:(fsetdec)).
       do 2 rewrite_nil_concat.
       eapply wf_typ_weakening...
-    + forwards: notin_fv_ee_open_ee SpH2.
+      * simpl_env; apply ok_from_wf_env.
+        applys typing_regular H1.
+      * simpl_env; clear; fsetdec.
+      * simpl_env; clear; fsetdec.
+    + forwards: notin_fv_ve_open_ve SpH2.
       notin_solve.
       notin_solve.
-  - cbn [fv_ee].
+  - cbn [fv_ve].
     apply notin_union...
-  - cbn [fv_ee].
+  - simpl.
+    pick fresh y.
+    forwards SpH0: H0 y; [ notin_solve
+                         | simpl_env; notin_solve
+                         | ..].
+    + specialize (H0 y ltac:(fsetdec)).
+      specialize (H y ltac:(fsetdec)).
+      do 2 rewrite_nil_concat.
+      eapply wf_typ_weakening...
+      * applys typing_regular H.
+      * simpl_env; apply ok_from_wf_env; applys typing_regular H.
+      * simpl_env; clear; fsetdec.
+      * simpl_env; clear; fsetdec.
+    + forwards: notin_fv_ve_open_ve SpH0.
+      notin_solve.
+      enough (x `~in`A fv_ve e) by notin_solve.
+      apply IHTyp...
+      applys typing_regular Typ.
+  - cbn [fv_ve].
     pick fresh y.
     forwards SpH2: H2 y; [ notin_solve | simpl_env; notin_solve |..|].
     + specialize (H0 y ltac:(fsetdec)).
       specialize (H1 y ltac:(fsetdec)).
       do 2 rewrite_nil_concat.
       eapply wf_typ_weakening...
-    + apply notin_fv_ee_open_te in SpH2...
-  - cbn [fv_ee].
+      * simpl_env; apply ok_from_wf_env; applys typing_regular H1.
+      * simpl_env; clear; fsetdec.
+      * simpl_env; clear; fsetdec.
+    + apply notin_fv_ve_open_te in SpH2...
+  - cbn [fv_ve].
     assert (wf_typ_in E T) as HA...
   - eauto.
-  - simpl.
-    pick fresh y.
-    specialize (H0 y ltac:(fsetdec)).
-    specialize (H y ltac:(fsetdec)).
-    eapply notin_fv_ee_open_ee...
-  - cbn [fv_ee].
-    apply notin_union...
-  - simpl.
-    fsetdec.
 Qed.
-
 
 (* ********************************************************************** *)
 (** ** Type substitution preserves subtyping (10) *)
@@ -541,7 +574,10 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
           apply sub_regular, proj2, proj1 in PsubQ;
           apply PsubQ
         ].
-      all : trivial...
+      simpl_env.
+      apply ok_from_wf_env.
+      eapply wf_env_subst_tb...
+      all: clear; fsetdec.
     + apply sub_reflexivity with (Ap := dom (map (subst_tb Z P) F ++ E))
                                  (Am := dom (map (subst_tb Z P) F ++ E))...
       inversion H0; subst.
@@ -554,6 +590,8 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
         forwards: binds_In H2.
         econstructor...
         fsetdec.
+      * clear; fsetdec.
+      * clear; fsetdec.   
   - Case "sub_trans_tvar".
     assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as WfE by auto.
     apply binding_uniq_from_wf_env in WfE as FrZ.
@@ -707,7 +745,6 @@ eauto 4 using wf_typ_subst_tb, wf_env_subst_tb, wf_typ_weaken_head.
     + repeat rewrite subst_tt_open_tt_var...
       rewrite_env (map (subst_tb Z P) ([(y, bind_sub T1)] ++ F) ++ E).
       eapply sub_through_subst_tt...
-  - econstructor...
 }
 Qed.
 
@@ -780,7 +817,9 @@ Proof with eauto using wf_env_subst_cb, wf_typ_in_subst_cset, subcapt_through_su
       assert (wf_cset_in E C) as WfC by auto.
       applys wf_typ_subst_cb C; simpl_env...
       * applys wf_cset_set_weakening WfC...
+        clear; fsetdec.
       * applys wf_cset_set_weakening WfC...
+        clear; fsetdec.
     + rewrite subst_ct_open_ct_var...
       specialize (H3 y ltac:(notin_solve)).
       simpl_env in H3.
@@ -801,7 +840,9 @@ Proof with eauto using wf_env_subst_cb, wf_typ_in_subst_cset, subcapt_through_su
       assert (wf_cset_in E C) as WfC by auto.
       applys wf_typ_subst_cb C; simpl_env...
       * applys wf_cset_set_weakening WfC...
+        clear; fsetdec.
       * applys wf_cset_set_weakening WfC...
+        clear; fsetdec.
     + specialize (H4 y ltac:(notin_solve)).
       rewrite subst_ct_open_ct_var...
       rewrite subst_ct_open_ct_var...
@@ -829,7 +870,9 @@ Proof with eauto using wf_env_subst_cb, wf_typ_in_subst_cset, subcapt_through_su
       assert (wf_cset_in E C) as WfC by auto.
       applys wf_typ_subst_cb C; simpl_env...
       * applys wf_cset_set_weakening WfC...
+        clear; fsetdec.
       * applys wf_cset_set_weakening WfC...
+        clear; fsetdec.
     + rewrite subst_ct_open_tt_var...
       specialize (H3 y ltac:(notin_solve)).
       simpl_env in H3.
@@ -850,13 +893,14 @@ Proof with eauto using wf_env_subst_cb, wf_typ_in_subst_cset, subcapt_through_su
       assert (wf_cset_in E C) as WfC by auto.
       applys wf_typ_subst_cb C; simpl_env...
       * applys wf_cset_set_weakening WfC...
+        clear; fsetdec.
       * applys wf_cset_set_weakening WfC...
+        clear; fsetdec.
     + specialize (H4 y ltac:(notin_solve)).
       rewrite subst_ct_open_tt_var...
       rewrite subst_ct_open_tt_var...
       rewrite_env (map (subst_cb x C) ([(y, bind_sub T1)] ++ F) ++ E).
       eapply sub_through_subst_ct; simpl_env...
-  - econstructor...
 }
 Qed.
 
@@ -868,7 +912,6 @@ Proof.
   destruct_set_mem x {}A. fsetdec. trivial.
 Qed.
 
-
 Lemma wf_pretyp_from_wf_env_typ : forall x C P E,
   wf_env ([(x, bind_typ (typ_capt C P))] ++ E) ->
   wf_pretyp_in E P.
@@ -877,6 +920,7 @@ Proof.
   inversion H4; subst...
   apply H9.
 Qed.
+
 Lemma wf_pretyp_dom_from_wf_env_typ : forall x C P E,
   wf_env ([(x, bind_typ (typ_capt C P))] ++ E) ->
   wf_pretyp E (dom E) (dom E) P.
@@ -885,14 +929,16 @@ Proof.
   inversion H4; subst...
   apply H9.
 Qed.
+
 Hint Resolve wf_pretyp_from_wf_env_typ wf_pretyp_dom_from_wf_env_typ : core.
 
-Lemma typing_through_subst_ee : forall P E F x T Q e u,
+(*
+Lemma typing_through_subst_ve : forall P E F x T Q e u,
   typing (F ++ [(x, bind_typ (typ_capt (free_for_cv u) P))] ++ E) Q e T ->
   value u ->
   typing E Q u (typ_capt (free_for_cv u) P) ->
   typing (map (subst_cb x (free_for_cv u)) F ++ E) Q
-         (subst_ee x u (free_for_cv u) e)
+         (subst_ve x u (free_for_cv u) e)
          (subst_ct x (free_for_cv u) T).
 Local Ltac hint ::=
   eauto 4 using wf_env_subst_cb, typing_cv, subst_ct_fresh, subst_cpt_fresh, wf_typ_from_binds_typ, notin_fv_wf_pretyp.
@@ -1290,7 +1336,7 @@ Proof with simpl_env; eauto.
   - rewrite_nil_concat.
     eapply wf_cset_weakening ; [ apply WfC | simpl_env; auto .. ].
 Qed.
-
+*)
 
 (************************************************************************ *)
 (** ** Type substitution preserves typing (11) *)
@@ -1316,11 +1362,11 @@ Proof with eauto with fsetdec.
     f_equal; repeat (apply subst_tt_open_ct_rec_straight)...
 Qed.
 
-Lemma typing_through_subst_te : forall Q E F Z QQ e T P,
-  typing (F ++ [(Z, bind_sub Q)] ++ E) QQ e T ->
+Lemma typing_through_subst_te : forall Q E F Z e T P,
+  typing (F ++ [(Z, bind_sub Q)] ++ E) e T ->
   sub E P Q ->
   ~ (`* in` (cv P)) ->
-  typing (map (subst_tb Z P) F ++ E) QQ (subst_te Z P e) (subst_tt Z P T).
+  typing (map (subst_tb Z P) F ++ E) (subst_te Z P e) (subst_tt Z P T).
 Proof with simpl_env;
            eauto 6 using wf_env_subst_tb,
                          wf_typ_subst_tb,
@@ -1339,7 +1385,7 @@ Proof with simpl_env;
     rewrite (map_subst_tb_id E Z P);
       [ | auto | eapply fresh_mid_tail; eauto ].
     + subst.
-      binds_cases H1...
+      binds_cases H0...
       * assert (type P) as TypP...
         destruct TypP.
         -- set (P' := X) in *.
@@ -1347,13 +1393,13 @@ Proof with simpl_env;
            rewrite (map_subst_tb_id E Z P') in HA;
              [ | auto | eapply fresh_mid_tail; eauto ].
            eapply typing_var_tvar...
-           apply binds_map with (f := (subst_tb Z P')) in H1.
-           simpl in H1.
+           apply binds_map with (f := (subst_tb Z P')) in H0.
+           simpl in H0.
            destruct (Z == Z); try easy...
         -- assert (wf_env (map (subst_tb Z (typ_capt C P)) F ++ E)) as HA...
            rewrite (map_subst_tb_id E Z (typ_capt C P)) in HA;
              [ | auto | eapply fresh_mid_tail; eauto ].
-           apply binds_map with (f := (subst_tb Z (typ_capt C P))) in H1.
+           apply binds_map with (f := (subst_tb Z (typ_capt C P))) in H0.
 
            assert (binds x (bind_typ (typ_capt C P))
              (map (subst_tb Z (typ_capt C P)) F ++
@@ -1370,6 +1416,7 @@ Proof with simpl_env;
            apply sub_capt.
            ++ destruct C; eauto using wf_cset_from_binds, subcapt_from_binds.
            ++ eapply sub_pre_reflexivity...
+              all: clear; fsetdec.
       * rewrite <- (map_subst_tb_id E Z P);
           [ | auto | eapply fresh_mid_tail; eauto ].
 
@@ -1386,11 +1433,12 @@ Proof with simpl_env;
         inversion PsubQ; subst.
         rewrite_nil_concat.
         eapply wf_pretyp_weakening; simpl_env...
+        all: clear; fsetdec.
     + subst.
       apply typing_var_tvar...
       rewrite (map_subst_tb_id E Z P);
         [ | auto | eapply fresh_mid_tail; eauto ].
-      binds_cases H1...
+      binds_cases H0...
       * enough (binds x (subst_tb Z P (bind_typ X)) (map (subst_tb Z P) E)) as HA...
         simpl in HA...
         destruct (X == Z); try easy...
@@ -1410,7 +1458,7 @@ Proof with simpl_env;
     apply typing_var with (C := (subst_cset Z (cv P) C))...
     rewrite (map_subst_tb_id E Z P);
       [ | auto | eapply fresh_mid_tail; eauto ].
-    binds_cases H1;
+    binds_cases H0;
       replace
         (bind_typ (typ_capt (subst_cset Z (cv P) C) (subst_tpt Z P P0)))
       with
@@ -1419,6 +1467,8 @@ Proof with simpl_env;
     assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
       pick fresh z for L.
       pose proof (H1 z Fr)...
+      assert (wf_env ([(z, bind_typ V)] ++ F ++ [(Z, bind_sub Q)] ++ E)) by applys typing_regular H3.
+      inversion H4...
     }
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
     2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
@@ -1461,24 +1511,34 @@ Proof with simpl_env;
       * apply sub_regular, proj2, proj1 in PsubQ.
         clear Fr.
         applys wf_typ_set_weakening PsubQ...
+        all: clear; fsetdec.
       * apply sub_regular, proj2, proj1 in PsubQ.
         clear Fr.
         applys wf_typ_set_weakening PsubQ...
+        all: clear; fsetdec.
       * pose proof (H1 y ltac:(notin_solve))...
       * apply (wf_typ_adapt HA).
         all: clear Fr; fsetdec.
     + rewrite_env (map (subst_tb Z P) ([(y, bind_typ V)] ++ F) ++ E).
-      rewrite subst_te_open_ee_var...
+      rewrite subst_te_open_ve_var...
       rewrite subst_tt_open_ct_var...
       unshelve eapply (H2 y _ ([(y, bind_typ V)] ++ F) _)...
   - Case "typing_app".
     replace (subst_tt Z P (open_ct T2 (cv T1')))
       with (open_ct (subst_tt Z P T2) (cv (subst_tt Z P T1')))...
     symmetry; apply subst_tt_open_ct_rec_straight...
+  - Case "typing_let".
+    pick fresh y and apply typing_let.
+    + apply IHTyp...
+    + rewrite_env (map (subst_tb Z P) ([(y, bind_typ T1)] ++ F) ++ E).
+      rewrite <- subst_te_open_ve...
+      unshelve eapply (H0 y _ ([(y, bind_typ T1)] ++ F) _)...
   - Case "typing_tabs".
     assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
       pick fresh z for L.
       pose proof (H1 z Fr)...
+      assert (wf_env ([(z, bind_sub V)] ++ F ++ [(Z, bind_sub Q)] ++ E)) by applys typing_regular H3.
+      inversion H4...
     }
     replace (free_for_cv e1) with (free_for_cv (subst_te Z P e1)).
     2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
@@ -1518,9 +1578,11 @@ Proof with simpl_env;
       * apply sub_regular, proj2, proj1 in PsubQ.
         clear Fr.
         applys wf_typ_set_weakening PsubQ...
+        all: clear; fsetdec.
       * apply sub_regular, proj2, proj1 in PsubQ.
         clear Fr.
         applys wf_typ_set_weakening PsubQ...
+        all: clear; fsetdec.
       * pose proof (H1 Y ltac:(notin_solve))...
       * apply (wf_typ_adapt HA).
         all: clear Fr; fsetdec.
@@ -1530,87 +1592,4 @@ Proof with simpl_env;
       apply H2...
   - Case "typing_tapp".
     rewrite subst_tt_open_tt...
-    econstructor...
-    destruct T1; simpl cv in *; try congruence.
-    + unfold subst_cset; destruct_if; trivial.
-      unfold cset_union.
-      destruct (`cset_uvar` (cv P)); easy.
-    + destruct_if; trivial.
-  - Case "typing_handle".
-    assert (wf_env (F ++ [(Z, bind_sub Q)] ++ E)) as HwfNarrE. {
-      pick fresh z for L.
-      pose proof (H z Fr)...
-    }
-    replace (free_for_cv e) with (free_for_cv (subst_te Z P e)).
-    2: { rewrite subst_te_idempotent_wrt_free_for_cv... }
-    replace (subst_cset Z (cv P) (free_for_cv (subst_te Z P e)))
-      with (free_for_cv (subst_te Z P e)).
-    2: {
-      unfold subst_cset.
-      find_and_destroy_set_mem.
-      pick fresh y.
-      forwards HA: H0 y ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F); [notin_solve|..]...
-      forwards (U & Zbnd): free_for_cv_bound_typing Z HA. {
-        rewrite subst_te_idempotent_wrt_free_for_cv.
-        rewrite subst_te_idempotent_wrt_free_for_cv in ZIn.
-        forwards (? & ? & ?): free_for_cv_open e 0 y...
-      }
-      assert (ok (F ++ [(Z, bind_sub Q)] ++ E)) as Ok by auto.
-      forwards: fresh_mid_tail Ok.
-      forwards: fresh_mid_head Ok.
-      assert (y <> Z) by notin_solve.
-      clear Fr.
-      binds_cases Zbnd.
-      - rename select (binds Z _ E) into Err.
-        forwards: binds_In Err.
-        exfalso;fsetdec.
-      - rename select (binds Z _ _) into Err.
-        forwards: binds_In Err;simpl_env in *.
-        exfalso;fsetdec.
-    }
-    pick fresh y and apply typing_handle.
-    + rewrite subst_te_open_ee_var...
-      rewrite <- (subst_cset_univ_idempotent Z (cv P)).
-      rewrite_env (map (subst_tb Z P) ([(y,  bind_typ (typ_capt {*} (typ_ret T1)))] ++ F) ++ E).
-      apply H0...
-    + intro ScUniv.
-      eapply subcapt_univ_through_subst_tb in ScUniv...
-      * apply H1.
-        destruct ScUniv as [ScUniv|ScUniv].
-        1: { eapply subcapt_widening_univ... }
-        destruct ScUniv as [_ ScUniv].
-        forwards: univ_supercapt_inversion ScUniv.
-        destruct (cv P); easy.
-      * assert (wf_typ_in (F ++ [(Z, bind_sub Q)] ++ E) T1). {
-          pick fresh y for L.
-          specialize (H y Fr).
-          assert (wf_env ([(y, bind_typ (typ_capt {*} (typ_ret T1)))] ++ F ++
-                            [(Z, bind_sub Q)] ++ E)) as HA by eauto.
-          inversion HA; subst.
-          inversion select (wf_typ_in _ (typ_capt {*} (typ_ret T1))); subst.
-          inversion select (wf_pretyp _ _ _ (typ_ret T1)); subst...
-        }
-        eapply wf_typ_ignores_sub_bindings...
-  - eapply typing_do_ret.
-    + eapply IHTyp1...
-    + eapply IHTyp2...
-    + assert (wf_typ E (dom F `u`A {Z}A `u`A dom E) (dom F `u`A {Z}A `u`A dom E) P) as WfP. {
-        forwards (? & WfP & ?): sub_regular PsubQ.
-        applys wf_typ_set_weakening WfP...
-      }
-      rename select (wf_typ_in _ T2) into HH.
-      forwards WfP': wf_typ_subst_tb Q HH; simpl_env...
-  - unfold subst_cset.
-    find_and_destroy_set_mem; [exfalso;fsetdec|].
-    assert (~ Z `in`A (fv_tt T `u`A fv_ct T)). {
-      eapply (notin_fv_wf_typ empty).
-      - assert (wf_typ_in empty (typ_capt C (typ_ret T))) as HA. {
-          eapply wf_typ_from_binds_sig...
-        }
-        inversion HA; subst.
-        inversion select (wf_pretyp empty _ _ (typ_ret T))...
-      - simpl; fsetdec.
-    }
-    rewrite <- (subst_tt_fresh Z) by trivial.
-    eapply typing_lvar...
 Qed.
