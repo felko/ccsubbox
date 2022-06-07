@@ -91,7 +91,7 @@ Coercion exp_var : var >-> exp.
 Definition cv (T : typ) : cap :=
   match T with
   | typ_bvar n => {}      (* TODO is there a better way to do this? *)
-  | typ_fvar x => `cset_fvar` x (* REVIEW: why is the capture set referring to type variables? *)
+  | typ_fvar x => `cset_fvar` x
   | typ_capt C _ => C
   end.
 
@@ -163,6 +163,23 @@ Definition open_te e U := open_te_rec 0 U e.
 Definition open_ve e x c := open_ve_rec 0 x c e.
 Definition open_ct T c := open_ct_rec 0 c T.
 Definition open_cpt T c := open_cpt_rec 0 c T.
+
+Definition free_for_cv_var (v : var) : cap :=
+  match v with
+  | var_f x => (`cset_fvar` x)
+  | var_b _ => {}
+  end.
+
+(** The definition of "fv" used in typing jdmgnts*)
+Fixpoint free_for_cv (e : exp) : cap :=
+  match e with
+  | exp_var v => free_for_cv_var v
+  | exp_abs t e1 => (free_for_cv e1)
+  | exp_app f x => (cset_union (free_for_cv_var f) (free_for_cv_var x))
+  | exp_let e C => (cset_union (free_for_cv e) (free_for_cv C))
+  | exp_tabs t e1 => (free_for_cv e1)
+  | exp_tapp x t => (free_for_cv_var x)
+  end.
 
 (* ********************************************************************** *)
 (** * #<a name="lc"></a># Local closure *)
@@ -242,10 +259,10 @@ Inductive expr : exp -> Prop :=
       expr (exp_abs T e1)
   | expr_app : forall (f x : atom),
       expr (exp_app f x)
-  | expr_let : forall L e C,
+  | expr_let : forall L e k,
       expr e ->
-      (forall x : atom, x `notin` L -> expr (open_ve C x (`cset_fvar` x))) ->
-      expr (exp_let e C)
+      (forall x : atom, x `notin` L -> expr (open_ve k x (`cset_fvar` x))) ->
+      expr (exp_let e k)
   | expr_tabs : forall L T e1,
       type T ->
       (forall X : atom, X `notin` L -> expr (open_te e1 X)) ->
@@ -526,7 +543,6 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
       wf_typ_in E T1 ->
       wf_typ_in E S1 ->
       (forall X : atom, X `notin` L ->
-          (* REVIEW: difference between dom E and dom E `u`A {X}A? *)
           wf_typ ([(X, bind_sub T1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt T2 X)) ->
       (forall X : atom, X `notin` L ->
           wf_typ ([(X, bind_sub S1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt S2 X)) ->
@@ -537,23 +553,6 @@ with sub_pre : env -> pretyp -> pretyp -> Prop :=
 
 (* ********************************************************************** *)
 (** * #<a name="typing_doc"></a># Typing *)
-
-Definition free_for_cv_var (v : var) : cap :=
-  match v with
-  | var_f x => (`cset_fvar` x)
-  | var_b _ => {}
-  end.
-
-(** The definition of "fv" used in typing jdmgnts*)
-Fixpoint free_for_cv (e : exp) : cap :=
-  match e with
-  | exp_var v => free_for_cv_var v
-  | exp_abs t e1 => (free_for_cv e1)
-  | exp_app f x => (cset_union (free_for_cv_var f) (free_for_cv_var x))
-  | exp_let e C => (cset_union (free_for_cv e) (free_for_cv C))
-  | exp_tabs t e1 => (free_for_cv e1)
-  | exp_tapp x t => (free_for_cv_var x)
-  end.
 
 Inductive typing : env -> exp -> typ -> Prop :=
   | typing_var_tvar : forall E (x X : atom),
@@ -571,16 +570,15 @@ Inductive typing : env -> exp -> typ -> Prop :=
       (forall x : atom, x `notin` L ->
         typing ([(x, bind_typ V)] ++ E) (open_ve e1 x (`cset_fvar` x)) (open_ct T1 (`cset_fvar` x))) ->
       typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
-  | typing_app : forall T1 E (f x : atom) T2 Cf T1',
+  | typing_app : forall T1 E (f x : atom) T2 Cf,
       typing E f (typ_capt Cf (typ_arrow T1 T2)) ->
-      typing E x T1' ->
-      sub E T1' T1 ->
-      typing E (exp_app f x) (open_ct T2 (cv T1'))
-  | typing_let : forall L T1 T2 E e C,
+      typing E x T1 ->
+      typing E (exp_app f x) (open_ct T2 (`cset_fvar` x))
+  | typing_let : forall L T1 T2 E e k,
       typing E e T1 ->
       (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ T1)] ++ E) (open_ve C x (`cset_fvar` x)) T2) ->
-      typing E (exp_let e C) T2
+        typing ([(x, bind_typ T1)] ++ E) (open_ve k x (`cset_fvar` x)) T2) ->
+      typing E (exp_let e k) T2
   | typing_tabs : forall L E V e1 T1,
       wf_typ_in E V ->
       (forall x : atom, x `notin` L ->
@@ -615,91 +613,8 @@ Inductive answer : exp -> Prop :=
   | answer_var : forall (x : atom),
       answer x.
 
-(* States *)
-
-Inductive store_frame : Type :=
-  | store v : value v -> store_frame.
-
-Definition store_ctx : Type := list (atom * store_frame).
-Definition stores (S : store_ctx) (x : atom) (v : exp) (v_value : value v) : Prop :=
-    binds x (store v v_value) S.
-
-Inductive scope (c : cap) (e : exp) : Type :=
-  | mk_scope L : (forall x, x `notin` L -> expr (open_ve e x c)) -> scope c e.
-
-Inductive eval_frame : Type :=
-  | cont c e : scope c e -> eval_frame.
-
-Definition eval_ctx : Type := (list eval_frame).
-
-Inductive state : Type :=
-  | mk_state : store_ctx -> eval_ctx -> exp -> state.
-
-Notation "⟨ S | E | e ⟩" := (mk_state S E e) (at level 1).
-
-Inductive state_final : state -> Prop :=
-  | final_state : forall S a,
-      answer a ->
-      state_final ⟨ S | nil | a ⟩.
-
-Inductive store_typing : store_ctx -> env -> Prop :=
-  | typing_store_nil : store_typing nil nil
-  | typing_store_cons : forall x T v v_value S E,
-      store_typing S E ->
-      typing E v T ->
-      x `notin` dom E ->
-      store_typing ([(x, store v v_value)] ++ S) ([(x, bind_typ T)] ++ E).
-
-Inductive eval_typing (E : env) : eval_ctx -> typ -> typ -> Prop :=
-  | typing_eval_nil : forall T U,
-      wf_env E ->
-      sub E T U ->
-      eval_typing E nil T U
-  | typing_eval_cons : forall L c k (k_scope : scope c k) K T U V,
-      (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ T)] ++ E) (open_ve k x c) U) ->
-      eval_typing E K U V ->
-      eval_typing E (cont c k k_scope :: K) T V.
-
-Inductive state_typing : state -> typ -> Prop :=
-  | typing_state : forall S K e E T U,
-      store_typing S E ->
-      eval_typing E K T U ->
-      typing E e T ->
-      state_typing ⟨ S | K | e ⟩ U.
-
 (* ********************************************************************** *)
 (** * #<a name="reduction"></a># Reduction *)
-
-Inductive red (L : atoms) : state -> state -> Prop :=
-  | red_lift : forall x v (v_value : value v) c k (k_scope : scope c k) S E,
-      x `notin` L ->
-      red L ⟨ S | cont c k k_scope :: E | v ⟩
-            ⟨ [(x, store v v_value)] ++ S | E | open_ve k x c ⟩
-  | red_let_var : forall (x y : atom) v (v_value : value v) c k (k_scope : scope c k) S E,
-      stores S x v v_value ->
-      y `notin` L ->
-      red L ⟨ S | cont c k k_scope :: E | x ⟩
-            ⟨ [(y, store v v_value)] ++ S | E | open_ve k y c ⟩
-  | red_let_val : forall x v (v_value : value v) c k (k_scope : scope c k) S E,
-      x `notin` L ->
-      red L ⟨ S | E | exp_let v k ⟩
-            ⟨ [(x, store v v_value)] ++ S | E | open_ve k x c ⟩
-  | red_let_exp : forall e c k (k_scope : scope c k) S E,
-      red L ⟨ S | E | exp_let e k ⟩
-            ⟨ S | cont c k k_scope :: E | e ⟩
-  | red_app : forall f x U e v (v_value : value v) (abs_value : value (exp_abs U e)) S E,
-      stores S f (exp_abs U e) abs_value ->
-      stores S x v v_value ->
-      x `notin` L ->
-      red L ⟨ S | E | exp_app f x ⟩
-            ⟨ S | E | open_ve e x (free_for_cv e) ⟩
-  | red_tapp : forall x T U e (tabs_value : value (exp_tabs U e)) S E,
-      stores S x (exp_tabs U e) tabs_value ->
-      type T ->
-      x `notin` L ->
-      red L ⟨ S | E | exp_tapp x T ⟩
-            ⟨ S | E | open_te e T ⟩.
 
 
 (* ********************************************************************** *)
@@ -714,7 +629,7 @@ Inductive red (L : atoms) : state -> state -> Prop :=
     all constructors and then later removes some constructors when
     they cause proof search to take too long.) *)
 
-Hint Constructors type pretype expr bound wf_cset wf_typ wf_pretyp wf_env value red sub subcapt typing : core.
+Hint Constructors type pretype expr bound wf_cset wf_typ wf_pretyp wf_env value sub subcapt typing : core.
 Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
 Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
 Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound : core.

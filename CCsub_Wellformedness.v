@@ -137,7 +137,6 @@ Lemma wf_cset_extra : forall S2 E C,
 Proof with eauto*.
   intros * HwfC.
   induction HwfC...
-  (* REVIEW: automation broke here *)
   intros A_subset_S2.
   constructor...
   fsetdec.
@@ -158,7 +157,6 @@ Proof with eauto.
   intros.
   rewrite AtomSetFacts.union_iff in *.
   auto*.
-  (* REVIEW: automation broke here *)
   fsetdec.
 Qed.
 
@@ -172,7 +170,6 @@ Proof with eauto.
   intros.
   apply H.
   fsetdec.
-  (* REVIEW: automation broke here*)
   fsetdec.
 Qed.
 
@@ -259,7 +256,7 @@ Lemma wf_cset_in_weakening : forall E F G C,
 Proof with eauto.
   intros * Hwf Hok.
   eapply wf_cset_weakening...
-  simpl_env. (* REVIEW: another automation breakage, I thought fsetdec was taking care of simplifying the env *)
+  simpl_env.
   fsetdec.
 Qed.
 
@@ -567,6 +564,26 @@ Proof with eauto.
   - fsetdec.
 Qed.
 
+Lemma wf_cset_in_strengthen_typ : forall x E F C U,
+  x `~in`A (`cset_fvars` C) ->
+  wf_cset_in (E ++ [(x, bind_typ U)] ++ F) C ->
+  wf_cset_in (E ++ F) C.
+Proof with eauto.
+  intros * ? H.
+  inversion H; subst.
+  econstructor.
+  - intros y ?.
+    destruct (H1 y H3) as [V ?].
+    exists V.
+    inversion H4.
+    + binds_cases H5...
+      fsetdec.
+    + binds_cases H5... 
+  - clear - H0 H2.
+    repeat rewrite dom_concat in *; simpl in H2.
+    fsetdec.
+Qed.
+
 (*
 Print wf_typ.
 
@@ -624,7 +641,7 @@ Proof with eauto*.
   destruct (k N`mem` c)...
 Qed.
 
-Local Lemma notin_open_tt_rec_fv_ct : forall k x T U,
+Lemma notin_open_tt_rec_fv_ct : forall k x T U,
   x `~in`A (fv_ct T `u`A (`cset_fvars` (cv U)) `u`A fv_ct U) ->
   x `~in`A fv_ct (open_tt_rec k U T)
 with notin_open_tpt_rec_fv_cpt : forall k x P U,
@@ -747,6 +764,18 @@ Lemma wf_typ_in_strengthen_typ : forall x E F T U,
 Proof with eauto using wf_typ_strengthen_typ.
   intros * NotIn WfT.
   unfold wf_typ_in in *.
+  repeat rewrite dom_concat in *; simpl in *; simpl_env in *.
+  replace (dom E `u`A dom F) with ((dom E `u`A ({x}A `u`A {}A) `u`A dom F) `\`A x)...
+  fsetdec.
+Qed.
+
+Lemma wf_pretyp_in_strengthen_typ : forall x E F P U,
+  x `~in`A (dom E `u`A fv_cpt P `u`A dom F) ->
+  wf_pretyp_in (E ++ [(x, bind_typ U)] ++ F) P ->
+  wf_pretyp_in (E ++ F) P.
+Proof with eauto using wf_pretyp_strengthen_typ.
+  intros * NotIn WfT.
+  unfold wf_pretyp_in in *.
   repeat rewrite dom_concat in *; simpl in *; simpl_env in *.
   replace (dom E `u`A dom F) with ((dom E `u`A ({x}A `u`A {}A) `u`A dom F) `\`A x)...
   fsetdec.
@@ -1931,6 +1960,46 @@ Qed.
 Lemma wf_env_strengthening : forall F E, wf_env (F ++ E) -> wf_env E.
 Proof with eauto.
   induction F...
+Qed.
+
+Lemma wf_env_strengthening_typ : forall x T E F,
+  x `~in`A fv_cctx F ->
+  wf_env (F ++ [(x, bind_typ T)] ++ E) ->
+  wf_env (F ++ E).
+Proof with eauto using wf_cset_strengthen_typ.
+  intros * NotIn WfEnv.
+  eremember (F ++ [(x, bind_typ T)] ++ E) as E0.
+  generalize dependent F.
+  induction WfEnv; intros F NotIn EQ.
+  - induction F; inversion EQ.
+  - induction F; simpl_env in *.
+    + inversion EQ.
+    + destruct a as [y [U | U]]; simpl in *; simpl_env in *.
+      * inversion EQ; subst.
+        constructor...
+        eapply wf_typ_in_strengthen_typ...
+        assert (x `~in`A (dom E `u`A dom F)).
+        { assert (ok (F ++ [(x, bind_typ T)] ++ E)) by applys ok_from_wf_env WfEnv.
+          assert (x `~in`A dom F) by applys fresh_mid_head H1.
+          assert (ok ([(x, bind_typ T)] ++ E)) by applys ok_tail H1.
+          inversion H3...
+        }
+        clear - NotIn H1; fsetdec.
+      * inversion EQ; subst.
+  - induction F; simpl_env in *.
+    + inversion EQ; subst...
+    + destruct a as [y [U | U]]; simpl in *; simpl_env in *.
+      * inversion EQ; subst.
+      * inversion EQ; subst.
+        constructor...
+        apply wf_typ_in_strengthen_typ with (x := x) (U := T)...
+        assert (x `~in`A (dom E `u`A dom F)).
+        { assert (ok (F ++ [(x, bind_typ T)] ++ E)) by applys ok_from_wf_env WfEnv.
+          assert (x `~in`A dom F) by applys fresh_mid_head H1.
+          assert (ok ([(x, bind_typ T)] ++ E)) by applys ok_tail H1.
+          inversion H3...
+        }
+        clear - NotIn H1; fsetdec.
 Qed.
 
 Lemma wf_env_weaken_head : forall E F,

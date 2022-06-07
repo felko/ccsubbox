@@ -514,6 +514,9 @@ Proof with eauto.
       notin_solve.
       notin_solve.
   - cbn [fv_ve].
+    assert (WfFun : wf_typ_in E (typ_capt Cf (typ_arrow T1 T2))) by applys typing_regular Typ1.
+    inversion WfFun; inversion H5; subst.
+    simpl in IHTyp2 |- *.
     apply notin_union...
   - simpl.
     pick fresh y.
@@ -1362,6 +1365,14 @@ Proof with eauto with fsetdec.
     f_equal; repeat (apply subst_tt_open_ct_rec_straight)...
 Qed.
 
+Lemma typing_var_implies_binds_typ : forall E (x : atom) T,
+  typing E x T ->
+  exists S, binds x (bind_typ S) E.
+Proof with eauto*.
+  intros * Typ.
+  dependent induction Typ...
+Qed.
+
 Lemma typing_through_subst_te : forall Q E F Z e T P,
   typing (F ++ [(Z, bind_sub Q)] ++ E) e T ->
   sub E P Q ->
@@ -1524,9 +1535,19 @@ Proof with simpl_env;
       rewrite subst_tt_open_ct_var...
       unshelve eapply (H2 y _ ([(y, bind_typ V)] ++ F) _)...
   - Case "typing_app".
-    replace (subst_tt Z P (open_ct T2 (cv T1')))
-      with (open_ct (subst_tt Z P T2) (cv (subst_tt Z P T1')))...
-    symmetry; apply subst_tt_open_ct_rec_straight...
+    assert (okEnv : ok (F ++ [(Z, bind_sub Q)] ++ E)) by
+      (apply ok_from_wf_env; applys typing_regular Typ1).
+    assert (Z `notin` (dom F `union` dom E)) by
+      (eapply binding_uniq_from_ok; eauto*).
+    destruct (Z == x); subst.
+    + assert (xBindsSub : binds x (bind_sub Q) (F ++ [(x, bind_sub Q)] ++ E)) by
+       (apply binds_tail; eauto*).
+      destruct (typing_var_implies_binds_typ _ _ _ Typ2) as [S xBindsTyp].
+      assert (bind_sub Q = bind_typ S) by (eapply binds_unique; eauto*).
+      inversion H0.
+    + replace (subst_tt Z P (open_ct T2 (`cset_fvar` x)))
+        with (open_ct (subst_tt Z P T2) (`cset_fvar` x))...
+        apply subst_tt_open_ct_var...
   - Case "typing_let".
     pick fresh y and apply typing_let.
     + apply IHTyp...
@@ -1592,4 +1613,6 @@ Proof with simpl_env;
       apply H2...
   - Case "typing_tapp".
     rewrite subst_tt_open_tt...
+  Unshelve .
+  apply f. apply F.
 Qed.

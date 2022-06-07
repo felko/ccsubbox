@@ -811,7 +811,7 @@ Lemma open_te_rec_expr : forall e U k,
   e = open_te_rec k U e.
 Proof with auto using open_tt_rec_type.
   intros e U k WF; revert k;
-  induction WF; intros k; simpl; f_equal; auto using open_tt_rec_type.
+  induction WF; intros k0; simpl; f_equal; auto using open_tt_rec_type.
   - pick fresh x. eapply open_te_rec_exprN...
     eapply exprN_weakening with (n := 1); try lia...
     eapply open_ve_rec_exprN_aux with (s := x) (c := `cset_fvar` x)...
@@ -1241,7 +1241,7 @@ Lemma open_ve_rec_expr_aux : forall e j v u C D i,
      open_ct_rec_capt requires this.
    *)
   capt D ->
-  (`cset_fvars` C) `disjoint` (`cset_fvars` D) ->
+  (`cset_fvars` C) `disjoint` (`cset_fvars` D) -> 
   (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
   open_ve_rec j v D e = open_ve_rec i u C (open_ve_rec j v D e) ->
   e = open_ve_rec i u C e.
@@ -1249,22 +1249,62 @@ Proof with eauto using open_ct_rec_capt, open_vv_fuse.
   induction e; intros j x y C D i Neq Closed Disj DisjU H; simpl in *; inversion H; f_equal...
 Qed.
 
+Lemma free_for_cv_capt_var : forall v,
+  capt (free_for_cv_var v).
+Proof with eauto*.
+  intros.
+  destruct v; simpl...
+Qed.
+
+Lemma free_for_cv_capt : forall e,
+  capt (free_for_cv e).
+Proof with eauto using free_for_cv_capt_var.
+  intros.
+  induction e; simpl...
+  - intros a.
+    simpl.
+    assert (capt (free_for_cv_var v)) by apply free_for_cv_capt_var.
+    assert (capt (free_for_cv_var v0)) by apply free_for_cv_capt_var.
+    unfold capt in *.
+    fnsetdec.
+  - intros a.
+    simpl.
+    unfold capt in *.
+    fnsetdec.
+Qed.
+
+Lemma cset_fvars_free_for_cv_var_is_fv_vv : forall v,
+  `cset_fvars` (free_for_cv_var v) = fv_vv v.
+Proof with eauto*.
+  intros.
+  destruct v; simpl...
+Qed.
+
+Lemma cset_fvars_free_for_cv_is_fv_ve : forall e,
+  `cset_fvars` (free_for_cv e) = fv_ve e.
+Proof with eauto using cset_fvars_free_for_cv_var_is_fv_vv.
+  intros.
+  induction e; simpl...
+  - repeat rewrite cset_fvars_free_for_cv_var_is_fv_vv...
+  - rewrite IHe1, IHe2...
+Qed.
+
 Lemma open_ve_rec_expr : forall u c e k,
   expr e ->
   e = open_ve_rec k u c e.
 Proof with auto*.
   intros u c e k Hexpr. revert k.
-  induction Hexpr; intro k; simpl; f_equal; auto*.
+  induction Hexpr; intro k0; simpl; f_equal; auto*.
   - pick fresh x.
     apply open_ct_rec_type...
   - pick fresh x.
-    specialize H1 with (x := x) (k := S k).
+    specialize H1 with (x := x) (k := S k0).
     apply open_ve_rec_expr_aux with (j := 0) (v := x) (D := (`cset_fvar` x));
       simpl...
     + autounfold in *. fsetdec.
   - pick fresh x.
-    specialize H0 with (x := x) (k := S k).
-    apply open_ve_rec_expr_aux with (j := 0) (v := x) (D := (`cset_fvar` x));
+    specialize H0 with (x := x) (k0 := S k0).
+    apply open_ve_rec_expr_aux with (j := 0) (v := x) (D := `cset_fvar` x);
       simpl...
     + autounfold in *. fsetdec.
   - apply open_ct_rec_type...
@@ -1328,52 +1368,6 @@ Proof with auto using subst_cset_open_cset_rec.
   induction t ; intros c1 c2 k x c1empt;
     unfold open_cpt_rec; unfold subst_ct; unfold subst_cpt; f_equal...
 Qed.
-
-(*
-REVIEW: Not needed since we won't need substitution in the reduction.
-Lemma subst_ee_open_ee_rec : forall e1 e2 x u c1 c2 k,
-  expr u ->
-  capt c1 ->
-  subst_ee x u c1 (open_ee_rec k e2 c2 e1) =
-    open_ee_rec k (subst_ee x u c1 e2) (subst_cset x c1 c2) (subst_ee x u c1 e1).
-Proof with auto using subst_ct_open_rec.
-  intros e1 e2 x u c1 c2 k Wu Wc. revert k.
-  induction e1; intros k; simpl; f_equal...
-  Case "exp_bvar".
-    destruct (k === n); subst...
-  Case "exp_fvar".
-    destruct (a == x); subst... apply open_ee_rec_expr...
-Qed.
-
-Lemma subst_ee_open_ee : forall e1 e2 x u c1 c2,
-  expr u ->
-  capt c1 ->
-  subst_ee x u c1 (open_ee e1 e2 c2) =
-    open_ee (subst_ee x u c1 e1) (subst_ee x u c1 e2) (subst_cset x c1 c2).
-Proof with auto*.
-  intros.
-  unfold open_ee.
-  apply subst_ee_open_ee_rec...
-Qed.
-
-Lemma subst_ee_open_ee_var : forall (x y:atom) u c e,
-  y <> x ->
-  expr u ->
-  capt c ->
-  open_ee (subst_ee x u c e) y (`cset_fvar` y) = subst_ee x u c (open_ee e y (`cset_fvar` y)).
-Proof with auto*.
-  intros x y u c e Neq Wu Wc.
-  unfold open_ee.
-  rewrite subst_ee_open_ee_rec...
-  simpl.
-  destruct (y == x)...
-
-  (* TODO factor into a tactic *)
-  unfold subst_cset; simpl.
-  destruct_set_mem x (`cset_fvar` y)...
-  fsetdec.
-Qed.
-*)
 
 (** The next lemma states that opening a term is equivalent to first
     opening the term with a fresh name and then substituting for the
@@ -1745,29 +1739,6 @@ Proof with auto.
     { apply open_tt_subst_ct_aux... notin_solve. }
     rewrite H1...
 Qed.
-
-(* REVIEW: No need for this anymore
-Lemma subst_ee_expr : forall z e1 e2 c,
-  expr e1 ->
-  expr e2 ->
-  capt c ->
-  expr (subst_ee z e2 c e1).
-Proof with eauto using subst_ct_type.
-  intros z e1 e2 c He1 He2 Closed. revert z.
-
-  induction He1; intro z; simpl; auto;
-  try solve [
-    econstructor; eauto using subst_ct_type;
-    try let F := gather_atoms in instantiate (1 := F);
-    intros;
-    try rewrite subst_ee_open_ee_var;
-    try rewrite subst_ee_open_te_var;
-    eauto
-  ].
-  - destruct (x == z)...
-Qed.
-*)
-
 
 (* *********************************************************************** *)
 (** * #<a name="auto"></a># Automation *)

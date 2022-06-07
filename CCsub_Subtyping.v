@@ -117,6 +117,232 @@ Proof with simpl_env; eauto using wf_typ_weakening, wf_pretyp_weakening, subcapt
 Qed.
 
 (* ********************************************************************** *)
+(** ** Strengthening (3) *)
+
+Lemma subcapt_concrete_implies_subset_fvars : forall E C D,
+  wf_env E ->
+  subcapt E C D ->
+  ~ `* in` D ->
+  (`cset_fvars` C) `c`A (`cset_fvars` D).
+Proof with eauto*.
+  intros * WfEnv CsubD DNotUniv.
+  assert (WfC : wf_cset_in E C) by applys subcapt_regular CsubD.
+  assert (WfD : wf_cset_in E D) by applys subcapt_regular CsubD.
+  inversion WfC; inversion WfD; subst.
+  assert (univ0 = false) by (clear - DNotUniv; destruct univ0; eauto*); subst.
+  assert (univ = false).
+  { assert (implb univ false = true) by applys subcapt_universal_mem WfEnv CsubD.
+    destruct univ... }
+  subst.
+  clear DNotUniv.
+  dependent induction CsubD...
+  - fsetdec.
+  - admit.
+  - admit.
+  - admit.
+Admitted.  
+
+Lemma sub_strengthening : forall x U E F S T,
+  x `~in`A (fv_cctx F `u`A fv_ct S `u`A fv_ct T) ->
+  sub (F ++ [(x, bind_typ U)] ++ E) S T ->
+  sub (F ++ E) S T
+with sub_pre_strengthening : forall x U E F P Q,
+  x `~in`A (fv_cctx F `u`A fv_cpt P `u`A fv_cpt Q) ->
+  sub_pre (F ++ [(x, bind_typ U)] ++ E) P Q ->
+  sub_pre (F ++ E) P Q.
+Proof with eauto using
+  wf_cset_in_strengthen_typ,
+  wf_pretyp_in_strengthen_typ,
+  wf_typ_in_strengthen_typ,
+  wf_env_strengthening_typ.
+{ intros * NotIn SsubT.
+  assert (ok (F ++ [(x, bind_typ U)] ++ E)) by (apply ok_from_wf_env; applys sub_regular SsubT).
+  eremember (F ++ [(x, bind_typ U)] ++ E) as E'.
+  generalize dependent F.
+  induction SsubT; intros F NotIn EQ; subst.
+  - Case "sub_refl_tvar".
+    constructor.
+    + eapply wf_env_strengthening_typ...
+      clear - NotIn; fsetdec.
+    + eapply wf_typ_in_strengthen_typ...
+      enough (x `~in`A (dom E `u`A dom F)) by fsetdec.
+      apply notin_union.
+      * applys fresh_mid_tail H.
+      * applys fresh_mid_head H.
+  - Case "sub_trans_tvar".
+    apply sub_trans_tvar with (U := U0).
+    + eapply binds_remove_mid...
+      binds_cases H0.
+      * simpl in Fr0; clear - Fr0; fsetdec.
+      * intros Xeqx; subst.
+        assert (x `in`A dom F) by applys binds_In H2.
+        assert (x `~in`A dom F) by applys fresh_mid_head H.
+        apply (H1 H0).
+    + apply IHSsubT.
+      * assumption.
+      * repeat apply notin_union.
+        -- clear - NotIn; fsetdec.
+        -- admit.
+        -- clear - NotIn; fsetdec.  
+      * reflexivity.  
+  - Case "sub_capt".
+    simpl in NotIn.
+    apply sub_capt...
+    + destruct (subcapt_regular _ _ _ H0).
+      eapply subcapt_strengthening...
+      * eapply wf_env_strengthening_typ...
+        clear - NotIn; fsetdec.
+      * eapply wf_cset_in_strengthen_typ...
+        clear - NotIn; fsetdec.
+      * eapply wf_cset_in_strengthen_typ...
+        clear - NotIn; fsetdec.
+    + apply sub_pre_strengthening with (x := x) (U := U).
+      * clear - NotIn; fsetdec.
+      * assumption. 
+}
+{ intros * NotIn PsubQ.
+  assert (ok (F ++ [(x, bind_typ U)] ++ E)) by (apply ok_from_wf_env; applys sub_pre_regular PsubQ).
+  eremember (F ++ [(x, bind_typ U)] ++ E) as E'.
+  generalize dependent F.
+  induction PsubQ; intros F NotIn EQ; subst.
+  - Case "sub_top".
+    apply sub_top...
+    + eapply wf_env_strengthening_typ...
+      clear - NotIn; fsetdec.
+    + eapply wf_pretyp_in_strengthen_typ...
+      clear - NotIn H.
+      repeat apply notin_union.
+      * applys fresh_mid_head H.
+      * fsetdec.
+      * applys fresh_mid_tail H.
+  - Case "sub_arrow".
+    simpl in NotIn.
+    apply sub_arrow with (L := L `u`A {x}A).
+    + clear - sub_strengthening NotIn H0; eapply sub_strengthening...
+      fsetdec.
+    + clear - NotIn H1 H; eapply wf_typ_in_strengthen_typ...
+      repeat apply notin_union.
+      * applys fresh_mid_head H.
+      * fsetdec.
+      * applys fresh_mid_tail H.
+    + clear - NotIn H2 H; eapply wf_typ_in_strengthen_typ...
+      repeat apply notin_union.
+      * applys fresh_mid_head H.
+      * fsetdec.
+      * applys fresh_mid_tail H.
+    + intros y yNotIn.
+      rewrite_env (([(y, bind_typ T1)] ++ F) ++ E).
+      replace (dom (F ++ E)) with (dom (F ++ [(x, bind_typ U)] ++ E) `\`A x).
+      replace ((dom (F ++ [(x, bind_typ U)] ++ E) `\`A x) `u`A {y}A) with ((dom (F ++ [(x, bind_typ U)] ++ E) `u`A {y}A) `\`A x).
+      eapply wf_typ_strengthen_typ.
+      repeat rewrite dom_concat; simpl.
+      repeat apply notin_union.
+      * clear - yNotIn; fsetdec.
+      * clear; fsetdec.
+      * applys fresh_mid_head H.
+      * apply notin_open_ct_rec_fv_ct.
+        clear - NotIn yNotIn; fsetdec.
+      * apply H3...
+      * clear - yNotIn; fsetdec.
+      * assert (x `~in`A dom F) by applys fresh_mid_head H.
+        assert (x `~in`A dom E) by applys fresh_mid_tail H.
+        repeat rewrite dom_concat; simpl; clear - H6 H7.
+        fsetdec.
+    + intros y yNotIn.
+      rewrite_env (([(y, bind_typ S1)] ++ F) ++ E).
+      replace (dom (F ++ E)) with (dom (F ++ [(x, bind_typ U)] ++ E) `\`A x).
+      replace ((dom (F ++ [(x, bind_typ U)] ++ E) `\`A x) `u`A {y}A) with ((dom (F ++ [(x, bind_typ U)] ++ E) `u`A {y}A) `\`A x).
+      eapply wf_typ_strengthen_typ.
+      repeat rewrite dom_concat; simpl.
+      repeat apply notin_union.
+      * clear - yNotIn; fsetdec.
+      * clear; fsetdec.
+      * applys fresh_mid_head H.
+      * apply notin_open_ct_rec_fv_ct.
+        clear - NotIn yNotIn; fsetdec.
+      * apply H4...
+      * clear - yNotIn; fsetdec.
+      * assert (x `~in`A dom F) by applys fresh_mid_head H.
+        assert (x `~in`A dom E) by applys fresh_mid_tail H.
+        repeat rewrite dom_concat; simpl; clear - H6 H7.
+        fsetdec.
+    + intros y yNotIn.
+      rewrite_env (([(y, bind_typ T1)] ++ F) ++ E).
+      eapply sub_strengthening with (x := x) (U := U); simpl.
+      * clear - NotIn yNotIn.
+        repeat apply notin_union.
+        -- fsetdec.
+        -- fsetdec.
+        -- apply notin_open_ct_rec_fv_ct; fsetdec.
+        -- apply notin_open_ct_rec_fv_ct; fsetdec.
+      * eapply H5...
+  - Case "sub_all".
+    simpl in NotIn.
+    apply sub_all with (L := L `u`A {x}A).
+    + clear - sub_strengthening NotIn H0; eapply sub_strengthening...
+      fsetdec.
+    + clear - NotIn H1 H; eapply wf_typ_in_strengthen_typ...
+      repeat apply notin_union.
+      * applys fresh_mid_head H.
+      * fsetdec.
+      * applys fresh_mid_tail H.
+    + clear - NotIn H2 H; eapply wf_typ_in_strengthen_typ...
+      repeat apply notin_union.
+      * applys fresh_mid_head H.
+      * fsetdec.
+      * applys fresh_mid_tail H.
+    + intros y yNotIn.
+      rewrite_env (([(y, bind_sub T1)] ++ F) ++ E).
+      replace (dom (F ++ E)) with (dom (F ++ [(x, bind_typ U)] ++ E) `\`A x).
+      replace ((dom (F ++ [(x, bind_typ U)] ++ E) `\`A x) `u`A {y}A) with ((dom (F ++ [(x, bind_typ U)] ++ E) `u`A {y}A) `\`A x).
+      eapply wf_typ_strengthen_typ.
+      repeat rewrite dom_concat; simpl.
+      repeat apply notin_union.
+      * clear - yNotIn; fsetdec.
+      * clear; fsetdec.
+      * applys fresh_mid_head H. 
+      * apply notin_open_tt_rec_fv_ct.
+        simpl.
+        clear - NotIn yNotIn; fsetdec.
+      * apply H3...
+      * clear - yNotIn; fsetdec.
+      * assert (x `~in`A dom F) by applys fresh_mid_head H.
+        assert (x `~in`A dom E) by applys fresh_mid_tail H.
+        repeat rewrite dom_concat; simpl; clear - H6 H7.
+        fsetdec.
+    + intros y yNotIn.
+      rewrite_env (([(y, bind_sub S1)] ++ F) ++ E).
+      replace (dom (F ++ E)) with (dom (F ++ [(x, bind_typ U)] ++ E) `\`A x).
+      replace ((dom (F ++ [(x, bind_typ U)] ++ E) `\`A x) `u`A {y}A) with ((dom (F ++ [(x, bind_typ U)] ++ E) `u`A {y}A) `\`A x).
+      eapply wf_typ_strengthen_typ.
+      repeat rewrite dom_concat; simpl.
+      repeat apply notin_union.
+      * clear - yNotIn; fsetdec.
+      * clear; fsetdec.
+      * applys fresh_mid_head H. 
+      * apply notin_open_tt_rec_fv_ct.
+        simpl.
+        clear - NotIn yNotIn; fsetdec.
+      * apply H4...
+      * clear - yNotIn; fsetdec.
+      * assert (x `~in`A dom F) by applys fresh_mid_head H.
+        assert (x `~in`A dom E) by applys fresh_mid_tail H.
+        repeat rewrite dom_concat; simpl; clear - H6 H7.
+        fsetdec.
+    + intros y yNotIn.
+      rewrite_env (([(y, bind_sub T1)] ++ F) ++ E).
+      eapply sub_strengthening with (x := x) (U := U); simpl.
+      * clear - NotIn yNotIn.
+        repeat apply notin_union.
+        -- fsetdec.
+        -- fsetdec.
+        -- apply notin_open_tt_rec_fv_ct; simpl; fsetdec.
+        -- apply notin_open_tt_rec_fv_ct; simpl; fsetdec.
+      * eapply H5... 
+}
+Admitted.
+
+(* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
 
 Lemma subcapt_narrowing_typ : forall F E x P Q C1 C2,
@@ -393,31 +619,6 @@ Proof with simpl_env; auto.
         unfold transitivity_on.
         auto using (sub_transitivity T1).
 Qed. (** Only slow *)
-(* REVIEW:
-Why is it slow?
-also, to avoid issues with termination checker (failure or slowness), could we encode mutual
-inductives like this?
-
-Inductive even : nat -> Prop :=
-  | even_z : even 0
-  | even_s : odd n -> even (s n)
-with odd : nat -> Prop :=
-  | odd_s : even n -> odd (s n).
-
-=======>
-
-Inductive odd_even_tag : Type :=
-  | even_t : odd_even_tag
-  | odd_t : odd_even_tag.
-
-Inductive even_odd : odd_even_tag -> nat -> Prop :=
-  | even_z : even_odd even_t 0
-  | even_s : even_odd odd_t n -> even_odd even_t (s n)
-  | odd_s : even_odd even_t n -> even_odd odd_t (s n).
-
-Definition even : nat -> Prop := even_odd even_t.
-Definition odd : nat -> Prop := even_odd odd_t.
-*)
 
 Lemma sub_narrowing : forall Q E F Z P S T,
   sub E P Q ->

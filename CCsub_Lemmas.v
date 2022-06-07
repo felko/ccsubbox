@@ -42,32 +42,32 @@ Qed.
 
 (** These proofs are all the same, but Coq isn't smart enough unfortunately... *)
 
-Lemma notin_fv_tt_open_tt_rec : forall k (Y X : atom) T,
-  X `notin` fv_tt (open_tt_rec k Y T) ->
+Lemma notin_fv_tt_open_tt_rec : forall k (X : atom) U T,
+  X `notin` fv_tt (open_tt_rec k U T) ->
   X `notin` fv_tt T
-with notin_fv_tpt_open_tpt_rec : forall k (Y X : atom) T,
-  X `notin` fv_tpt (open_tpt_rec k Y T) ->
+with notin_fv_tpt_open_tpt_rec : forall k (X : atom) U T,
+  X `notin` fv_tpt (open_tpt_rec k U T) ->
   X `notin` fv_tpt T.
 Proof.
 ------
-  intros k Y X T. unfold open_tt.
+  intros k X U T. unfold open_tt.
   generalize k.
   induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto.
 ------
-  intros k Y X T. unfold open_tt.
+  intros k X U T. unfold open_tt.
   generalize k.
   induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto.
 Qed.
 
-Lemma notin_fv_tt_open_tt : forall (Y X : atom) T,
-  X `notin` fv_tt (open_tt T Y) ->
+Lemma notin_fv_tt_open_tt : forall (X : atom) U T,
+  X `notin` fv_tt (open_tt T U) ->
   X `notin` fv_tt T
-with notin_fv_tpt_open_tpt : forall (Y X : atom) T,
-  X `notin` fv_tpt (open_tpt T Y) ->
+with notin_fv_tpt_open_tpt : forall (X : atom) U T,
+  X `notin` fv_tpt (open_tpt T U) ->
   X `notin` fv_tpt T.
 Proof with eauto.
-  intros. apply notin_fv_tt_open_tt_rec with (k := 0) (Y := Y)...
-  intros. apply notin_fv_tpt_open_tpt_rec with (k := 0) (Y := Y)...
+  intros. apply notin_fv_tt_open_tt_rec with (k := 0) (U := U)...
+  intros. apply notin_fv_tpt_open_tpt_rec with (k := 0) (U := U)...
 Qed.
 
 Lemma notin_cset_fvars_open_cset : forall X k C c,
@@ -81,70 +81,70 @@ Proof.
   csetdec.
 Qed.
 
-Lemma notin_fv_tt_open_ct_rec : forall (Y X : atom) T k,
-  X `notin` fv_ct (open_tt_rec k Y T) ->
-  X `notin` fv_ct T
-with notin_fv_tt_open_cpt_rec : forall (Y X : atom) T k,
-  X `notin` fv_cpt (open_tpt_rec k Y T) ->
-  X `notin` fv_cpt T.
-Proof with eauto using notin_cset_fvars_open_cset.
-------
-  intros Y X T. unfold open_tt_rec.
-  induction T; simpl; intros k Fr; notin_simpl; try apply notin_union...
-------
-  intros Y X T. unfold open_tt_rec.
-  induction T; simpl; intros k Fr; notin_simpl; try apply notin_union...
-Qed.
-
-Lemma notin_fv_tt_open_ct : forall (Y X : atom) T,
-  X `notin` fv_ct (open_tt T Y) ->
-  X `notin` fv_ct T
-with notin_fv_tt_open_cpt : forall (Y X : atom) T,
-  X `notin` fv_cpt (open_tpt T Y) ->
-  X `notin` fv_cpt T.
-Proof with eauto.
-  intros. apply notin_fv_tt_open_ct_rec with (k := 0) (Y := Y)...
-  intros. apply notin_fv_tt_open_cpt_rec with (k := 0) (Y := Y)...
-Qed.
-
-Lemma notin_fv_tt_open : forall (Y X : atom) T,
-  X `notin` fv_tt (open_tt T Y) ->
-  X `notin` fv_ct (open_tt T Y) ->
-  X `notin` (fv_tt T `union` fv_ct T).
-Proof with auto.
- intros. apply notin_union.
- - apply notin_fv_tt_open_tt with (Y := Y)...
- - apply notin_fv_tt_open_ct with (Y := Y)...
-Qed.
-
-Lemma notin_fv_ct_open_tt_rec : forall (X : atom) T C k,
+Lemma notin_fv_tt_open_ct_rec : forall k (X : atom) C T,
   X `notin` fv_tt (open_ct_rec k C T) ->
   X `notin` fv_tt T
-with notin_fv_cpt_open_tpt_rec : forall (X : atom) T C k,
-  X `notin` fv_tpt (open_cpt_rec k C T) ->
-  X `notin` fv_tpt T.
-Proof with auto.
+with notin_fv_tt_open_cpt_rec : forall k (X : atom) C P,
+  X `notin` fv_tpt (open_cpt_rec k C P) ->
+  X `notin` fv_tpt P.
+Proof with eauto using notin_cset_fvars_open_cset.
 ------
-  intros X T C. unfold open_ct.
-  induction T ; simpl ; intros k Fr ; try apply notin_union; eauto.
+  intros k Y C T. unfold open_tt.
+  generalize k.
+  induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto.
 ------
-  intros X T C. unfold open_ct.
-  induction T ; simpl ; intros k Fr ; try apply notin_union; eauto.
-  - apply notin_fv_ct_open_tt_rec with (C := C) (k := k)...
-  - apply notin_fv_ct_open_tt_rec with (C := C) (k := S k)...
-  - apply notin_fv_ct_open_tt_rec with (C := C) (k := k)...
-  - apply notin_fv_ct_open_tt_rec with (C := C) (k := S k)...
+  intros k Y C P. unfold open_tt.
+  generalize k.
+  induction P; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto.
 Qed.
 
-Lemma notin_fv_ct_open_tt : forall (X : atom) T C,
+Lemma notin_fv_tt_open_ct : forall (X : atom) C T,
   X `notin` fv_tt (open_ct T C) ->
   X `notin` fv_tt T
-with notin_fv_cpt_open_tpt : forall (X : atom) T C,
+with notin_fv_tpt_open_cpt : forall (X : atom) C T,
   X `notin` fv_tpt (open_cpt T C) ->
   X `notin` fv_tpt T.
 Proof with eauto.
-  intros. apply notin_fv_ct_open_tt_rec with (k := 0) (C := C)...
-  intros. apply notin_fv_cpt_open_tpt_rec with (k := 0) (C := C)...
+  intros. apply notin_fv_tt_open_ct_rec with (k := 0) (C := C)...
+  intros. apply notin_fv_tt_open_cpt_rec with (k := 0) (C := C)...
+Qed.
+
+Lemma notin_fv_ct_open_tt_rec : forall k (X : atom) U T,
+  X `notin` fv_ct (open_tt_rec k U T) ->
+  X `notin` fv_ct T
+with notin_fv_cpt_open_tpt_rec : forall k (X : atom) U P,
+  X `notin` fv_cpt (open_tpt_rec k U P) ->
+  X `notin` fv_cpt P.
+Proof with eauto using notin_cset_fvars_open_cset.
+------
+  intros k X U T. unfold open_tt.
+  generalize k.
+  induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union...
+------
+  intros k X U P. unfold open_tt.
+  generalize k.
+  induction P; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto.
+Qed.
+
+Lemma notin_fv_ct_open_tt : forall (X : atom) U T,
+  X `notin` fv_ct (open_tt T U) ->
+  X `notin` fv_ct T
+with notin_fv_cpt_open_tpt : forall (X : atom) U P,
+  X `notin` fv_cpt (open_tpt P U) ->
+  X `notin` fv_cpt P.
+Proof with eauto*.
+  intros. apply notin_fv_ct_open_tt_rec with (k := 0) (U := U)...
+  intros. apply notin_fv_cpt_open_tpt_rec with (k := 0) (U := U)...
+Qed.
+
+Lemma notin_fv_tt_open : forall (X : atom) U T,
+  X `notin` fv_tt (open_tt T U) ->
+  X `notin` fv_ct (open_tt T U) ->
+  X `notin` (fv_tt T `union` fv_ct T).
+Proof with auto.
+ intros. apply notin_union.
+ - apply notin_fv_tt_open_tt with (U := U)...
+ - apply notin_fv_ct_open_tt with (U := U)...
 Qed.
 
 Lemma notin_fv_ct_open_ct_rec : forall (X : atom) T C k,
@@ -223,7 +223,7 @@ Lemma notin_fv_ct_open : forall (X : atom) T C,
   X `notin` (fv_tt T `union` fv_ct T).
 Proof with auto.
   intros. apply notin_union...
-  - apply notin_fv_ct_open_tt with (C := C)...
+  - apply notin_fv_tt_open_ct with (C := C)...
   - apply notin_fv_ct_open_ct with (C := C)...
 Qed.
 
@@ -258,7 +258,7 @@ Proof with eauto.
     simpl in *.
     specialize (HT2 ltac:(notin_solve)).
     assert (X `notin` fv_tt T2). {
-      apply notin_fv_ct_open_tt with (C := (`cset_fvar` Y))...
+      apply notin_fv_tt_open_ct with (C := (`cset_fvar` Y))...
     }
     assert (X `notin` fv_ct T2);
       [ apply notin_fv_ct_open_ct with (C := (`cset_fvar` Y)); try discriminate | .. ]...
@@ -269,10 +269,10 @@ Proof with eauto.
     simpl in *.
     specialize (HT2 ltac:(notin_solve)).
     assert (X `notin` fv_tt T2). {
-      apply notin_fv_tt_open_tt with (Y := Y)...
+      apply notin_fv_tt_open_tt with (U := Y)...
     }
     assert (X `notin` fv_ct T2);
-      [ apply notin_fv_tt_open_ct with (Y := Y); try discriminate | .. ]...
+      [ apply notin_fv_ct_open_tt with (U := Y); try discriminate | .. ]...
 Qed.
 
 Lemma notin_fv_wf : forall E (X : atom) T,
@@ -420,12 +420,11 @@ Proof with eauto*.
   fsetdec.
 Qed.
 
-Lemma free_for_cv_open : forall e k (y : atom),
-  cset_subset_prop (free_for_cv e) (free_for_cv (open_ve_rec k y (`cset_fvar` y) e)).
+Lemma free_for_cv_open : forall e k (y : atom) C,
+  cset_subset_prop (free_for_cv e) (free_for_cv (open_ve_rec k y C e)).
 Proof with eauto using free_for_cv_var_open, subset_union.
   intros e.
   induction e; intros; simpl...
-  
 Qed.
 
 Lemma free_for_cv_open_type : forall e k (y : atom),
@@ -492,8 +491,8 @@ Lemma free_for_cv_bound_typing : forall E e (x : atom) S,
   x A`in` (free_for_cv e) ->
   exists T, binds x (bind_typ T) E.
 Proof with eauto using wf_cset_over_union, cv_free_never_universal.
-  intros * Htyp xIn.
-  induction Htyp; simpl in *...
+  intros * Typ xIn.
+  induction Typ; simpl in *...
   - assert (x = x0) by fsetdec; subst...
   - assert (x = x0) by fsetdec; subst...
   - pick fresh y.
@@ -510,14 +509,14 @@ Proof with eauto using wf_cset_over_union, cv_free_never_universal.
   - destruct_union_mem xIn...
   - pick fresh y.
     destruct (cset_references_fvar_over_union _ _ _ xIn).
-    + apply IHHtyp...
+    + apply IHTyp...
     + forwards HA: H0 y.
       * notin_solve.
-      * assert (cset_subset_prop (free_for_cv C) (free_for_cv (open_ve C y (`cset_fvar` y)))) by apply (free_for_cv_open C 0 y).
-        assert (cset_subset_prop (free_for_cv e) (free_for_cv (open_ve e y (`cset_fvar` y)))) by apply (free_for_cv_open e 0 y).
-        clear - xIn H1 H2 IHHtyp.
+      * assert (cset_subset_prop (free_for_cv e) (free_for_cv (open_ve e y (`cset_fvar` y)))) by apply (free_for_cv_open e 0 y).
+        assert (cset_subset_prop (free_for_cv k) (free_for_cv (open_ve k y (`cset_fvar` y)))) by apply (free_for_cv_open k 0 y).
+        clear - xIn H1 H2 H3 IHTyp.
         rewrite <- fvars_union_1 in xIn.
-        apply subset_in with (A := free_for_cv C)...
+        apply subset_in with (A := free_for_cv k)...
       * destruct HA as (T & HA)...
         inversion HA.
         assert (x <> y) by notin_solve.
@@ -566,18 +565,19 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
       csetdec.
     }
     forwards SpH0: H2 y...
-    pose proof (free_for_cv_open e1 0 y)...
+    pose proof (free_for_cv_open e1 0 y (`cset_fvar` y))...
     pose proof (cv_free_never_universal).
     pose proof (cv_free_is_bvar_free e1).
     destruct (free_for_cv e1) eqn:Hfcv1; subst...
     unfold open_ve in *.
     inversion SpH0; subst...
+    Check free_for_cv_is_free_ve.
+    assert (t0 = {}N) by fnsetdec; subst...
     rename select (_ = _) into EQ.
     rename select (cset_subset_prop _ _) into HH.
     destruct HH as (HA1 & HA2 & HA3).
     rewrite <- EQ in *.
     simpl in *.
-    assert (t0 = {}N) by fnsetdec; subst...
     constructor.
     2: clear Fr; fsetdec.
     intros x ?.
@@ -594,25 +594,25 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     apply wf_cset_over_union; split...
     pick fresh y.
     assert (y `notin` L) by fsetdec.
-    assert (~ y A`in` (free_for_cv C)). {
-      pose proof (free_for_cv_is_free_ve C) as P...
+    assert (~ y A`in` (free_for_cv k)). {
+      pose proof (free_for_cv_is_free_ve k) as P...
       inversion P; subst.
       simpl in *.
       csetdec.
     }
     forwards SpH0: H0 y...
-    pose proof (free_for_cv_open C 0 y)...
+    pose proof (free_for_cv_open k 0 y (`cset_fvar` y))...
     pose proof (cv_free_never_universal).
-    pose proof (cv_free_is_bvar_free C).
-    destruct (free_for_cv C) eqn:Hfcv1; subst...
+    pose proof (cv_free_is_bvar_free k).
+    destruct (free_for_cv k) eqn:Hfcv1; subst...
     unfold open_ve in *.
     inversion SpH0; subst...
+    assert (t0 = {}N) by fnsetdec; subst...
     rename select (_ = _) into EQ.
     rename select (cset_subset_prop _ _) into HH.
     destruct HH as (HA1 & HA2 & HA3).
     rewrite <- EQ in *.
     simpl in *.
-    assert (t0 = {}N) by fnsetdec; subst...
     constructor.
     2: clear Fr; fsetdec.
     intros x ?.
@@ -781,7 +781,7 @@ Proof with auto.
     specialize (Wf__t0 y ltac:(fsetdec)).
     forwards: bind_typ_notin_fv_tt Wf__t; [eauto|..].
     forwards HA: bind_typ_notin_fv_tt x Wf__t0; [eauto|..].
-    forwards: notin_fv_ct_open_tt HA.
+    forwards: notin_fv_tt_open_ct HA.
     notin_solve.
   - inversion WfT; subst.
     rename H4 into Wf__t.
@@ -876,6 +876,14 @@ Proof with simpl_env; eauto*.
     repeat split...
 Qed.
 
+Lemma typing_var_implies_binds : forall E (x : atom) T,
+  typing E x T ->
+  exists S, binds x (bind_typ S) E.
+Proof with eauto*.
+  intros * Typ.
+  dependent induction Typ...
+Qed.
+
 Lemma typing_regular : forall E e T,
   typing E e T ->
   wf_env E /\ expr e /\ wf_typ_in E T.
@@ -921,9 +929,13 @@ Proof with simpl_env; auto*.
     apply wf_typ_set_weakening with (Ap := dom E) (Am := dom E)...
     (** needs substitution lemma here. *)
     apply wf_typ_open_capt with (T1 := T1)...
-    apply cv_wf with (T := T1')...
+    destruct (typing_var_implies_binds _ _ _ H0) as [T1' xBinds].
+    constructor.
+    + intros z zIn; assert (z = x) by (clear - zIn; fsetdec); subst; clear zIn.
+      eauto.
+    + enough (x `in`A dom E) by fsetdec.
+      eapply binds_In, xBinds.
   (* typing rule: let *)
-
   - repeat split...
     + pick fresh x and apply expr_let...
       assert (x `notin` L) by fsetdec...
@@ -974,20 +986,6 @@ Proof with simpl_env; auto*.
       inversion Hwf; subst...
   - repeat split...
     forwards: sub_regular H0...
-Qed.
-
-Lemma eval_typing_regular : forall E K T U,
-  eval_typing E K T U ->
-  wf_env E /\ wf_typ_in E T /\ wf_typ_in E U.
-Proof with eauto*.
-  intros E K T U eval_typ.
-  induction eval_typ; repeat split...
-  - apply (sub_regular _ _ _ H0).
-  - apply (sub_regular _ _ _ H0).
-  - pick fresh x.
-    specialize (H x ltac:(fsetdec)).
-    destruct (typing_regular _ _ _ H) as [wf_xTΓ _].
-    inversion wf_xTΓ; subst...
 Qed.
 
 Lemma value_regular : forall e,

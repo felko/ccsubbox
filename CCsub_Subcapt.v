@@ -530,7 +530,6 @@ Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
           eapply subcapt_transitivity...
         }
         eapply subcapt_in...
-        (* REVIEW: Stuck on this one *)
         admit.
 Admitted.
 
