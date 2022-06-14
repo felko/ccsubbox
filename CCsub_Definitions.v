@@ -616,6 +616,83 @@ Inductive answer : exp -> Prop :=
 (* ********************************************************************** *)
 (** * #<a name="reduction"></a># Reduction *)
 
+Inductive store_frame : Type :=
+  | store v : value v -> store_frame.
+
+Definition store_ctx : Type := list (atom * store_frame).
+Definition stores (S : store_ctx) (x : atom) (v : exp) (v_value : value v) : Prop :=
+    binds x (store v v_value) S.
+
+Inductive scope (e : exp) : Type :=
+  | mk_scope L : (forall x, x `notin` L -> expr (open_ve e x (`cset_fvar` x))) -> scope e.
+
+Inductive eval_frame : Type :=
+  | cont e : scope e -> eval_frame.
+
+Definition eval_ctx : Type := (list eval_frame).
+
+Inductive state : Type :=
+  | mk_state : store_ctx -> eval_ctx -> exp -> state.
+
+Notation "⟨ S | E | e ⟩" := (mk_state S E e) (at level 1).
+
+Inductive state_final : state -> Prop :=
+  | final_state : forall S a,
+      answer a ->
+      state_final ⟨ S | nil | a ⟩.
+
+Inductive store_typing : store_ctx -> env -> Prop :=
+  | typing_store_nil : store_typing nil nil
+  | typing_store_cons : forall x T v v_value S E,
+      store_typing S E ->
+      typing E v T ->
+      x `notin` dom E ->
+      store_typing ([(x, store v v_value)] ++ S) ([(x, bind_typ T)] ++ E).
+
+Inductive eval_typing (E : env) : eval_ctx -> typ -> typ -> Prop :=
+  | typing_eval_nil : forall T U,
+      wf_env E ->
+      sub E T U ->
+      eval_typing E nil T U
+  | typing_eval_cons : forall L k (k_scope : scope k) K T U V,
+      (forall x, x `notin` L ->
+        typing ([(x, bind_typ T)] ++ E) (open_ve k x (`cset_fvar` x)) U) ->
+      eval_typing E K U V ->
+      eval_typing E (cont k k_scope :: K) T V.
+
+Inductive state_typing : state -> typ -> Prop :=
+  | typing_state : forall S K e E T U,
+      store_typing S E ->
+      eval_typing E K T U ->
+      typing E e T ->
+      state_typing ⟨ S | K | e ⟩ U.
+
+Inductive red : state -> state -> Prop :=
+  | red_lift : forall x v (v_value : value v) k (k_scope : scope k) S K,
+      x `~in`A dom S ->
+      red ⟨ S | cont k k_scope :: K | v ⟩
+          ⟨ [(x, store v v_value)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
+  | red_let_var : forall (x : atom) v (v_value : value v) k (k_scope : scope k) S K,
+      stores S x v v_value ->
+      red ⟨ S | cont k k_scope :: K | x ⟩
+          ⟨ S | K | open_ve k x (`cset_fvar` x) ⟩
+  | red_let_val : forall x v (v_value : value v) k (k_scope : scope k) S K,
+      x `~in`A dom S ->
+      red ⟨ S | K | exp_let v k ⟩
+          ⟨ [(x, store v v_value)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
+  | red_let_exp : forall e k (k_scope : scope k) S K,
+      red ⟨ S | K | exp_let e k ⟩
+          ⟨ S | cont k k_scope :: K | e ⟩
+  | red_app : forall f x U e v (v_value : value v) (abs_value : value (exp_abs U e)) S K,
+      stores S f (exp_abs U e) abs_value ->
+      stores S x v v_value ->
+      red ⟨ S | K | exp_app f x ⟩
+          ⟨ S | K | open_ve e x (`cset_fvar` x) ⟩
+  | red_tapp : forall x T U e (tabs_value : value (exp_tabs U e)) S K,
+      stores S x (exp_tabs U e) tabs_value ->
+      type T ->
+      red ⟨ S | K | exp_tapp x T ⟩
+          ⟨ S | K | open_te e T ⟩.
 
 (* ********************************************************************** *)
 (** * #<a name="auto"></a># Automation *)

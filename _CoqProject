@@ -23,4 +23,3 @@ CCsub_Subtyping.v
 CCsub_Typing.v
 CCsub_Substitution.v
 CCsub_Soundness.v
-CoqIntro.v

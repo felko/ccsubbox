@@ -571,7 +571,6 @@ Proof with eauto using cv_free_never_universal, wf_cset_over_union; eauto*.
     destruct (free_for_cv e1) eqn:Hfcv1; subst...
     unfold open_ve in *.
     inversion SpH0; subst...
-    Check free_for_cv_is_free_ve.
     assert (t0 = {}N) by fnsetdec; subst...
     rename select (_ = _) into EQ.
     rename select (cset_subset_prop _ _) into HH.
@@ -795,6 +794,83 @@ Proof with auto.
 }
 Qed.
 
+Lemma wf_cset_notin_fvars : forall x E A C,
+  wf_cset E A C ->
+  x `~in`A dom E ->
+  x `~in`A (`cset_fvars` C).
+Proof with eauto*.
+  intros * WfC NotIn.
+  induction WfC.
+  enough (fvars `c`A dom E) by fsetdec.
+  intros y yIn.
+  destruct (H y ltac:(fsetdec)) as [T [B|B]]; eapply binds_In...
+Qed.
+
+Lemma wf_typ_notin_fv_ct : forall x E Ap Am T,
+  wf_typ E Ap Am T ->
+  x `~in`A dom E ->
+  x `~in`A fv_ct T
+with wf_pretyp_notin_fv_cpt : forall x E Ap Am P,
+  wf_pretyp E Ap Am P ->
+  x `~in`A dom E ->
+  x `~in`A fv_cpt P.
+Proof with eauto*.
+{ intros * WfT NotIn.
+  induction WfT; simpl.
+  - fsetdec.
+  - assert (x `~in`A (`cset_fvars` C)) by (applys wf_cset_notin_fvars; eauto*).
+    assert (x `~in`A fv_cpt P) by (applys wf_pretyp_notin_fv_cpt; eauto*).
+    fsetdec.
+}
+{ intros * WfP NotIn.
+  induction WfP; simpl.
+  - fsetdec.
+  - assert (x `~in`A fv_ct T1) by (applys wf_typ_notin_fv_ct; eauto*).
+    pick fresh y and specialize H0.
+    assert (x `~in`A fv_ct T2).
+    { eapply notin_fv_ct_open_ct.
+      eapply wf_typ_notin_fv_ct.
+      apply H0.
+      simpl.
+      assert (x <> y) by (clear - Fr; fsetdec).
+      clear Fr.
+      fsetdec.
+    }
+    clear - H1 H2.
+    fsetdec.
+  - assert (x `~in`A fv_ct T1) by (applys wf_typ_notin_fv_ct; eauto*).
+    pick fresh y and specialize H0.
+    assert (x `~in`A fv_ct T2).
+    { eapply notin_fv_ct_open_tt.
+      eapply wf_typ_notin_fv_ct.
+      apply H0.
+      simpl.
+      assert (x <> y) by (clear - Fr; fsetdec).
+      clear Fr.
+      fsetdec.
+    }
+    clear - H1 H2.
+    fsetdec.
+}
+Qed.
+
+Lemma wf_typ_in_notin_fv_ct : forall x E T,
+  wf_typ_in E T ->
+  x `~in`A dom E ->
+  x `~in`A fv_ct T
+with wf_pretyp_in_notin_fv_cpt : forall x E P,
+  wf_pretyp_in E P ->
+  x `~in`A dom E ->
+  x `~in`A fv_cpt P.
+Proof with eauto*.
+{ intros * WfT NotIn.
+  eapply wf_typ_notin_fv_ct with (E := E) (Ap := dom E) (Am := dom E)...
+}
+{ intros * WfP NotIn.
+  eapply wf_pretyp_notin_fv_cpt with (E := E) (Ap := dom E) (Am := dom E)...
+}
+Qed.
+
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)
 
@@ -995,22 +1071,18 @@ Proof.
   intros e H. induction H; auto.
 Qed.
 
-(* Lemma red_regular : forall e e', *)
-(*   red e e' -> *)
-(*   expr e /\ expr e'. *)
-(* Proof with auto*. *)
-(*   intros e e' H. *)
-(*   induction H; assert (J := value_regular); split... *)
-(*   - Case "red_abs". *)
-(*     inversion H. pick fresh y. *)
-(*     rewrite (subst_ee_intro y)... *)
-(*     eapply subst_ee_expr... *)
-(*     pose proof (cv_free_is_bvar_free v2). *)
-(*     destruct (free_for_cv v2); subst... *)
-(*   - Case "red_tabs". *)
-(*     inversion H. pick fresh Y. rewrite (subst_te_intro Y)... *)
-(* Qed. *)
-
+Lemma eval_typing_regular : forall E K T U,
+  eval_typing E K T U ->
+  wf_env E /\ wf_typ_in E T /\ wf_typ_in E U.
+Proof with eauto*.
+  intros * EvalTyp.
+  induction EvalTyp.
+  - destruct (sub_regular _ _ _ H0).
+    repeat split...
+  - pick fresh x and specialize H.
+    destruct (typing_regular _ _ _ H) as [wf_xTE _].
+    inversion wf_xTE; subst...
+Qed.
 
 (* *********************************************************************** *)
 (** * #<a name="auto"></a># Automation *)

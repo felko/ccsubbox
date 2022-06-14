@@ -470,7 +470,6 @@ Local Lemma test_wf_typ_inversion : forall E Ap Am C S T U D P,
   wf_typ_in E S /\ wf_typ E Am Ap S.
 Proof.
   intros* H1 H2 H3 H4.
-  let t := match goal with |- ?g => g end in idtac t.
   wf_typ_inversion H1.
   wf_typ_inversion H2.
   wf_typ_inversion H3.          (* shouldn't invert pretyp *)
@@ -583,54 +582,6 @@ Proof with eauto.
     repeat rewrite dom_concat in *; simpl in H2.
     fsetdec.
 Qed.
-
-(*
-Print wf_typ.
-
-Fixpoint wf_typ_mutual_induction
-  (PTyp : env -> atoms -> atoms -> typ -> Prop)
-  (PPretyp : env -> atoms -> atoms -> pretyp -> Prop)
-  (wf_typ_var_case   : forall U E Ap Am X, binds X (bind_sub U) E -> X `in`A Ap -> PTyp E Ap Am X)
-  (wf_typ_capt_case  : forall E Ap Am C P, wf_cset E Ap C -> PPretyp E Ap Am P -> PTyp E Ap Am (typ_capt C P))
-  (wf_typ_top_case   : forall E Ap Am, PPretyp E Ap Am typ_top)
-  (wf_typ_arrow_case : forall L E Ap Am T1 T2, PTyp E Am Ap T1 -> (forall X, X `~in`A L -> PTyp ([(X, bind_typ T1)] ++ E) (Ap `u`A {X}A) Am (open_ct T2 (`cset_fvar` X))) -> PPretyp E Ap Am (typ_arrow T1 T2))
-  (wf_typ_all_case   : forall L E Ap Am T1 T2, PTyp E Am Ap T1 -> (forall X, X `~in`A L -> PTyp ([(X, bind_sub T1)] ++ E) Ap Am (open_tt T2 X)) -> PPretyp E Ap Am (typ_all T1 T2))
-  (E : env) (Ap Am : atoms) (T : typ) (WfT : wf_typ E Ap Am T)
-  : PTyp E Ap Am T :=
-  match WfT with
-  | wf_typ_var U E Ap Am X XBinds XNotIn => wf_typ_var_case U E Ap Am X XBinds XNotIn
-  | wf_typ_capt E Ap Am C P WfC WfP => wf_typ_capt_case E Ap Am C P WfC (wf_pretyp_mutual_induction PTyp PPretyp wf_typ_var_case wf_typ_capt_case wf_typ_top_case wf_typ_arrow_case wf_typ_all_case E Ap Am P WfP)
-  end
-with wf_pretyp_mutual_induction
-  (PTyp : env -> atoms -> atoms -> typ -> Prop)
-  (PPretyp : env -> atoms -> atoms -> pretyp -> Prop)
-  (wf_typ_var_case   : forall U E Ap Am X, binds X (bind_sub U) E -> X `in`A Ap -> PTyp E Ap Am X)
-  (wf_typ_capt_case  : forall E Ap Am C P, wf_cset E Ap C -> PPretyp E Ap Am P -> PTyp E Ap Am (typ_capt C P))
-  (wf_typ_top_case   : forall E Ap Am, PPretyp E Ap Am typ_top)
-  (wf_typ_arrow_case : forall L E Ap Am T1 T2, PTyp E Am Ap T1 -> (forall X, X `~in`A L -> PTyp ([(X, bind_typ T1)] ++ E) (Ap `u`A {X}A) Am (open_ct T2 (`cset_fvar` X))) -> PPretyp E Ap Am (typ_arrow T1 T2))
-  (wf_typ_all_case   : forall L E Ap Am T1 T2, PTyp E Am Ap T1 -> (forall X, X `~in`A L -> PTyp ([(X, bind_sub T1)] ++ E) Ap Am (open_tt T2 X)) -> PPretyp E Ap Am (typ_all T1 T2))
-  (E : env) (Ap Am : atoms) (P : pretyp) (WfP : wf_pretyp E Ap Am P)
-  : PPretyp E Ap Am P :=
-  match WfP with
-  | wf_typ_top E Ap Am => wf_typ_top_case E Ap Am
-  | wf_typ_arrow L E Ap Am T1 T2 WfT1 WfT2 =>
-      wf_typ_arrow_case L E Ap Am T1 T2
-        (wf_typ_mutual_induction PTyp PPretyp wf_typ_var_case wf_typ_capt_case wf_typ_top_case wf_typ_arrow_case wf_typ_all_case E Am Ap T1 WfT1)
-        (fun X XNotIn => wf_typ_mutual_induction PTyp PPretyp wf_typ_var_case wf_typ_capt_case wf_typ_top_case wf_typ_arrow_case wf_typ_all_case ([(X, bind_typ T1)] ++ E) (Ap `u`A {X}A) Am (open_ct T2 (`cset_fvar` X)) (WfT2 X XNotIn))
-  | wf_typ_all L E Ap Am T1 T2 WfT1 WfT2 =>
-        wf_typ_all_case L E Ap Am T1 T2
-          (wf_typ_mutual_induction PTyp PPretyp wf_typ_var_case wf_typ_capt_case wf_typ_top_case wf_typ_arrow_case wf_typ_all_case E Am Ap T1 WfT1)
-          (fun X XNotIn => wf_typ_mutual_induction PTyp PPretyp wf_typ_var_case wf_typ_capt_case wf_typ_top_case wf_typ_arrow_case wf_typ_all_case ([(X, bind_sub T1)] ++ E) Ap Am (open_tt T2 X) (WfT2 X XNotIn))
-  end.
-
-  Lemma wf_typ_strengthen_typ : forall x E F Ap Am T U,
-  x `~in`A (dom E `u`A fv_ct T `u`A fv_cctx E) ->
-  wf_typ (E ++ [(x, bind_typ U)] ++ F) Ap Am T ->
-  wf_typ (E ++ F) (Ap `\`A x) (Am `\`A x) T.
-Proof with eauto*.
-  intros * NotIn WfT.
-  induction WfT using wf_typ_mutual_induction with (PPretyp := fun E Ap Am P => wf_typ (E ++ F) (Ap `\`A x) (Am `\`A x) T).
-*)
 
 Lemma notin_open_cset_cv : forall k x U c,
   x `~in`A ((`cset_fvars` c) `u`A (`cset_fvars` (cv U))) ->

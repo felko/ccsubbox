@@ -151,7 +151,7 @@ Tactic Notation
 Tactic Notation
     "pick" "fresh" ident(atom_name)
     "excluding" constr(L)
-    "and" "destruct" constr(H) "as" intropattern(pat) :=
+    "and" "destruct" constr(H) "as" simple_intropattern(pat) :=
   let L := beautify_fset L in
   pick fresh atom_name for L;
   first [ destruct (@H atom_name ltac:(fsetdec)) as pat

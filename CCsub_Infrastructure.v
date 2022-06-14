@@ -231,7 +231,7 @@ Tactic Notation
   pick fresh atom_name excluding L and destruct lemma.
 
 Tactic Notation
-      "pick" "fresh" ident(atom_name) "and" "destruct" constr(lemma) "as" intropattern(pat) :=
+      "pick" "fresh" ident(atom_name) "and" "destruct" constr(lemma) "as" simple_intropattern(pat) :=
   let L := gather_atoms in
   pick fresh atom_name excluding L and destruct lemma as pat.
 
@@ -1884,4 +1884,36 @@ Proof with auto.
   induction T; simpl; try reflexivity;
     try solve [repeat try rewrite subst_ct_useless_repetition; auto].
 }
+Qed.
+
+Lemma notin_open_ve_rec_fv_ve : forall k y z C e,
+  y `notin` (fv_ve e `union` singleton z) ->
+  y `notin` fv_ve (open_ve_rec k z C e).
+Proof with eauto*.
+  intros * y_notin_e_z.
+  generalize dependent k.
+  induction e; intros k; simpl in *;
+  repeat match goal with
+  | v : var |- _ =>
+      destruct v; simpl in *; eauto*;
+      destruct (k === n); eauto*
+  | |- y `notin` (_ `union` _) => apply notin_union
+  | IH : y `notin` _ -> forall k, _ |- _ => apply IH; eauto*
+  end.
+Qed.
+
+Lemma notin_open_te_rec_fv_ve : forall k y z e,
+  y `notin` (fv_ve e `union` singleton z) ->
+  y `notin` fv_ve (open_te_rec k z e).
+Proof with eauto*.
+  intros * y_notin_e_z.
+  generalize dependent k.
+  induction e; intros k; simpl in *;
+  repeat match goal with
+  | v : var |- _ =>
+      destruct v; simpl in *; eauto*;
+      destruct (k === n); eauto*
+  | |- y `notin` (_ `union` _) => apply notin_union
+  | IH : y `notin` _ -> forall k, _ |- _ => apply IH; eauto*
+  end.
 Qed.

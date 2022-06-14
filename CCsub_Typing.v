@@ -282,3 +282,25 @@ Proof with simpl_env; auto.
   - Case "typing_sub".
     eauto using (sub_transitivity T).
 Qed.
+
+Lemma typing_inv_let : forall E e k T,
+  typing E (exp_let e k) T ->
+  exists U,
+       typing E e U
+    /\ exists L, forall x, x `~in`A L ->
+         typing ([(x, bind_typ U)] ++ E) (open_ve k x (`cset_fvar` x)) T.
+Proof with eauto*.
+  intros * Typ.
+  dependent induction Typ...
+  destruct (IHTyp e k ltac:(reflexivity)) as [U [eTyp [L kTyp]]].
+  exists U.
+  split...
+  exists (L `u`A dom E).
+  intros y NotIn.
+  specialize (kTyp y ltac:(clear - NotIn; fsetdec)).
+  apply typing_sub with (S := S)...
+  rewrite_env (empty ++ [(y, bind_typ U)] ++ E).
+  apply sub_weakening...
+  apply wf_env_typ...
+  applys typing_regular eTyp. 
+Qed.
