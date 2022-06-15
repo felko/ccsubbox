@@ -1575,6 +1575,17 @@ Proof with eauto*.
     destruct (x == x)...
 Qed.
 
+Lemma subst_vv_open_vv : forall x u k y v,
+  y <> x ->
+  subst_vv x u (open_vv k y v) = open_vv k y (subst_vv x u v).
+Proof with eauto*.
+  intros * Neq.
+  destruct v; simpl.
+  - destruct (a == x); simpl...
+  - destruct (k === n); simpl...
+    destruct (y == x); simpl; subst...
+Qed.
+
 Lemma subst_ve_intro_rec : forall x e u c k,
   x `notin` (fv_ve e `u`A fv_ce e) ->
   open_ve_rec k u c e = subst_ve x u c (open_ve_rec k x (`cset_fvar` x) e).
@@ -1589,6 +1600,45 @@ Proof with auto*.
   intros.
   unfold open_ve.
   apply subst_ve_intro_rec...
+Qed.
+
+Lemma subst_ve_open_ve_rec : forall e x y u c1 c2 k,
+  y <> x ->
+  capt c1 ->
+  subst_ve x u c1 (open_ve_rec k y c2 e) =
+    open_ve_rec k y (subst_cset x c1 c2) (subst_ve x u c1 e).
+Proof with auto using subst_vv_open_vv, subst_ct_open_rec.
+  intros * Neq Capt.
+  revert k.
+  induction e; intros k; simpl; f_equal...
+Qed.
+
+Lemma subst_ve_open_ve : forall (e : exp) (x y u : atom) (c1 c2 : cap),
+  y <> x ->
+  capt c1 ->
+  subst_ve x u c1 (open_ve e y c2) =
+  open_ve (subst_ve x u c1 e) y (subst_cset x c1 c2).
+Proof with auto*.
+  intros.
+  unfold open_ve.
+  apply subst_ve_open_ve_rec...
+Qed.
+
+Lemma subst_ve_open_ve_var : forall (x y u : atom) c e,
+  y <> x ->
+  expr u ->
+  capt c ->
+  open_ve (subst_ve x u c e) y (`cset_fvar` y) =
+  subst_ve x u c (open_ve e y (`cset_fvar` y)).
+Proof with auto*.
+  intros x y u c e Neq Wu Wc.
+  unfold open_ve.
+  rewrite subst_ve_open_ve_rec...
+  simpl.
+  destruct (y == x)...
+  unfold subst_cset; simpl.
+  destruct_set_mem x (`cset_fvar` y)...
+  fsetdec.
 Qed.
 
 (* *********************************************************************** *)
