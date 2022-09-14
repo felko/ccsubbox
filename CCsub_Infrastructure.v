@@ -2,62 +2,49 @@ Require Export CCsub_Definitions.
 Require Import Program.Equality.
 Require Import Lia.
 
-
-(* ********************************************************************** *)
-(** * #<a name="fv"></a># Free variables *)
-
-(** In this section, we define free variable functions.  The functions
-    [fv_tt] and [fv_te] calculate the set of atoms used as free type
-    variables in a type or expression, respectively.  The function
-    [fv_ve] calculates the set of atoms used as free expression
-    variables in an expression.  Cases involving binders are
-    straightforward since bound variables are indices, not names, in
-    locally nameless representation. *)
-
 Fixpoint fv_ct (T : typ) {struct T} : atoms :=
   match T with
-  | typ_bvar J => {}A
-  | typ_fvar X => {}A
-  | typ_capt C P => (`cset_fvars` C) `u`A (fv_cpt P)
-  end
-with fv_cpt (T : pretyp) {struct T} : atoms :=
-  match T with
-  | typ_top => {}A
-  | typ_arrow T1 T2 => (fv_ct T1) `u`A (fv_ct T2)
-  | typ_all T1 T2 => (fv_ct T1) `u`A (fv_ct T2)
+  | typ_var _ => {}A
+  | C # R => `cset_fvars` C `u`A fv_ct R
+  | ⊤ => {}A
+  | ∀ (S') T => fv_ct S' `u`A fv_ct T
+  | ∀ [R] T => fv_ct R `u`A fv_ct T
+  | □ T => fv_ct T
   end.
 
 Fixpoint fv_tt (T : typ) {struct T} : atoms :=
   match T with
-  | typ_bvar J => {}A
-  | typ_fvar X => singleton X
-  | typ_capt C P => fv_tpt P
-  end
-with fv_tpt (T : pretyp) {struct T} : atoms :=
-  match T with
-  | typ_top => {}A
-  | typ_arrow T1 T2 => (fv_tt T1) `u`A (fv_tt T2)
-  | typ_all T1 T2 => (fv_tt T1) `u`A (fv_tt T2)
+  | var_b J => {}A
+  | var_f X => singleton X
+  | C # R => fv_tt R
+  | ⊤ => {}A
+  | ∀ (S') T => fv_tt S' `u`A fv_tt T
+  | ∀ [R] T => fv_tt R `u`A fv_tt T
+  | □ T => fv_tt T
   end.
 
 Fixpoint fv_ce (e : exp) {struct e} : atoms :=
   match e with
   | exp_var _ => {}A
-  | exp_abs V e1 => (fv_ct V) `u`A (fv_ce e1)
-  | exp_app _ _ => {}A
-  | exp_let e C => (fv_ce e) `u`A (fv_ce C)
-  | exp_tabs V e1 => (fv_ct V) `u`A (fv_ce e1)
-  | exp_tapp _ V => fv_ct V
+  | λ (V) e1 => fv_ct V `u`A fv_ce e1
+  | _ @ _ => {}A
+  | let= e in C => fv_ce e `u`A fv_ce C
+  | Λ [V] e1 => fv_ct V `u`A fv_ce e1
+  | _ @ [V] => fv_ct V
+  | box _ => {}A
+  | C ⟜ x => `cset_fvars` C
   end.
 
 Fixpoint fv_te (e : exp) {struct e} : atoms :=
   match e with
   | exp_var _ => {}A
-  | exp_abs V e1  => (fv_tt V) `u`A (fv_te e1)
-  | exp_app _ _ => {}A
-  | exp_let e C => (fv_te e) `u`A (fv_te C)
-  | exp_tabs V e1 => (fv_tt V) `u`A (fv_te e1)
-  | exp_tapp _ V => fv_tt V
+  | λ (V) e1  => fv_tt V `u`A fv_te e1
+  | _ @ _ => {}A
+  | let= e in C => fv_te e `u`A fv_te C
+  | Λ [V] e1 => fv_tt V `u`A fv_te e1
+  | _ @ [V] => fv_tt V
+  | box _ => {}A
+  | C ⟜ x => {}A
   end.
 
 Definition fv_vv (v : var) : atoms :=
@@ -69,11 +56,13 @@ Definition fv_vv (v : var) : atoms :=
 Fixpoint fv_ve (e : exp) {struct e} : atoms :=
   match e with
   | exp_var v => fv_vv v
-  | exp_abs V e1 => fv_ve e1
-  | exp_app x y => (fv_vv x) `u`A (fv_vv y)
-  | exp_let e C => (fv_ve e) `u`A (fv_ve C)
-  | exp_tabs V e1 => fv_ve e1
-  | exp_tapp x V => fv_vv x
+  | λ (V) e1 => fv_ve e1
+  | x @ y => fv_vv x `u`A fv_vv y
+  | let= e in C => fv_ve e `u`A fv_ve C
+  | Λ [V] e1 => fv_ve e1
+  | x @ [V] => fv_vv x
+  | box x => fv_vv x
+  | C ⟜ x => `cset_fvars` C `u`A fv_vv x
   end.
 
 Fixpoint fv_cctx (E : env) {struct E} : atoms :=
@@ -83,57 +72,38 @@ Fixpoint fv_cctx (E : env) {struct E} : atoms :=
   | (_, bind_sub T) :: F => fv_ct T `u`A fv_cctx F
   end.
 
-(* ********************************************************************** *)
-(** * #<a name="subst"></a># Substitution *)
-
-(** In this section, we define substitution for expression and type
-    variables appearing in types, expressions, and environments.
-    Substitution differs from opening because opening replaces indices
-    whereas substitution replaces free variables.  The definitions
-    below are relatively simple for two reasons.
-      - We are using locally nameless representation, where bound
-        variables are represented using indices.  Thus, there is no
-        need to rename variables to avoid capture.
-      - The definitions below assume that the term being substituted
-        in, i.e., the second argument to each function, is locally
-        closed.  Thus, there is no need to shift indices when passing
-        under a binder. *)
-
-
 Fixpoint subst_tt (Z : atom) (U : typ) (T : typ) {struct T} : typ :=
   match T with
-  | typ_bvar J => J
-  | typ_fvar X => if X == Z then U else X
-  | typ_capt C P => typ_capt (subst_cset Z (cv U) C) (subst_tpt Z U P)
-  end
-with subst_tpt (Z : atom) (U : typ) (T : pretyp) {struct T} : pretyp :=
-  match T with
-  | typ_top => typ_top
-  | typ_arrow T1 T2 => typ_arrow (subst_tt Z U T1) (subst_tt Z U T2)
-  | typ_all T1 T2 => typ_all (subst_tt Z U T1) (subst_tt Z U T2)
+  | var_b J => J
+  | var_f X => if X == Z then U else X
+  | C # R => subst_cset Z (typ_cv U) C # subst_tt Z U R
+  | ⊤ => typ_top
+  | ∀ (S') T => ∀ (subst_tt Z U S') (subst_tt Z U T)
+  | ∀ [R] T => ∀ [subst_tt Z U R] (subst_tt Z U T)
+  | □ T => □ (subst_tt Z U T)
   end.
 
 Fixpoint subst_ct (z : atom) (c : cap) (T : typ) {struct T} : typ :=
   match T with
-  | typ_bvar J => J
-  | typ_fvar X => X
-  | typ_capt C P => typ_capt (subst_cset z c C) (subst_cpt z c P)
-  end
-with subst_cpt (z : atom) (c : cap) (T : pretyp) {struct T} : pretyp :=
-  match T with
-  | typ_top => typ_top
-  | typ_arrow T1 T2 => typ_arrow (subst_ct z c T1) (subst_ct z c T2)
-  | typ_all T1 T2 => typ_all (subst_ct z c T1) (subst_ct z c T2)
+  | var_b J => J
+  | var_f X => X
+  | C # R => subst_cset z c C # subst_ct z c R
+  | ⊤ => ⊤
+  | ∀ (S') T => ∀ (subst_ct z c S') (subst_ct z c T)
+  | ∀ [R] T => ∀ [subst_ct z c R] (subst_ct z c T)
+  | □ T => □ (subst_ct z c T)
   end.
 
 Fixpoint subst_te (Z : atom) (U : typ) (e : exp) {struct e} : exp :=
   match e with
-  | exp_var v => exp_var v
-  | exp_abs V e1 => exp_abs (subst_tt Z U V) (subst_te Z U e1)
-  | exp_app f x => exp_app f x
-  | exp_let e C => exp_let (subst_te Z U e) (subst_te Z U C)
-  | exp_tabs V e1 => exp_tabs (subst_tt Z U V)  (subst_te Z U e1)
-  | exp_tapp x V => exp_tapp x (subst_tt Z U V)
+  | exp_var v => v
+  | λ (V) e1 => λ (subst_tt Z U V) (subst_te Z U e1)
+  | f @ x => f @ x
+  | let= e in C => let= subst_te Z U e in subst_te Z U C
+  | Λ [V] e1 => Λ [subst_tt Z U V]  (subst_te Z U e1)
+  | x @ [V] => x @ [subst_tt Z U V]
+  | box x => box x
+  | C ⟜ x => subst_cset Z (typ_cv U) C ⟜ x
   end.
 
 Definition subst_vv (z : atom) (u : atom) (v : var) : var :=
@@ -145,11 +115,13 @@ Definition subst_vv (z : atom) (u : atom) (v : var) : var :=
 Fixpoint subst_ve (z : atom) (u : atom) (c : cap) (e : exp) {struct e} : exp :=
   match e with
   | exp_var v => subst_vv z u v
-  | exp_abs t e1 => exp_abs (subst_ct z c t) (subst_ve z u c e1)
-  | exp_app f x => exp_app (subst_vv z u f) (subst_vv z u x)
-  | exp_let e C => exp_let (subst_ve z u c e) (subst_ve z u c C)
-  | exp_tabs t e1 => exp_tabs (subst_ct z c t) (subst_ve z u c e1)
-  | exp_tapp x t => exp_tapp (subst_vv z u x) (subst_ct z c t)
+  | λ (t) e1 => exp_abs (subst_ct z c t) (subst_ve z u c e1)
+  | f @ x => subst_vv z u f @ subst_vv z u x
+  | let= e in C => let= subst_ve z u c e in subst_ve z u c C
+  | Λ [t] e1 => Λ [subst_ct z c t] (subst_ve z u c e1)
+  | x @ [t] => subst_vv z u x @ [subst_ct z c t]
+  | box x => box (subst_vv z u x)
+  | C ⟜ x => subst_cset z (`cset_fvar` u) C ⟜ subst_vv z u x
   end.
 
 Definition subst_tb (Z : atom) (P : typ) (b : binding) : binding :=
@@ -164,26 +136,6 @@ Definition subst_cb (Z : atom) (c : cap) (b : binding) : binding :=
   | bind_typ T => bind_typ (subst_ct Z c T)
   end.
 
-(* ********************************************************************** *)
-(** * #<a name="pick_fresh"></a># The "[pick fresh]" tactic *)
-
-(** The "[pick fresh]" tactic introduces a fresh atom into the context.
-    We define it in two steps.
-
-    The first step is to define an auxiliary tactic [gather_atoms],
-    meant to be used in the definition of other tactics, which returns
-    a set of atoms in the current context.  The definition of
-    [gather_atoms] follows a pattern based on repeated calls to
-    [gather_atoms_with].  The one argument to this tactic is a
-    function that takes an object of some particular type and returns
-    a set of atoms that appear in that argument.  It is not necessary
-    to understand exactly how [gather_atoms_with] works.  If we add a
-    new inductive datatype, say for kinds, to our language, then we
-    would need to modify [gather_atoms].  On the other hand, if we
-    merely add a new type, say products, then there is no need to
-    modify [gather_atoms]; the required changes would be made in
-    [fv_tt]. *)
-
 Ltac gather_atoms :=
   let A := gather_atoms_with (fun x : atoms => x) in
   let B := gather_atoms_with (fun x : atom => singleton x) in
@@ -197,28 +149,8 @@ Ltac gather_atoms :=
   let J := gather_atoms_with (fun x : env => fv_cctx x) in
   constr:(A `union` B `union` C `union` D `union` E `union` F `union` G `union` H `union` I `union` J).
 
-(** The second step in defining "[pick fresh]" is to define the tactic
-    itself.  It is based on the [(pick fresh ... for ...)] tactic
-    defined in the [Atom] library.  Here, we use [gather_atoms] to
-    construct the set [L] rather than leaving it to the user to
-    provide.  Thus, invoking [(pick fresh x)] introduces a new atom
-    [x] into the current context that is fresh for "everything" in the
-    context. *)
-
 Tactic Notation "pick" "fresh" ident(x) :=
   let L := gather_atoms in (pick fresh x for L).
-
-
-(* *********************************************************************** *)
-(** * #<a name="apply_fresh"></a># The "[pick fresh and apply]" tactic *)
-
-(** This tactic is implementation specific only because of its
-    reliance on [gather_atoms], which is itself implementation
-    specific.  The definition below may be copied between developments
-    without any changes, assuming that the other other developments
-    define an appropriate [gather_atoms] tactic.  For documentation on
-    the tactic on which the one below is based, see the
-    [Metatheory] library. *)
 
 Tactic Notation
       "pick" "fresh" ident(atom_name) "and" "apply" constr(lemma) :=
@@ -240,139 +172,287 @@ Tactic Notation
   let L := gather_atoms in
   pick fresh atom_name excluding L and specialize lemma.
 
-(* ********************************************************************** *)
-(** * #<a name="properties"></a># Properties of opening and substitution *)
-
-(** The following lemmas provide useful structural properties of
-    substitution and opening.  While the exact statements are language
-    specific, we have found that similar properties are needed in a
-    wide range of languages.
-
-    Below, we indicate which lemmas depend on which other lemmas.
-    Since [te] functions depend on their [tt] counterparts, a similar
-    dependency can be found in the lemmas.
-
-    The lemmas are split into three sections, one each for the [tt],
-    [te], and [ee] functions.  The most important lemmas are the
-    following:
-      - Substitution and opening commute with each other, e.g.,
-        [subst_tt_open_tt_var].
-      - Opening a term is equivalent to opening the term with a fresh
-        name and then substituting for that name, e.g.,
-        [subst_tt_intro].
-
-    We keep the sections as uniform in structure as possible.  In
-    particular, we state explicitly strengthened induction hypotheses
-    even when there are more concise ways of proving the lemmas of
-    interest. *)
-
-
-(* ********************************************************************** *)
-(** ** Properties of type substitution in types *)
-
-(** The next lemma is the strengthened induction hypothesis for the
-    lemma that follows, which states that opening a locally closed
-    term is the identity.  This lemma is not otherwise independently
-    useful. *)
-
 Notation "`succ`" := Datatypes.S.
 
-Inductive typeN : nat -> typ -> Prop :=
-  | typeN_bvar : forall n m,
+Inductive varN : nat -> var -> Prop :=
+  | varN_b : forall n (m : nat),
       m < n ->
-      typeN n (typ_bvar m)
-  | typeN_fvar : forall n x,
-      typeN n (typ_fvar x)
-  | typeN_capt : forall n C P,
-      NatSet.F.For_all (fun m => m < n) (`cset_bvars` C) ->
-      pretypeN n P ->
-      typeN n (typ_capt C P)
-with pretypeN : nat -> pretyp -> Prop :=
-  | typeN_top : forall n, pretypeN n typ_top
-  | typeN_arrow : forall n T1 T2,
-    typeN n T1 ->
-    typeN (`succ` n) T2 ->
-    pretypeN n (typ_arrow T1 T2)
-  | typeN_all : forall n T1 T2,
-    typeN n T1 ->
-    typeN (`succ` n) T2 ->
-    pretypeN n (typ_all T1 T2).
+      varN n m
+  | varN_f : forall n (x : atom),
+      varN n x.
+
+Definition captN (n : nat) (C : cap) : Prop :=
+  NatSet.F.For_all (fun m => m < n) (`cset_bvars` C).
+
+Inductive typeN : nat -> typ -> Prop :=
+  | typeN_pure : forall n R, pure_typeN n R -> typeN n R
+  | typeN_capt : forall n C R,
+      captN n C ->
+      pure_typeN n R ->
+      typeN n (C # R)
+with pure_typeN : nat -> typ -> Prop :=
+  | typeN_var : forall n v,
+      varN n v ->
+      pure_typeN n v
+  | typeN_top : forall n,
+      pure_typeN n typ_top
+  | typeN_arr : forall n S' T,
+      typeN n S' ->
+      typeN (`succ` n) T ->
+      pure_typeN n (∀ (S') T)
+  | typeN_all : forall n R T,
+      pure_typeN n R ->
+      typeN (`succ` n) T ->
+      pure_typeN n (∀ [R] T)
+  | typeN_box : forall n T,
+      typeN n T ->
+      pure_typeN n (□ T).
+
+Hint Constructors varN typeN pure_typeN : core.
+
+Lemma varN_weakening_aux : forall n v,
+  varN n v ->
+  varN (`succ` n) v.
+Proof with eauto*.
+  intros.
+  induction H; constructor; lia.
+Qed.
+
+Lemma captN_weakening_aux : forall n C,
+  captN n C ->
+  captN (`succ` n) C.
+Proof with eauto*.
+  intros.
+  intros m mIn.
+  enough (m < n) by lia.
+  apply H, mIn.
+Qed.
+
+Lemma varN_weakening : forall n m v,
+  varN n v ->
+  n <= m ->
+  varN m v.
+Proof with eauto*.
+  intros.
+  induction H; constructor; lia.
+Qed.
+
+Lemma typeN_weakening_aux : forall n T,
+  typeN n T ->
+  typeN (`succ` n) T
+with pure_typeN_weakening_aux : forall n R,
+  pure_typeN n R ->
+  pure_typeN (`succ` n) R.
+Proof with eauto using varN_weakening_aux, captN_weakening_aux.
+{ clear typeN_weakening_aux.
+  intros * H.
+  destruct H...
+}
+{ clear pure_typeN_weakening_aux.
+  intros * H.
+  induction H...
+}
+Qed.
+
+Lemma captN_weakening : forall n m C,
+  captN n C ->
+  n <= m ->
+  captN m C.
+Proof with eauto*.
+  intros.
+  intros k kIn.
+  enough (k < n) by lia.
+  apply H, kIn.
+Qed.
+
+Lemma typeN_weakening : forall n m T,
+  typeN n T ->
+  n <= m ->
+  typeN m T
+with pure_typeN_weakening : forall n m R,
+  pure_typeN n R ->
+  n <= m ->
+  pure_typeN m R.
+Proof with eauto using varN_weakening, captN_weakening, typeN_weakening_aux, pure_typeN_weakening_aux.
+{ clear typeN_weakening.
+  intros.
+  destruct H...
+}
+{ clear pure_typeN_weakening.
+  intros.
+  induction H...
+  all: constructor...
+  all: eapply typeN_weakening...
+  all: lia.
+}
+Qed.
+
+Lemma open_vt_typeN_aux : forall n S v,
+  typeN n (open_vt n S v) ->
+  typeN (`succ` n) v.
+Proof with eauto*.
+  intros.
+  destruct v...
+  unfold open_vt in H.
+  destruct (n === n0); subst...
+  inversion H; inversion H0; inversion H5; subst...
+  apply typeN_pure, typeN_var, varN_b.
+  lia.
+Qed.
 
 Lemma open_tt_rec_typeN_aux : forall n S T,
   typeN n (open_tt_rec n S T) ->
   typeN (`succ` n) T
-with open_tpt_rec_typeN_aux : forall n S T,
-  pretypeN n (open_tpt_rec n S T) ->
-  pretypeN (`succ` n) T.
-Proof with eauto*.
-{ intros * H.
-  dependent induction T.
-  - inversion H; subst.
-    econstructor.
-    2: eapply open_tpt_rec_typeN_aux...
-    unfold open_cset in H3.
+with open_tt_rec_pure_typeN_aux : forall n S R,
+  pure_typeN n (open_tt_rec n S R) ->
+  pure_typeN (`succ` n) R.
+Proof with eauto using open_vt_typeN_aux.
+{ clear open_tt_rec_typeN_aux.
+  intros * H.
+  inversion H; subst...
+  destruct T; simpl in *; try discriminate H0...
+  injection H0 as HC HR; subst.
+  unfold open_cset in H1.
+  apply typeN_capt.
+  - intros m mIn.
     destruct_set_mem n (`cset_bvars` c).
-    2: intros i iIn; specialize (H3 i iIn)...
-    intros i iIn.
-    destruct (i === n).
-    + subst...
-    + specialize (H3 i ltac:(csetdec))...
-  - unfold open_tt_rec in H.
-    destruct (n === n0)...
-    + subst; constructor...
-    + inversion H; subst.
-      constructor...
-  - constructor.
+    + destruct (m === n); subst...
+      enough (m < n) by lia.
+      apply H1.
+      csetdec.
+    + enough (m < n) by lia.
+      apply H1, mIn.
+  - eapply open_tt_rec_pure_typeN_aux, H3.
 }
-{ intros * H.
-  dependent induction T; inversion H; subst; constructor...
+{ clear open_tt_rec_pure_typeN_aux.
+  intros * H.
+  dependent induction H.
+  - Case "bound variable".
+    unfold open_tt_rec in x.
+    destruct R; simpl in x.
+    1: {
+      destruct v0...
+      unfold open_vt in x.
+      destruct (n === n0); subst...
+      injection x as x; subst.
+      apply typeN_var, varN_b.
+      inversion H; subst.
+      lia.
+    }
+    all: discriminate x.
+  - Case "⊤".
+    destruct R; simpl in x...
+    1: {
+      destruct v...
+      simpl in x.
+      destruct (n === n0); subst...
+      inversion x.
+    }
+    all: discriminate x.
+  - Case "∀ (S') T".
+    destruct R; simpl in x...
+    1: {
+      destruct v...  
+      simpl in x.
+      destruct (n === n0); subst...
+      inversion x.
+    }
+    injection x as x; subst.
+    apply typeN_arr...
+    all: discriminate x.
+  - Case "∀ [R] T". 
+    destruct R; simpl in x...
+    1: {
+      destruct v...
+      simpl in x.
+      destruct (n === n0); subst...
+      inversion x.
+    }
+    2: {
+      injection x as x1 x2.
+      apply typeN_all...
+      eapply open_tt_rec_typeN_aux with (S0 := S).
+      rewrite <- x2.
+      apply H0.
+    }
+    all: discriminate x.
+  - Case "□ T".
+    destruct R; simpl in x...
+    1: {
+      unfold open_vt in x.
+      destruct v...  
+      destruct (n === n0); subst...
+      discriminate x.
+    }
+    3: {
+      injection x as x; subst.
+      apply typeN_box...
+    }
+    all: discriminate x.
 }
 Qed.
 
 Lemma open_ct_rec_typeN_aux : forall n S T,
   typeN n (open_ct_rec n S T) ->
   typeN (`succ` n) T
-with open_cpt_rec_typeN_aux : forall n S T,
-  pretypeN n (open_cpt_rec n S T) ->
-  pretypeN (`succ` n) T.
+with open_ct_rec_pure_typeN_aux : forall n S R,
+  pure_typeN n (open_ct_rec n S R) ->
+  pure_typeN (`succ` n) R.
 Proof with eauto*.
-{ intros * H.
-  dependent induction T.
-  - inversion H; subst.
-    econstructor.
-    2: eapply open_cpt_rec_typeN_aux...
-    unfold open_cset in H3.
+{ clear open_ct_rec_typeN_aux.
+  intros * H.
+  dependent induction H...
+  Case "C # R".
+  destruct T; simpl in x.
+  1: destruct v...
+  all: try (discriminate x).
+  inversion x; subst; clear x.
+  unfold open_cset in H.
+  apply typeN_capt.
+  - intros m mIn.
     destruct_set_mem n (`cset_bvars` c).
-    2: intros i iIn; specialize (H3 i iIn)...
-    intros i iIn.
-    destruct (i === n).
-    + subst...
-    + specialize (H3 i ltac:(csetdec))...
-  - inversion H; subst.
-    constructor...
-  - constructor.
+    + destruct (m === n); subst...
+      enough (m < n) by lia.
+      apply H.
+      csetdec.
+    + enough (m < n) by lia.
+      apply H, mIn.
+  - eapply open_ct_rec_pure_typeN_aux, H0.
 }
-{ intros * H.
-  dependent induction T; inversion H; subst; constructor...
+{ clear open_ct_rec_pure_typeN_aux.
+  intros * H.
+  dependent induction H; destruct R; simpl in x...
+  1: destruct v; destruct v0; inversion H; injection x as x; subst...
+  all: injection x; intros; subst...
 }
 Qed.
 
-Lemma type_to_type0 : forall t,
-  type t -> typeN 0 t
-with pretype_to_pretype0 : forall t,
-  pretype t -> pretypeN 0 t.
+Lemma capt_to_capt0 : forall C,
+  capt C -> captN 0 C.
+Proof with eauto*.
+  intros.
+  intros m mIn.
+  exfalso.
+  contradict mIn.
+  apply H.
+Qed.
+
+Lemma type_to_type0 : forall T,
+  type T -> typeN 0 T
+with pure_type_to_pure_type0 : forall R,
+  pure_type R -> pure_typeN 0 R.
 Proof with eauto.
-{ intros * H.
-  dependent induction H.
-  - constructor.
-  - constructor...
-    intros i iIn.
-    unfold capt in H.
-    exfalso; fnsetdec.
+{ clear type_to_type0.
+  intros * H.
+  dependent induction H...
+  apply typeN_capt...
+  intros i iIn.
+  unfold capt in H.
+  exfalso; fnsetdec.
 }
-{ intros * H.
-  dependent induction H.
-  - constructor.
+{ clear pure_type_to_pure_type0.
+  intros * H.
+  dependent induction H...
   - constructor...
     pick fresh X.
     unfold open_ct in H0.
@@ -402,103 +482,82 @@ Qed.
 
 Hint Extern 1 (_ >= _) => lia : core.
 
+Lemma open_vt_typeN : forall n m S v,
+  varN n v ->
+  m >= n ->
+  typ_var v = open_vt m S v.
+Proof with eauto*.
+  intros.
+  unfold open_vt.
+  destruct v...
+  destruct (m === n0); subst...
+  inversion H.
+  lia.
+Qed.
+
 Lemma open_tt_rec_typeN : forall n m S T,
   typeN n T ->
   m >= n ->
-  T = (open_tt_rec m S T)
-with open_tpt_rec_typeN : forall n m S T,
-  pretypeN n T ->
-  m >= n ->
-  T = (open_tpt_rec m S T).
-Proof with eauto*.
-{ intros * H1 H2.
-  induction T; simpl.
-  - inversion H1; subst.
-    f_equal...
-    unfold open_cset.
-    destruct_set_mem m (`cset_bvars` c)...
-    specialize (H4 m mIn); lia.
-  - inversion H1; subst.
-    destruct_if...
-    subst.
-    exfalso; lia.
-  - easy.
-}
-{ intros * H1 H2.
-  induction T; simpl; inversion H1; subst; f_equal...
-}
+  T = open_tt_rec m S T.
+Proof with eauto using open_vt_typeN.
+  intros n m S T.
+  generalize dependent m.
+  generalize dependent n.
+  induction T; intros * H1 H2; simpl; inversion H1; inversion H; subst; f_equal...
 Qed.
 
 Lemma open_ct_rec_typeN : forall n m C T,
   typeN n T ->
   m >= n ->
-  T = (open_ct_rec m C T)
-with open_cpt_rec_typeN : forall n m C T,
-  pretypeN n T ->
-  m >= n ->
-  T = (open_cpt_rec m C T).
+  T = open_ct_rec m C T.
 Proof with eauto*.
-------
-  intros * H1 H2.
-  induction T; simpl...
-  - inversion H1; subst...
-    f_equal...
-    unfold open_cset.
-    destruct_set_mem m (`cset_bvars` c)...
-    specialize (H4 m mIn); lia.
-------
-  intros * H1 H2.
-  induction T; simpl; inversion H1; subst; f_equal...
+  intros n m C T.
+  generalize dependent m.
+  generalize dependent n.
+  induction T; intros * H1 H2; simpl; inversion H1; inversion H; subst; f_equal...
+  unfold open_cset.
+  destruct_set_mem m (`cset_bvars` c)...
+  specialize (H4 m mIn); lia.
 Qed.
 
 Lemma open_tt_rec_type : forall T U k,
   type T ->
-  T = open_tt_rec k U T
-with open_tpt_rec_type : forall T U k,
-  pretype T ->
-  T = open_tpt_rec k U T.
+  T = open_tt_rec k U T.
 Proof with auto*.
-------
-  intros T U k Htyp. revert k.
-  induction Htyp; intros k; simpl; f_equal...
-------
-  intros T U k Htyp. revert k.
-  induction Htyp; intros k; simpl; f_equal...
-  - Case "typ_arrow".
-    unfold open_ct in *.
-    pick fresh X.
-    eapply (open_tt_rec_typeN 1).
-    2: induction k; auto.
-    eapply open_ct_rec_typeN_aux with (S0 := (`cset_fvar` X))...
-    eapply type_to_type0 ...
-  - Case "typ_all".
-    unfold open_tt in *.
-    pick fresh X.
-    eapply (open_tt_rec_typeN 1).
-    2: induction k; auto.
-    eapply open_tt_rec_typeN_aux with (S0 := X)...
-    eapply type_to_type0 ...
+  intros * [R | C R].
+  - Case "R".
+    apply open_tt_rec_typeN with (n := k)...
+    apply typeN_pure.
+    apply pure_type_to_pure_type0 in H. 
+    apply pure_typeN_weakening with (m := k) in H...
+    lia.
+  - Case "C # R".
+    simpl.
+    f_equal...
+    apply open_tt_rec_typeN with (n := k)...
+    apply typeN_pure.
+    apply pure_type_to_pure_type0 in H0.
+    apply pure_typeN_weakening with (m := k) in H0...
+    lia.
 Qed.
 
 (** If a name is fresh for a term, then substituting for it is the
     identity. *)
 
 Lemma subst_tt_fresh : forall Z U T,
-  Z `notin` (fv_tt T `u`A fv_ct T) ->
-  T = subst_tt Z U T
-with subst_tpt_fresh : forall Z U T,
-  Z `notin` (fv_tpt T `u`A fv_cpt T) ->
-  T = subst_tpt Z U T.
+  Z ∉ (fv_tt T `u`A fv_ct T) ->
+  T = subst_tt Z U T.
 Proof with auto*.
-------
+  intros Z U T.
   induction T; simpl; intro H; f_equal...
-  - Case "typ_capt".
-    apply subst_cset_fresh...
-  - Case "typ_fvar".
+  - Case "variable".
+    destruct v...
     destruct (a == Z)...
-    contradict H; fsetdec.
-------
-  induction T; simpl; intro H; f_equal...
+    contradict H.
+    fsetdec.
+  - Case "c # T".
+    apply subst_cset_fresh.
+    fsetdec.
 Qed.
 
 (** Substitution commutes with opening under certain conditions.  This
@@ -506,60 +565,54 @@ Qed.
     the identity. *)
 
 Lemma type_implies_capt_cv : forall T,
-  type T -> capt (cv T).
+  type T ->
+  capt (typ_cv T).
 Proof with eauto.
-  intros. induction H...
-  * csetdec.
+  intros.
+  induction H...
+  induction R; simpl...
+  - destruct v; simpl...
+  - inversion H...
 Qed.
 
 Hint Resolve type_implies_capt_cv : core.
 
 Lemma cv_subst_correspondence : forall x S T,
-  (cv (subst_tt x S T)) =
-  (subst_cset x (cv S) (cv T)).
+  typ_cv (subst_tt x S T) =
+  subst_cset x (typ_cv S) (typ_cv T).
 Proof with eauto*.
-  intros *.
-  destruct T; simpl... {
-    unfold subst_cset. simpl.
-    destruct_set_mem x {}A...
-    exfalso; fsetdec.
-  }
-  destruct (a == x)...
-  2: {
-    unfold subst_cset. simpl.
-    destruct_set_mem x {a}A...
-    exfalso; csetdec.
-  }
-  unfold subst_cset. simpl.
-  destruct_set_mem x {a}A.
-  2: exfalso; csetdec.
-  subst.
-  destruct S; csetdec.
+  intros.
+  destruct T; simpl...
+  1: destruct v; simpl in *; unfold subst_cset;
+     [ destruct_set_mem x {a}A; destruct (a == x); subst;
+       [ replace ({x}A `\`A x) with {}A by fsetdec;
+         csetdec
+       | fsetdec
+       | fsetdec
+       | fsetdec ]
+     | destruct_set_mem x {}A;
+       [ exfalso; fsetdec
+       | eauto* ] ].
+  all: unfold subst_cset;
+       destruct_set_mem x {}A;
+       [ exfalso; fsetdec
+       | eauto* ].
 Qed.
 
 Lemma subst_tt_open_tt_rec : forall T1 T2 X P k,
   type P ->
   subst_tt X P (open_tt_rec k T2 T1) =
-    open_tt_rec k (subst_tt X P T2) (subst_tt X P T1)
-with subst_tpt_open_tpt_rec : forall T1 T2 X P k,
-  type P ->
-  subst_tpt X P (open_tpt_rec k T2 T1) =
-    open_tpt_rec k (subst_tt X P T2) (subst_tpt X P T1).
+  open_tt_rec k (subst_tt X P T2) (subst_tt X P T1).
 Proof with auto*.
-------
-  intros T1 T2 X P k WP. revert k.
+  intros.
+  generalize dependent k.
   induction T1; intros k; simpl; f_equal...
-  - replace (cv (subst_tt X P T2))
-      with (subst_cset X (cv P) (cv T2)).
-    eapply subst_cset_open_cset_rec...
-    symmetry; apply cv_subst_correspondence.
-  - Case "typ_bvar".
+  destruct v; simpl.
+  - Case "a".
+    destruct (a == X); subst...
+    apply open_tt_rec_type, H.
+  - Case "n".
     destruct (k === n); subst...
-  - Case "typ_fvar".
-    destruct (a == X); subst... apply open_tt_rec_type...
-------
-  intros T1 T2 X P k WP. revert k.
-  induction T1; intros k; simpl; f_equal...
 Qed.
 
 (** The next lemma is a direct corollary of the immediately preceding
@@ -597,29 +650,32 @@ Qed.
     the version we use in practice. *)
 
 Lemma subst_tt_intro_rec : forall X T2 U k,
-  X `notin` (fv_tt T2 `u`A fv_ct T2) ->
-  open_tt_rec k U T2 = subst_tt X U (open_tt_rec k X T2)
-with subst_tpt_intro_rec : forall X T2 U k,
-  X `notin` (fv_tpt T2 `u`A fv_cpt T2) ->
-  open_tpt_rec k U T2 = subst_tpt X U (open_tpt_rec k X T2).
+  X ∉ (fv_tt T2 `u`A fv_ct T2) ->
+  open_tt_rec k U T2 = subst_tt X U (open_tt_rec k X T2).
 Proof with auto*.
-------
   induction T2; intros U k Fr; simpl in *; f_equal...
-  - Case "typ_capt".
-    apply subst_cc_intro_rec...
-  - Case "typ_bvar".
-    destruct (k === n)... simpl. destruct (X == X)...
-  - Case "typ_fvar".
-    destruct (a == X)... contradict Fr; fsetdec.
-------
-  induction T2; intros U k Fr; simpl in *; f_equal...
+  - Case "variable".
+    unfold open_vt.
+    destruct v.
+    + SCase "a".
+      unfold subst_tt; simpl.
+      destruct (a == X); subst...
+      exfalso; fsetdec.
+    + SCase "n".
+      destruct (k === n); subst...
+      simpl.
+      destruct (X == X); try (contradict n; reflexivity)...
+  - Case "c # P" .
+    unfold subst_cset.
+    destruct_set_mem X c.
+    exfalso; fsetdec.
 Qed.
 
 (** The next lemma is a direct corollary of the immediately preceding
     lemma---the index is specialized to zero.  *)
 
 Lemma subst_tt_intro : forall X T2 U,
-  X `notin` (fv_tt T2 `u`A fv_ct T2) ->
+  X ∉ (fv_tt T2 `u`A fv_ct T2) ->
   open_tt T2 U = subst_tt X U (open_tt T2 X).
 Proof with auto*.
   intros.
@@ -635,13 +691,6 @@ Qed.
     one notable difference is that we require two auxiliary lemmas to
     show that substituting a type in a locally-closed expression is
     the identity. *)
-
-Inductive varN : nat -> var -> Prop :=
-  | varN_f : forall n (m : nat),
-      m < n ->
-      varN n m
-  | varN_b : forall n (x : atom),
-      varN n x.
 
 Inductive exprN : nat -> exp -> Prop :=
   | exprN_var : forall n v,
@@ -666,48 +715,21 @@ Inductive exprN : nat -> exp -> Prop :=
   | exprN_tapp : forall n x V,
       varN n x ->
       typeN n V ->
-      exprN n (exp_tapp x V).
-
-Lemma typeN_weakening_aux : forall n T,
-  typeN n T ->
-  typeN (S n) T
-with pretypeN_weakening_aux : forall n T,
-  pretypeN n T ->
-  pretypeN (S n) T.
-Proof with eauto*.
-------
-  dependent induction T; intros H; inversion H; constructor...
-  intros m mIn. specialize (H3 m mIn)...
-------
-  dependent induction T; intros H; inversion H; constructor...
-Qed.
-
-Lemma varN_weakening : forall n m v,
-  varN n v ->
-  n <= m ->
-  varN m v.
-Proof with eauto*.
-  intros.
-  induction H; constructor; lia.
-Qed.
+      exprN n (exp_tapp x V)
+  | exprN_box : forall n x,
+      varN n x ->
+      exprN n (box x)
+  | exprN_unbox : forall n C x,
+      captN n C ->
+      varN n x ->
+      exprN n (C ⟜ x).
 
 Lemma exprN_weakening_aux : forall n e,
   exprN n e ->
   exprN (S n) e.
-Proof with eauto using typeN_weakening_aux, varN_weakening; eauto*.
+Proof with eauto using captN_weakening_aux, typeN_weakening_aux, varN_weakening; eauto*.
   intros n e. generalize dependent n.
   dependent induction e; intros n' H; inversion H; constructor...
-Qed.
-
-Lemma typeN_weakening : forall n m T,
-  typeN n T ->
-  n <= m ->
-  typeN m T.
-Proof with eauto using typeN_weakening_aux.
-  intros. dependent induction m...
-  assert (n = 0) by lia; subst...
-  destruct (n === `succ` m); subst...
-  assert (n <= m) by lia...
 Qed.
 
 Lemma exprN_weakening : forall n m T,
@@ -721,8 +743,7 @@ Proof with eauto using exprN_weakening_aux.
   assert (n <= m) by lia...
 Qed.
 
-
-Hint Resolve varN_weakening exprN_weakening typeN_weakening : core.
+Hint Resolve captN_weakening varN_weakening exprN_weakening typeN_weakening : core.
 
 Lemma open_vv_varN_aux : forall n s v,
   varN n (open_vv n s v) ->
@@ -737,7 +758,24 @@ Proof with eauto*.
   * destruct v...
     inversion H2; subst.
     destruct (n === n0); subst...
-    constructor; lia.
+Qed.
+
+Lemma open_cset_captN_aux : forall n D C, 
+  captN n (open_cset n D C) ->
+  captN (`succ` n) C.
+Proof with eauto*.
+  intros.
+  intros m mIn.
+  unfold open_cset in H.
+  destruct_set_mem n C.
+  - unfold captN in H.
+    enough (m <= n) by lia.
+    destruct (m === n); subst...
+    enough (m < n) by lia.
+    apply H.
+    csetdec.
+  - enough (m < n) by lia.
+    apply H, mIn.
 Qed.
 
 Lemma open_ve_rec_exprN_aux : forall n s c e,
@@ -750,7 +788,7 @@ Proof with eauto*.
     constructor;
     inversion H; subst;
     eauto*;
-    eauto using open_vv_varN_aux, open_ct_rec_typeN_aux.
+    eauto using open_vv_varN_aux, open_cset_captN_aux, open_ct_rec_typeN_aux.
 Qed.
 
 Lemma open_te_rec_exprN_aux : forall n S e,
@@ -763,20 +801,23 @@ Proof with eauto*.
     constructor;
     inversion H; subst;
     eauto*;
-    eauto using open_tt_rec_typeN_aux.
+    eauto using open_cset_captN_aux, open_tt_rec_typeN_aux.
 Qed.
 
 Lemma expr_to_expr0 : forall e,
   expr e -> exprN 0 e.
-Proof with eauto using type_to_type0, open_vv_varN_aux, open_ve_rec_exprN_aux, open_te_rec_exprN_aux.
+Proof with eauto
+    using capt_to_capt0,
+          type_to_type0,
+          pure_type_to_pure_type0,
+          open_vt_typeN_aux,
+          open_vv_varN_aux,
+          open_cset_captN_aux,
+          open_ve_rec_exprN_aux,
+          open_te_rec_exprN_aux.
   intros.
-  induction H; repeat constructor...
-  * pick fresh x.
-    eapply (open_ve_rec_exprN_aux 0 x (`cset_fvar` x))...
-  * pick fresh x.
-    eapply (open_ve_rec_exprN_aux 0 x (`cset_fvar` x))...
-  * pick fresh X.
-    eapply (open_te_rec_exprN_aux 0 X)...
+  induction H; constructor...
+  all: pick fresh x for L...
 Qed.
 
 Lemma open_vv_varN : forall n s v,
@@ -790,10 +831,65 @@ Proof with eauto*.
   lia.
 Qed.
 
+Lemma open_cset_captN : forall n C D,
+  captN n C ->
+  C = open_cset n D C.
+Proof with eauto*.
+  intros.
+  unfold open_cset.
+  destruct_set_mem n C.
+  exfalso.
+  unfold captN in H.
+  enough (n < n) by lia.
+  apply H, nIn.
+Qed.
+
+Lemma open_cset_capt : forall n C D,
+  capt C ->
+  C = open_cset n D C.
+Proof with eauto*.
+  intros.
+  apply capt_to_capt0 in H.
+  apply open_cset_captN.
+  apply captN_weakening with (n := 0)...
+  lia.
+Qed.
+
+Lemma subst_cset_intro : forall X k D C,
+  X ∉ `cset_fvars` C ->
+  open_cset k D C = subst_cset X D (open_cset k (`cset_fvar` X) C).
+Proof with eauto*.
+  intros.
+  unfold open_cset.
+  destruct_set_mem k C.
+  - rewrite subst_cset_union.
+    unfold subst_cset.
+    f_equal.
+    + destruct_set_mem X {X}A.
+      * replace ({X}A `\`A X) with {}A by fsetdec.
+        csetdec.
+      * exfalso; clear - XIn; fsetdec.
+    + destruct_set_mem X C...
+  - unfold subst_cset.
+    destruct_set_mem X C.
+    exfalso; fsetdec.
+Qed.
+
+Lemma subst_cset_open_cset : forall C D x E k,
+  capt E ->
+  subst_cset x E (open_cset k D C) =
+    open_cset k (subst_cset x E D) (subst_cset x E C).
+Proof.
+  intros * H.
+  unfold open_cset, subst_cset.
+  unfold capt in H.
+  csetdec.
+Qed.
+
 Lemma open_ve_rec_exprN : forall n s c e,
   exprN n e ->
   e = open_ve_rec n s c e.
-Proof with eauto using open_vv_varN, open_tt_rec_typeN, open_ct_rec_typeN.
+Proof with eauto using open_cset_captN, open_vv_varN, open_tt_rec_typeN, open_ct_rec_typeN.
   intros.
   induction H; simpl; f_equal...
 Qed.
@@ -801,7 +897,7 @@ Qed.
 Lemma open_te_rec_exprN : forall n S e,
   exprN n e ->
   e = open_te_rec n S e.
-Proof with eauto using open_tt_rec_typeN, open_ct_rec_typeN.
+Proof with eauto using open_cset_captN, open_tt_rec_typeN, open_ct_rec_typeN.
   intros.
   induction H; simpl; f_equal...
 Qed.
@@ -809,7 +905,7 @@ Qed.
 Lemma open_te_rec_expr : forall e U k,
   expr e ->
   e = open_te_rec k U e.
-Proof with auto using open_tt_rec_type.
+Proof with auto using open_cset_capt, open_tt_rec_type.
   intros e U k WF; revert k;
   induction WF; intros k0; simpl; f_equal; auto using open_tt_rec_type.
   - pick fresh x. eapply open_te_rec_exprN...
@@ -842,16 +938,20 @@ Lemma subst_te_fresh : forall X U e,
   X `notin` (fv_te e `u`A fv_ce e) ->
   e = subst_te X U e.
 Proof.
-  induction e; simpl; intros; f_equal; auto using subst_tt_fresh.
+  induction e; simpl; intros; f_equal; auto using subst_cset_fresh, subst_tt_fresh.
 Qed.
 
 Lemma subst_te_open_te_rec : forall e T X U k,
   type U ->
   subst_te X U (open_te_rec k T e) =
     open_te_rec k (subst_tt X U T) (subst_te X U e).
-Proof.
-  intros e T X U k WU. revert k.
+Proof with eauto*.
+intros.
+generalize dependent k.
   induction e; intros k; simpl; f_equal; auto using subst_tt_open_tt_rec.
+  rewrite cv_subst_correspondence.
+  apply subst_cset_open_cset.
+  apply type_implies_capt_cv, H.
 Qed.
 
 Lemma subst_te_open_te : forall e T X U,
@@ -880,7 +980,7 @@ Lemma subst_te_intro_rec : forall X e U k,
   open_te_rec k U e = subst_te X U (open_te_rec k X e).
 Proof.
   induction e; intros U k Fr; simpl in *; f_equal;
-    auto using subst_tt_intro_rec.
+    auto using subst_cset_intro,subst_tt_intro_rec.
 Qed.
 
 Lemma subst_te_intro : forall X e U,
@@ -892,244 +992,29 @@ Proof with auto*.
   apply subst_te_intro_rec...
 Qed.
 
-(* ********************************************************************** *)
-(** ** Properties of capture substitution in types *)
-(*
-(** A warmup, to get started with. *)
-Lemma open_cset_singleton : forall i c,
-  open_cset i i c = c.
-Proof with eauto*.
-  intros i c.
-  unfold open_cset, cset_union, cset_remove_bvar.
-  case_eq (cset_references_bvar_dec i c)...
-  destruct c; simpl; unfold cset_references_bvar_dec; intro...
-  (* If i isn't in C, this is trivial.  Now we assume i is in C,
-     and C isn't the univeral set, as that's also trivial. *)
-  f_equal.
-  * fsetdec.
-  * rewrite_set_facts_in H. fnsetdec.
-Qed.
-
-(*
-  TODO clean up the proof
-*)
-Lemma subst_cset_singleton : forall k c C x,
-  x `notin` fv_cset C ->
-  open_cset k c C = subst_cset x c (open_cset k x C).
-Proof with auto.
-  intros k c C x H. unfold not in H.
-  destruct C...
-  destruct (cset_references_bvar_dec k (cset_set t t0)) eqn:Ck...
-  - destruct (cset_references_fvar_dec x (cset_set t t0)) eqn:Cf...
-    * exfalso. csetdec. rewrite cset_references_fvar_eq in Cf. csetdec.
-    * csetdec. simpl in *.
-      replace (AtomSet.F.mem x (singleton x `union` t)) with true.
-      replace (AtomSet.F.remove x (singleton x `union` t)) with t by fsetdec.
-      replace (NatSet.F.union {}N (NatSet.F.remove k t0)) with (NatSet.F.remove k t0) by fnsetdec...
-      symmetry.
-      rewrite <- AtomSetFacts.mem_iff. fsetdec.
-  - autounfold with cset_scope.
-    rewrite Ck.
-    simpl in *.
-    rewrite AtomSetFacts.mem_iff in H.
-    destruct (AtomSet.F.mem x t)... contradiction.
-Qed.
-
-
-(** Why fnsetdec doesn't do this for us, I really don't know... *)
-Lemma elim_empty_nat_set : forall C,
-  NatSet.F.union {}N C = C.
-Proof.
-  intros. fnsetdec.
-Qed.
-
-(** NEW: Opening by a subset is the identity, if the subset contains the index one is opening by. *)
-Lemma open_cset_subset_with_index : forall i C c,
-  cset_subset_prop C c ->
-  cset_references_bvar i C ->
-  c = open_cset i C c.
-Proof with eauto*.
-  intros i C c S.
-  unfold open_cset.
-  (* Two cases : i in C and i not in C *)
-  case_eq (cset_references_bvar_dec i c); intro.
-  (* Two more cases : C is universal or not. *)
-  * case_eq C; intros.
-    ** rewrite H0 in S. inversion S. destruct (cset_remove_bvar i c); destruct c...
-    (* Two cases : c is universal or it's not *)
-    ** case_eq (c); intros; rewrite H0 in S; rewrite H2 in S; inversion S.
-      (** The cases where c is universal are trivial. *)
-      *** intuition.
-      (** The cases where c isn't universal are a bit more work. *)
-      *** csetdec. f_equal...
-        **** fsetdec.
-        **** fnsetdec.
-  * rewrite cset_not_references_bvar_eq in H. intuition.
-Qed.
-
-
-Lemma cset_open_unused_bvar : forall i C c,
-  ~ (cset_references_bvar i c) ->
-  c = open_cset i C c.
-Proof.
-  intros i C c H.
-  unfold open_cset.
-  rewrite <- cset_not_references_bvar_eq in H.
-  rewrite H.
-  reflexivity.
-Qed.
-
-
-Lemma cset_references_bvar_iff : forall i t1 t2,
-  cset_references_bvar i (cset_set t1 t2) <-> NatSet.F.In i t2.
-Proof.
-  intros. simpl. reflexivity.
-Qed.
-
-
-Hint Resolve cset_references_bvar_iff : cset_scope.
-
-Lemma cset_open_idempotent : forall i C c,
-  c = open_cset i C c <->
-  ~ (cset_references_bvar i c) \/ (cset_subset_prop C c /\ cset_references_bvar i C).
-Proof.
-  intros i C c.
-  split.
-  (* -> *)
-  - intros H. destruct (cset_references_bvar_dec i c) eqn:Hic.
-    * csethyp. destruct c ; auto.
-      simpl in Hic.
-      destruct C.
-      ** discriminate H.
-      ** inversion H. right. split.
-        *** eapply cset_subset_elem ; csetdec.
-        *** inversion H. rewrite H2 in Hic. csetdec.
-    * left. apply cset_not_references_bvar_eq. auto.
-  (* <-  *)
-  - intros H. destruct H.
-    * auto using cset_open_unused_bvar.
-    * destruct H ; auto using open_cset_subset_with_index.
-Qed.
-
-
-Lemma capt_from_empty_cset_bvars : forall C,
-  empty_cset_bvars C ->
-  capt C.
-Proof with auto.
-  intros C H.
-  destruct C.
-  - constructor...
-  - assert (t0 = {}N). { unfold empty_cset_bvars in *. unfold cset_all_bvars in *. fnsetdec. }
-    subst.
-    econstructor.
-Qed.
-
-Lemma open_cset_capt : forall i C c,
-  capt C ->
-  C = open_cset i c C.
-Proof with eauto*.
-  intros i C c H.
-  destruct H; cset_split; destruct c eqn:Hc...
-  - exfalso. unfold cset_references_bvar_dec in *. apply NatSetFacts.mem_iff in H_destruct.
-    fnsetdec.
-  - exfalso. unfold cset_references_bvar_dec in *. apply NatSetFacts.mem_iff in H_destruct.
-    fnsetdec.
-Qed.
-
-(** NEW: Commuting local closure, when opening by disjoint capture sets with no bound variables,
-    which are not universal.
-
-    c[j -> D] = c[j -> D][i -> C] implies that i \notin c and in particular c[i -> C] = c,
-    so long as D references no free variables (and isn't the universal set).
-
-    Can that lemma be strengthened to
-
-      i <> j ->
-      open_ct_rec i c1 t = open_ct_rec j c2 (open_ct_rec i c1 t) ->
-      t = open_ct_rec j c2 t.
-    ?
-*)
-Lemma open_cset_aux : forall j D i C c,
-  i <> j ->
-  empty_cset_bvars D ->
-  (fv_cset C) `disjoint` (fv_cset D) ->
-  open_cset j D c = open_cset i C (open_cset j D c) ->
-  c = open_cset i C c.
-Proof with eauto*.
-  intros j D i C c Neq Closed Disj H.
-
-  rewrite (cset_open_idempotent i C (open_cset j D c)) in H.
-
-  rewrite cset_open_idempotent.
-
-  destruct (cset_references_bvar_dec i c) eqn:Hic.
-  (* i is in c *)
-  - destruct (cset_references_bvar_dec j c) eqn:Hjc ; csethyp...
-    destruct H.
-    * destruct D ; destruct c ; csethyp ; auto.
-      left. fnsetdec.
-    * destruct H. destruct C eqn:HC.
-      ** contradiction.
-      ** unfold empty_cset_bvars in Closed. unfold cset_all_bvars in *. destruct D ; destruct c eqn:Hc ; eauto.
-         right. split...
-         inversion H ; csethyp ; simpl in *. constructor. unfold disjoint in *. fsetdec. fnsetdec.
-  (* i is not in c *)
-  - left. apply cset_not_references_bvar_eq. apply Hic.
-Qed.
-*)
-
 Lemma open_ct_rec_type_aux : forall n T i C,
   typeN n T ->
   i >= n ->
-  T = open_ct_rec i C T
-with open_cpt_rec_type_aux : forall n T i C,
-  pretypeN n T ->
-  i >= n ->
-  T = open_cpt_rec i C T.
-Proof with eauto*.
-------
-  dependent induction T; intros * Htp Hineq; simpl in *...
-  - inversion Htp; subst.
-    f_equal...
-    unfold open_cset.
-    destruct_set_mem i (`cset_bvars` c)...
-    specialize (H2 i iIn)...
-    exfalso; lia.
-------
-  dependent induction T; intros * Htp Hineq; simpl in *;
-    try solve [ inversion Htp; subst; f_equal; eauto ]...
+  T = open_ct_rec i C T.
+Proof with eauto using open_cset_captN, captN_weakening.
+  intros n T.
+  generalize dependent n.
+  induction T; intros; simpl; f_equal; inversion H; inversion H1; subst...
 Qed.
 
 Lemma open_ct_rec_type : forall T C k,
   type T ->
-  T = open_ct_rec k C T
-with open_cpt_rec_type : forall T C k,
-  pretype T ->
-  T = open_cpt_rec k C T.
+  T = open_ct_rec k C T.
 Proof with auto using type_to_type0.
-------
-  intros T C k Htyp. revert k.
-  induction Htyp; intros k; simpl; f_equal...
-------
-  intros T C k Htyp. revert k.
-  induction Htyp; intros k; simpl; f_equal...
-  - (* Case typ_arrow *)
-    (* Here, we are opening (\ T1 -> T2), assuming that this is locally closed.
-       Hence T1 is locally closed, so by the induction hypothesis it goes away.
-       T2 isn't locally closed, but the only open capture variable in it is
-       bound by \0. *)
-    pick fresh X.
-    unfold open_ct in *.
-    assert (X `notin` L) by fsetdec.
-    specialize (H0 X).
-    eapply open_ct_rec_type_aux with (n := 1)...
-    eapply open_ct_rec_typeN_aux...
-  (* Case typ_all *)
-  - pick fresh X.
-    unfold open_tt in *.
-    apply (open_ct_rec_type_aux 1).
-    2: lia.
-    eapply (open_tt_rec_typeN_aux 0 X)...
+  intros.
+  generalize dependent k.
+  induction T; intros k; simpl; f_equal; inversion H; inversion H0; subst...
+  - pick fresh x and specialize H5.
+    apply open_ct_rec_type_aux with (n := 1)...
+    apply open_ct_rec_typeN_aux with (S0 := `cset_fvar` x)...
+  - pick fresh X and specialize H5.
+    apply open_ct_rec_type_aux with (n := 1)...
+    apply open_tt_rec_typeN_aux with (S0 := X)...
 Qed.
 
 (*
@@ -1137,30 +1022,24 @@ Qed.
  *)
 Lemma subst_tt_open_ct_rec : forall (X : atom) P T C k,
   type P ->
-  X `notin` `cset_fvars` C ->
-  subst_tt X P (open_ct_rec k C T) = open_ct_rec k C (subst_tt X P T)
-with subst_tpt_open_cpt_rec : forall (X : atom) P T C k,
-  type P ->
-  X `notin` `cset_fvars` C ->
-  subst_tpt X P (open_cpt_rec k C T) = open_cpt_rec k C (subst_tpt X P T).
-Proof with auto using open_cset_capt, open_cpt_rec_type.
-------
-  intros X P T C.
-  induction T ; intros ; simpl; f_equal...
-  - assert (C = subst_cset X (cv P) C). apply subst_cset_fresh...
+  X ∉ `cset_fvars` C ->
+  subst_tt X P (open_ct_rec k C T) = open_ct_rec k C (subst_tt X P T).
+Proof with auto using open_cset_capt, open_ct_rec_type.
+  intros.
+  generalize dependent k.
+  induction T; intros k; simpl; f_equal...
+  - destruct v...
+    destruct (a == X); subst...
+  - assert (C = subst_cset X (typ_cv P) C) by (apply subst_cset_fresh; eauto*).
     rewrite H1 at 2.
-    eapply subst_cset_open_cset_rec...
-  - destruct (a == X)...
-    inversion H ; simpl ; f_equal; subst...
-------
-  intros X P T C.
-  induction T ; intros ; simpl; f_equal...
+    apply subst_cset_open_cset.
+    inversion H...
 Qed.
 
 (* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
 Lemma subst_tt_open_ct : forall (X : atom) P T C,
   type P ->
-  X `notin` `cset_fvars` C ->
+  X ∉ `cset_fvars` C ->
   subst_tt X P (open_ct T C) = open_ct (subst_tt X P T) C.
 Proof with auto*.
   intros X P T C.
@@ -1172,6 +1051,18 @@ Qed.
 (** ** Properties of expression substitution in expressions *)
 
 (** This section follows the structure of the previous two sections. *)
+
+Lemma open_cset_type_aux : forall n C D i,
+  captN n C ->
+  i >= n ->
+  C = open_cset i D C.
+Proof with eauto*.
+  intros.
+  unfold open_cset.
+  destruct_set_mem i C.
+  apply H in iIn.
+  exfalso; lia.
+Qed.
 
 Lemma open_vv_type_aux : forall n v u i,
   varN n v ->
@@ -1189,7 +1080,7 @@ Lemma open_ve_rec_type_aux : forall n e u c i,
   exprN n e ->
   i >= n ->
   e = open_ve_rec i u c e.
-Proof with eauto using open_vv_type_aux, open_ct_rec_type_aux.
+Proof with eauto using open_cset_type_aux, open_vv_type_aux, open_ct_rec_type_aux.
   intros n e; revert n.
   dependent induction e;
     intros * Hexpr Hineq; simpl in *;
@@ -1204,24 +1095,25 @@ Lemma open_ct_rec_capt : forall T j D i C,
   (`cset_fvars` C) `disjoint` (`cset_fvars` D) ->
   (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
   open_ct_rec j D T = open_ct_rec i C (open_ct_rec j D T) ->
-  T = open_ct_rec i C T
-with open_cpt_rec_capt : forall T j D i C,
-  i <> j ->
-  (* can't change this to `capt D` since then D can be universal. *)
-  capt D ->
-  (`cset_fvars` C) `disjoint` (`cset_fvars` D) ->
-  (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
-  open_cpt_rec j D T = open_cpt_rec i C (open_cpt_rec j D T) ->
-  T = open_cpt_rec i C T.
+  T = open_ct_rec i C T.
 Proof with eauto using open_cset_rec_capt_aux.
-------
   induction T; intros j D i C Neq Closed; intros HCommon HcommonU H; simpl in *; inversion H; f_equal...
     eapply open_cset_rec_capt_aux with (V := D)...
-  * destruct C; destruct D; simpl; destr_bool...
-  * autounfold in *; fsetdec...
-------
-  induction T; intros j D i C Neq Closed; intros HCommon HcommonU H; simpl in *; inversion H; f_equal...
+  + destruct C; destruct D; simpl; destr_bool...
+  + autounfold in *; fsetdec...
 Qed.
+
+Lemma open_cset_fuse : forall i j x y C,
+  i <> j ->
+  open_cset j (`cset_fvar` x) C = open_cset i (`cset_fvar` y) (open_cset j (`cset_fvar` x) C) ->
+  C = open_cset i (`cset_fvar` y) C.
+Proof with eauto*.
+  intros.
+  unfold open_cset in *.
+  destruct_set_mem j C.
+  destruct_set_mem i C.
+  destruct_set_mem i (`cset_fvar` x `u` (C N`\` j)).
+Admitted.
 
 Lemma open_vv_fuse : forall i j x y v,
   i <> j ->
@@ -1245,49 +1137,51 @@ Lemma open_ve_rec_expr_aux : forall e j v u C D i,
   (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
   open_ve_rec j v D e = open_ve_rec i u C (open_ve_rec j v D e) ->
   e = open_ve_rec i u C e.
-Proof with eauto using open_ct_rec_capt, open_vv_fuse.
+Proof with eauto using open_ct_rec_capt, open_vv_fuse, open_cset_fuse.
   induction e; intros j x y C D i Neq Closed Disj DisjU H; simpl in *; inversion H; f_equal...
 Qed.
 
-Lemma free_for_cv_capt_var : forall v,
-  capt (free_for_cv_var v).
+Lemma var_cv_capt : forall v,
+  capt (var_cv v).
 Proof with eauto*.
   intros.
   destruct v; simpl...
 Qed.
 
-Lemma free_for_cv_capt : forall e,
-  capt (free_for_cv e).
-Proof with eauto using free_for_cv_capt_var.
-  intros.
-  induction e; simpl...
-  - intros a.
-    simpl.
-    assert (capt (free_for_cv_var v)) by apply free_for_cv_capt_var.
-    assert (capt (free_for_cv_var v0)) by apply free_for_cv_capt_var.
+Lemma exp_cv_capt : forall e,
+  capt (exp_cv e).
+Proof with eauto using var_cv_capt.
+  intros e.
+  induction e; subst; simpl in *...
+  - assert (capt (var_cv v)) by apply var_cv_capt.
+    assert (capt (var_cv v0)) by apply var_cv_capt.
     unfold capt in *.
     fnsetdec.
   - intros a.
     simpl.
     unfold capt in *.
     fnsetdec.
+  - intros a.
+    simpl.
+    assert (capt (var_cv v)) by apply var_cv_capt.
+    unfold capt in *.
+    apply NatSetNotin.notin_union...
 Qed.
 
-Lemma cset_fvars_free_for_cv_var_is_fv_vv : forall v,
-  `cset_fvars` (free_for_cv_var v) = fv_vv v.
+Lemma cset_fvars_var_var_is_fv_vv : forall v,
+  `cset_fvars` (var_cv v) = fv_vv v.
 Proof with eauto*.
   intros.
   destruct v; simpl...
 Qed.
 
-Lemma cset_fvars_free_for_cv_is_fv_ve : forall e,
-  `cset_fvars` (free_for_cv e) = fv_ve e.
-Proof with eauto using cset_fvars_free_for_cv_var_is_fv_vv.
+(* REVIEW: not true anymore? exp_cv does not include variables behind a box while fv_ve does *)
+Lemma cset_fvars_exp_cv_is_fv_ve : forall e,
+  `cset_fvars` (exp_cv e) = fv_ve e.
+Proof with eauto using cset_fvars_var_var_is_fv_vv.
   intros.
-  induction e; simpl...
-  - repeat rewrite cset_fvars_free_for_cv_var_is_fv_vv...
-  - rewrite IHe1, IHe2...
-Qed.
+  induction e; simpl; f_equal...
+Abort.
 
 Lemma open_ve_rec_expr : forall u c e k,
   expr e ->
@@ -1303,10 +1197,10 @@ Proof with auto*.
       simpl...
     + autounfold in *. fsetdec.
   - pick fresh x.
-    specialize H0 with (x := x) (k0 := S k0).
-    apply open_ve_rec_expr_aux with (j := 0) (v := x) (D := `cset_fvar` x);
-      simpl...
-    + autounfold in *. fsetdec.
+    specialize H0 with (x := x) (k := S k0).
+    apply open_ve_rec_expr_aux with (j := 0) (v := x) (D := `cset_fvar` x); simpl...
+    autounfold in *.
+    fsetdec.
   - apply open_ct_rec_type...
   - pick fresh X.
     unfold open_te in H0.
@@ -1316,20 +1210,16 @@ Proof with auto*.
   - apply open_ct_rec_type...
 Qed.
 
-Lemma subst_ct_fresh : forall (x: atom) c t,
+Lemma subst_ct_fresh : forall (x : atom) c t,
   x `notin` fv_ct t ->
-  t = subst_ct x c t
-with subst_cpt_fresh : forall (x: atom) c t,
-  x `notin` fv_cpt t ->
-  t = subst_cpt x c t.
+  t = subst_ct x c t.
 Proof with eauto using subst_cset_fresh.
-------
-  intros x c t. induction t; intro H ; simpl in *; f_equal...
-------
-  intros x c t. induction t; intro H ; simpl in *; f_equal...
+  intros x c t.
+  induction t; intro H ; simpl in *; f_equal...
+  destruct v...
 Qed.
 
-Lemma subst_vv_fresh : forall (x: atom) u v,
+Lemma subst_vv_fresh : forall (x : atom) u v,
   x `notin` fv_vv v ->
   v = subst_vv x u v.
 Proof with eauto*.
@@ -1340,33 +1230,20 @@ Proof with eauto*.
   fsetdec.
 Qed.
 
-Lemma subst_ve_fresh : forall (x: atom) u c e,
+Lemma subst_ve_fresh : forall (x : atom) u c e,
   x `notin` (fv_ve e `u`A fv_ce e) ->
   e = subst_ve x u c e.
-Proof with auto using subst_vv_fresh, subst_ct_fresh.
-  intros x u c e; induction e; simpl ; intro H ; f_equal; unfold open_vv, fv_vv in *...
+Proof with auto using subst_vv_fresh, subst_ct_fresh, subst_cset_fresh.
+  induction e; intros; simpl in *; f_equal...
 Qed.
 
-Lemma subst_ct_open_rec : forall x k c1 c2 t,
+Lemma subst_ct_open_rec : forall t x k c1 c2,
   capt c1 ->
   subst_ct x c1 (open_ct_rec k c2 t) =
-  open_ct_rec k (subst_cset x c1 c2) (subst_ct x c1 t)
-with subst_cpt_open_rec : forall x k c1 c2 t,
-  capt c1 ->
-  subst_cpt x c1 (open_cpt_rec k c2 t) =
-  open_cpt_rec k (subst_cset x c1 c2) (subst_cpt x c1 t).
+  open_ct_rec k (subst_cset x c1 c2) (subst_ct x c1 t).
 Proof with auto using subst_cset_open_cset_rec.
-------
-  intros x k c1 c2 t. revert c1 c2 k x.
-  induction t ; intros c1 c2 k x c1empt;
-    unfold open_ct_rec; unfold subst_ct; fold open_ct_rec; fold subst_ct;
-    f_equal; try solve [apply subst_cset_open_cset_rec; eauto].
-  apply subst_cpt_open_rec.
-  trivial.
-------
-  intros x k c1 c2 t. revert c1 c2 k x.
-  induction t ; intros c1 c2 k x c1empt;
-    unfold open_cpt_rec; unfold subst_ct; unfold subst_cpt; f_equal...
+  induction t; intros; simpl; f_equal...
+  destruct v...
 Qed.
 
 (** The next lemma states that opening a term is equivalent to first
@@ -1376,18 +1253,14 @@ Qed.
 
 Lemma subst_ct_intro_rec : forall X T2 C k,
   X `notin` fv_ct T2 ->
-  open_ct_rec k C T2 = subst_ct X C (open_ct_rec k (`cset_fvar` X) T2)
-with subst_cpt_intro_rec : forall X T2 C k,
-  X `notin` fv_cpt T2 ->
-  open_cpt_rec k C T2 = subst_cpt X C (open_cpt_rec k (`cset_fvar` X) T2).
+  open_ct_rec k C T2 = subst_ct X C (open_ct_rec k (`cset_fvar` X) T2).
 Proof with auto*.
-------
   induction T2; intros C k Fr; simpl in *; f_equal...
-  - Case "typ_cset".
+  - Case "v".
+    destruct v...
+  - Case "c # T2".
     apply subst_cc_intro_rec.
     csetdec; destruct c...
-------
-  induction T2; intros C k Fr; simpl in *; f_equal...
 Qed.
 
 (** The next lemma is a direct corollary of the immediately preceding
@@ -1416,57 +1289,26 @@ Proof with auto*.
   eapply subst_cset_open_cset_rec...
 Qed.
 
-(* unfold subst_cset; unfold open_cset;
-  cset_split; cset_cleanup;
-  destruct C2 eqn:HC2; destruct C1 eqn:HC1; try destruct c eqn:Hc;
-  f_equal; subst; try fsetdec; try fnsetdec. *)
-(* all: inversion H; inversion H0; subst; fnsetdec. *)
-
 Lemma subst_ct_open_ct_rec : forall (X : atom) C1 T C2 k,
   capt C1 ->
   capt C2 ->
   ~ X A`in` C2 ->
-  subst_ct X C1 (open_ct_rec k C2 T) = open_ct_rec k C2 (subst_ct X C1 T)
-with subst_cpt_open_cpt_rec : forall (X : atom) C1 T C2 k,
-  capt C1 ->
-  capt C2 ->
-  ~ X A`in` C2 ->
-  subst_cpt X C1 (open_cpt_rec k C2 T) = open_cpt_rec k C2 (subst_cpt X C1 T).
-Proof with auto.
-------
+  subst_ct X C1 (open_ct_rec k C2 T) = open_ct_rec k C2 (subst_ct X C1 T).
+Proof with auto using subst_cset_open_cset_fresh.
   intros X C1 T C2.
-  induction T; intros; simpl; try trivial.
-
-  f_equal.
-  - apply subst_cset_open_cset_fresh...
-  - apply subst_cpt_open_cpt_rec...
-------
-  intros X C1 T C2.
-  induction T; intros; simpl; try trivial;
-    try solve [f_equal; apply subst_ct_open_ct_rec; eauto].
+  induction T; intros; simpl; f_equal...
+  destruct v...
 Qed.
 
 Lemma subst_ct_open_tt_rec_fresh : forall c z P t k,
   capt c ->
-  capt (cv P) ->
+  capt (typ_cv P) ->
   z `notin` (fv_ct P `u`A fv_tt P) ->
-  subst_ct z c (open_tt_rec k P t) = open_tt_rec k P (subst_ct z c t)
-with subst_cpt_open_tpt_rec_fresh : forall c z P t k,
-  capt c ->
-  capt (cv P) ->
-  z `notin` (fv_ct P `u`A fv_tt P) ->
-  subst_cpt z c (open_tpt_rec k P t) = open_tpt_rec k P (subst_cpt z c t).
-Proof with eauto.
-------
-  induction t ; intros ; simpl ; f_equal...
-  -
-    apply subst_cset_open_cset_fresh...
-    destruct P; simpl in *...
-  - Case "exp_bvar".
-    destruct (k === n)... symmetry.
-    apply subst_ct_fresh...
-------
-  induction t ; intros ; simpl ; f_equal...
+  subst_ct z c (open_tt_rec k P t) = open_tt_rec k P (subst_ct z c t).
+Proof with eauto using subst_ct_fresh, subst_cset_fresh.
+  induction t; intros; simpl; f_equal...
+  destruct v...
+  destruct P; simpl in *; destruct (k === n); subst; simpl in *; f_equal; try destruct v; symmetry...
 Qed.
 
 Lemma subst_ct_open_tt_var : forall (X Y:atom) C T,
@@ -1492,16 +1334,16 @@ Qed.
 
 Lemma subst_te_open_ve_rec : forall e z c Z P k,
   type P ->
-  Z `notin` `cset_fvars` c ->
+  Z `notin` (`cset_fvars` c `u`A {z}A) ->
   subst_te Z P (open_ve_rec k z c e) =
     open_ve_rec k z c (subst_te Z P e).
-Proof with eauto using subst_tt_open_ct_rec.
-  induction e; intros z c' Z P k Tpe Zfr; simpl; f_equal...
+Proof with eauto using subst_tt_open_ct_rec, subst_cset_open_cset_fresh.
+  induction e; intros; simpl in *; f_equal...
 Qed.
 
 Lemma subst_te_open_ve : forall e z c Z P,
   type P ->
-  Z `notin` `cset_fvars` c ->
+  Z `notin` (`cset_fvars` c `u`A {z}A) ->
   subst_te Z P (open_ve e z c) = open_ve (subst_te Z P e) z c.
 Proof with auto*.
   intros.
@@ -1509,9 +1351,9 @@ Proof with auto*.
   apply subst_te_open_ve_rec...
 Qed.
 
-Lemma subst_te_open_ve_var : forall Z (x: atom) P e c,
+Lemma subst_te_open_ve_var : forall Z (x : atom) P e c,
   type P ->
-  Z `notin` `cset_fvars` c ->
+  Z `notin` (`cset_fvars` c `u`A {x}A) ->
   open_ve (subst_te Z P e) x c = subst_te Z P (open_ve e x c).
 Proof with auto*.
   intros.
@@ -1520,16 +1362,19 @@ Qed.
 
 Lemma subst_ve_open_te_rec : forall e P z u c k,
   capt c ->
-  capt (cv P) ->
+  capt (typ_cv P) ->
   z `~in`A (fv_ct P `u`A fv_tt P) ->
   subst_ve z u c (open_te_rec k P e) = open_te_rec k P (subst_ve z u c e).
-Proof with eauto using subst_ct_open_tt_rec_fresh.
+Proof with eauto using subst_ct_open_tt_rec_fresh, subst_cset_open_cset_fresh.
   induction e; intros * Hc1 Hc2 Hfv; simpl; f_equal...
+  apply subst_cset_open_cset_fresh...
+  induction P; simpl in *...
+  destruct v0...
 Qed.
 
 Lemma subst_ve_open_te : forall e P z u c,
   capt c ->
-  capt (cv P) ->
+  capt (typ_cv P) ->
   z `~in`A (fv_ct P `u`A fv_tt P) ->
   subst_ve z u c (open_te e P) = open_te (subst_ve z u c e) P.
 Proof with auto*.
@@ -1538,7 +1383,7 @@ Proof with auto*.
   apply subst_ve_open_te_rec...
 Qed.
 
-Lemma subst_ve_open_te_var : forall z (X:atom) u c e,
+Lemma subst_ve_open_te_var : forall z (X : atom) u c e,
   z <> X ->
   capt c ->
   open_te (subst_ve z u c e) X = subst_ve z u c (open_te e X).
@@ -1550,16 +1395,11 @@ Qed.
 (* if x is fresh, opening with {x} and then substituting is the same as opening directly. *)
 Lemma open_ct_subst_ct_var : forall x c t k,
   x `notin` fv_ct t ->
-  open_ct_rec k c t = subst_ct x c (open_ct_rec k (`cset_fvar` x) t)
-with open_cpt_subst_cpt_var : forall x c t k,
-  x `notin` fv_cpt t ->
-  open_cpt_rec k c t = subst_cpt x c (open_cpt_rec k (`cset_fvar` x) t).
+  open_ct_rec k c t = subst_ct x c (open_ct_rec k (`cset_fvar` x) t).
 Proof with auto.
-------
-  induction t ; intros ; simpl in * ; f_equal...
+  induction t; intros; simpl in *; f_equal...
+  1: destruct v...
   apply subst_cc_intro_rec...
-------
-  induction t ; intros ; simpl in * ; f_equal...
 Qed.
 
 Lemma subst_vv_intro : forall k x u v,
@@ -1589,7 +1429,7 @@ Qed.
 Lemma subst_ve_intro_rec : forall x e u c k,
   x `notin` (fv_ve e `u`A fv_ce e) ->
   open_ve_rec k u c e = subst_ve x u c (open_ve_rec k x (`cset_fvar` x) e).
-Proof with eauto using open_ct_subst_ct_var, subst_vv_intro.
+Proof with eauto using open_ct_subst_ct_var, subst_vv_intro, subst_cset_intro.
   induction e; intros u c' k Fr; simpl in *; f_equal...
 Qed.
 
@@ -1607,7 +1447,7 @@ Lemma subst_ve_open_ve_rec : forall e x y u c1 c2 k,
   capt c1 ->
   subst_ve x u c1 (open_ve_rec k y c2 e) =
     open_ve_rec k y (subst_cset x c1 c2) (subst_ve x u c1 e).
-Proof with auto using subst_vv_open_vv, subst_ct_open_rec.
+Proof with auto using subst_vv_open_vv, subst_ct_open_rec, subst_cset_open_cset_fresh.
   intros * Neq Capt.
   revert k.
   induction e; intros k; simpl; f_equal...
@@ -1651,58 +1491,51 @@ Qed.
 
 Lemma subst_tt_type : forall Z P T,
   type T ->
-  type P ->
+  pure_type P ->
   type (subst_tt Z P T)
-with subst_tpt_type : forall Z P T,
-  pretype T ->
-  type P ->
-  pretype (subst_tpt Z P T).
+with subst_tt_pure_type : forall Z P T,
+  pure_type T ->
+  pure_type P ->
+  pure_type (subst_tt Z P T).
 Proof with auto.
-------
+{ clear subst_tt_type.
   intros Z P T HT HP.
   induction HT; simpl...
-  - Case "type_fvar".
-    destruct (X == Z)...
-------
+}
+{ clear subst_tt_pure_type.
   intros Z P T HT HP.
   induction HT; simpl...
-  - Case "type_arrow".
-    pick fresh Y and apply type_arrow...
+  - Case "X".
+    destruct (X == Z); subst...
+  - Case "∀ (S') T".
+    pick fresh Y and apply type_arr...
     rewrite <- subst_tt_open_ct...
-  - Case "type_all".
+  - Case "∀ [R] T".
     pick fresh Y and apply type_all...
     rewrite subst_tt_open_tt_var...
+}
 Qed.
-
-
-(** The following lemma depends on [subst_tt_type] and
-    [subst_te_open_ee_var]. *)
 
 Lemma subst_te_expr : forall Z P e,
   expr e ->
-  type P ->
+  pure_type P ->
   expr (subst_te Z P e).
-Proof with eauto using subst_tt_type.
-  intros Z P e He Hp.
-  induction He; simpl ; econstructor...
-  (* case exp_abs *)
-  - instantiate (1 := L `union` singleton Z). intros.
+Proof with eauto using subst_tt_type, subst_tt_pure_type.
+  intros.
+  induction H; simpl; econstructor...
+  - Case "λ (T) e1".
+    instantiate (1 := L `union` singleton Z).
+    intros.
     rewrite subst_te_open_ve_var...
-
-  (* case exp_let *)
-  - instantiate (1 := L `union` singleton Z). intros.
+  - Case "let= e1 in e2".
+    instantiate (1 := L `union` singleton Z).
+    intros.
     rewrite subst_te_open_ve_var...
-
-  (* case exp_tabs *)
-  - instantiate (1 := L `union` singleton Z). intros.
+  - Case "Λ [R] T".
+    instantiate (1 := L `union` singleton Z).
+    intros.
     rewrite subst_te_open_te_var...
 Qed.
-
-(** The following lemma depends on [subst_ee_open_ee_var] and
-    [subst_ee_open_te_var].
-
-    This lemma can be cleaned up quite a bit -- just making it go through for now.
-*)
 
 Local Hint Extern 1 (~ AtomSet.F.In _ _) => simpl_env in *; [fsetdec] : core.
 
@@ -1712,30 +1545,13 @@ Lemma subst_ct_open_fresh : forall k z C T X,
     /\ X `notin` `cset_fvars` C ->
   capt C ->
   (open_ct_rec k (`cset_fvar` X) (subst_ct z C T)) =
-    (subst_ct z C (open_ct_rec k (`cset_fvar` X) T))
-with subst_cpt_open_fresh : forall k z C T X,
-    (* X fresh requirement here in z c T *)
-    X `notin` (singleton z `union` fv_tpt T `union` fv_cpt T)
-      /\ X `notin` `cset_fvars` C ->
-    capt C ->
-    (open_cpt_rec k (`cset_fvar` X) (subst_cpt z C T)) =
-      (subst_cpt z C (open_cpt_rec k (`cset_fvar` X) T)).
-Proof with eauto*.
-------
-  intros k z C T X HXfresh HCfresh. revert k.
-  induction T; intro k; simpl in *; try reflexivity.
-  * (* Case typ_capt *)
-    f_equal...
-    (** pull this out into a tactic.*)
-    symmetry.
-    assert (`cset_fvar` X = subst_cset z C (`cset_fvar` X)). {
-      cbv [subst_cset]; csetdec.
-    }
-    rewrite H at 2.
-    apply subst_cset_open_cset_rec...
-------
-  intros k z C T X HXfresh HCfresh. revert k.
-  induction T; intro k; simpl in *; try reflexivity; f_equal...
+    (subst_ct z C (open_ct_rec k (`cset_fvar` X) T)).
+Proof with eauto.
+  intros k z C T X HXfresh HCfresh.
+  revert k.
+  induction T; intro k; simpl in *; try reflexivity; try destruct v; f_equal...
+  symmetry.
+  apply subst_cset_open_cset_fresh...
 Qed.
 
 Lemma open_tt_subst_ct_aux : forall k X z C T,
@@ -1743,51 +1559,52 @@ Lemma open_tt_subst_ct_aux : forall k X z C T,
   capt C ->
   X `notin` `cset_fvars` C ->
   open_tt_rec k X (subst_ct z C T) =
-  subst_ct z C (open_tt_rec k X T)
-with open_tpt_subst_ct_aux : forall k X z C T,
-  z <> X ->
-  capt C ->
-  X `notin` `cset_fvars` C ->
-  open_tpt_rec k X (subst_cpt z C T) =
-  subst_cpt z C (open_tpt_rec k X T).
+  subst_ct z C (open_tt_rec k X T).
 Proof with eauto*.
-------
-  intros * ? ? HXfresh; revert k; induction T; intro k; simpl in *; f_equal...
-  - symmetry.
-    apply subst_cset_open_cset_fresh...
-  - destruct (k === n)...
-------
-  intros * ? ? HXfresh; revert k; induction T; intro k; simpl in *; f_equal...
+  intros * ? ? HXfresh.
+  revert k.
+  induction T; intro k; simpl in *; f_equal...
+  destruct v; simpl...
+  destruct (k === n); subst...
 Qed.
 
 Lemma subst_ct_type : forall T z c,
   type T ->
   capt c ->
   type (subst_ct z c T)
-with subst_cpt_type : forall T z c,
-  pretype T ->
+with subst_ct_pure_type : forall R z c,
+  pure_type R ->
   capt c ->
-  pretype (subst_cpt z c T).
-Proof with auto.
-------
-  intros T z c Tpe Closed.
-  induction Tpe; simpl; try econstructor...
-------
-  intros T z c Tpe Closed.
-  induction Tpe; simpl; try econstructor...
-  - let F := gather_atoms in instantiate (1 := F).
-    intros X HXfresh.
-    assert ((open_ct (subst_ct z c T2) (`cset_fvar` X)) =
-            (subst_ct z c (open_ct T2 (`cset_fvar` X)))).
-    { apply subst_ct_open_fresh. split. fsetdec. destruct c; fsetdec. apply Closed. }
+  pure_type (subst_ct z c R).
+Proof with auto*.
+{ clear subst_ct_type.
+  intros * Typ ?.
+  induction Typ; simpl...
+}
+{ clear subst_ct_pure_type.
+  intros * Typ Cap.
+  induction Typ; simpl...
+  - Case "∀ (S') T".
+    pick fresh x and apply type_arr...
+    assert ((open_ct (subst_ct z c T) (`cset_fvar` x)) =
+    (subst_ct z c (open_ct T (`cset_fvar` x)))).
+    { apply subst_ct_open_fresh.
+      split.
+      - fsetdec.
+      - destruct c.
+        fsetdec.
+      - apply Cap.
+    }
     rewrite H1...
-  (* Can we use subst_ct_fresh??? -- no, that requires z to be fresh; but we get a simple
-      helper lemma above for the equality. *)
-  - let F := gather_atoms in instantiate (1 := F).
-    intros X HXfresh.
-    assert ((open_tt (subst_ct z c T2) X) = (subst_ct z c (open_tt T2 X))).
-    { apply open_tt_subst_ct_aux... notin_solve. }
-    rewrite H1...
+  - Case "∀ [R] T".
+    pick fresh X and apply type_all...
+    assert ((open_tt (subst_ct z c T) X) =
+    (subst_ct z c (open_tt T X))).
+    { symmetry.
+      apply subst_ct_open_tt_rec_fresh; simpl...
+    }
+    rewrite H0...
+}
 Qed.
 
 (* *********************************************************************** *)
@@ -1829,53 +1646,38 @@ Ltac closed_type :=
       auto
   end).
 
-(* UNDOABLE! *)
-Lemma cv_subst_ct_correspondence : forall x C T,
+Lemma typ_cv_subst_ct_correspondence : forall x C T,
   x `~in`A fv_tt T ->
-  (cv (subst_ct x C T)) =
-  (subst_cset x C (cv T)).
+  (typ_cv (subst_ct x C T)) =
+  (subst_cset x C (typ_cv T)).
 Proof with eauto*.
   intros * ?.
-  destruct T; simpl... {
+  destruct T; simpl...
+  1: {
     unfold subst_cset. simpl.
-    destruct_set_mem x {}A...
+    destruct v; simpl.
+    - destruct_set_mem x {a}A...
+    - destruct_set_mem x {}A...
   }
-  destruct (a == x)...
-  2: {
-    unfold subst_cset. simpl.
-    destruct_set_mem x {a}A...
-  }
-  unfold subst_cset. simpl.
-  destruct_set_mem x {a}A.
-  1,2: exfalso; csetdec.
+  all: unfold subst_cset; destruct_set_mem x {}A; auto; exfalso; fsetdec.
 Qed.
-
 
 (** More substitution lemmas *)
 Lemma subst_ct_open_tt_rec : forall c z P t k,
   capt c ->
   z `~in`A fv_tt P ->
-  subst_ct z c (open_tt_rec k P t) = open_tt_rec k (subst_ct z c P) (subst_ct z c t)
-with subst_cpt_open_tpt_rec : forall c z P t k,
-  capt c ->
-  z `~in`A fv_tt P ->
-  subst_cpt z c (open_tpt_rec k P t) = open_tpt_rec k (subst_ct z c P) (subst_cpt z c t).
+  subst_ct z c (open_tt_rec k P t) = open_tt_rec k (subst_ct z c P) (subst_ct z c t).
 Proof with eauto.
-------
   induction t ; intros ; simpl ; f_equal...
-  - rewrite cv_subst_ct_correspondence...
-    apply subst_cset_open_cset_rec...
-  - Case "exp_bvar".
-    destruct (k === n)...
-------
-  induction t ; intros ; simpl ; f_equal...
+  destruct v; simpl...
+  destruct (k === n); subst...
 Qed.
 
 Lemma subst_ct_open_tt : forall x c t1 t2,
   capt c ->
   x `~in`A fv_tt t2 ->
   subst_ct x c (open_tt t1 t2) = (open_tt (subst_ct x c t1) (subst_ct x c t2)).
-Proof with auto using open_cset_capt, open_cpt_rec_type, subst_ct_open_tt_rec.
+Proof with auto using open_cset_capt, open_ct_rec_type, subst_ct_open_tt_rec.
   intros.
   cbv [open_tt].
   apply subst_ct_open_tt_rec...
@@ -1885,17 +1687,20 @@ Lemma subst_ct_open_ct : forall x c1 T c2,
   capt c1 ->
   x `~in`A fv_tt T ->
   subst_ct x c1 (open_ct T c2) = (open_ct (subst_ct x c1 T) (subst_cset x c1 c2)).
-Proof with auto using open_cset_capt, open_cpt_rec_type, subst_ct_open_rec.
-  intros.
-  induction T... eapply subst_ct_open_rec...
+Proof with eauto using open_cset_capt, open_ct_rec_type, subst_ct_open_rec.
+  induction T...
 Qed.
 
 Lemma open_ct_subst_tt : forall x C S T,
   type S ->
   x `notin` `cset_fvars` C ->
   open_ct (subst_tt x S T) C = subst_tt x S (open_ct T C).
-Proof with auto using open_cset_capt, open_cpt_rec_type, subst_ct_open_rec,
-  subst_ct_open_tt_var, open_ct_subst_ct_var.
+Proof with auto
+    using open_cset_capt,
+          open_ct_rec_type,
+          subst_ct_open_rec,
+          subst_ct_open_tt_var,
+          open_ct_subst_ct_var.
   intros * HS Hfr.
   cbv [open_ct]...
   pick fresh y for (fv_ct (subst_tt x S T)).
@@ -1919,21 +1724,11 @@ Qed.
 
 Lemma subst_ct_useless_repetition : forall x C D T,
   x `notin` `cset_fvars` D ->
-  subst_ct x C (subst_ct x D T) = (subst_ct x D T)
-with subst_cpt_useless_repetition : forall x C D T,
-  x `notin` `cset_fvars` D ->
-  subst_cpt x C (subst_cpt x D T) = (subst_cpt x D T).
-Proof with auto.
-{ intros.
-  induction T; simpl; try reflexivity.
-  rewrite subst_cset_useless_repetition.
-  rewrite subst_cpt_useless_repetition.
-  all : trivial.
-}
-{ intros.
-  induction T; simpl; try reflexivity;
-    try solve [repeat try rewrite subst_ct_useless_repetition; auto].
-}
+  subst_ct x C (subst_ct x D T) = (subst_ct x D T).
+Proof with auto using subst_cset_useless_repetition.
+  intros.
+  induction T; simpl; try reflexivity; f_equal...
+  destruct v...
 Qed.
 
 Lemma notin_open_ve_rec_fv_ve : forall k y z C e,
@@ -1950,20 +1745,18 @@ Proof with eauto*.
   | |- y `notin` (_ `union` _) => apply notin_union
   | IH : y `notin` _ -> forall k, _ |- _ => apply IH; eauto*
   end.
+  unfold open_cset.
+  destruct c; simpl.
+  destruct_set_mem k t0...
 Qed.
 
 Lemma notin_open_te_rec_fv_ve : forall k y z e,
   y `notin` (fv_ve e `union` singleton z) ->
   y `notin` fv_ve (open_te_rec k z e).
-Proof with eauto*.
+Proof with auto.
   intros * y_notin_e_z.
   generalize dependent k.
-  induction e; intros k; simpl in *;
-  repeat match goal with
-  | v : var |- _ =>
-      destruct v; simpl in *; eauto*;
-      destruct (k === n); eauto*
-  | |- y `notin` (_ `union` _) => apply notin_union
-  | IH : y `notin` _ -> forall k, _ |- _ => apply IH; eauto*
-  end.
+  induction e; simpl in *; intros k...
+  unfold open_cset.
+  destruct_set_mem k c...
 Qed.
