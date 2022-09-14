@@ -3,36 +3,20 @@ Require Export Metatheory.
 Require Export CaptureSets.
 Require Import Coq.Program.Wf.
 
-(* ********************************************************************** *)
-(** * #<a name="syntax"></a># Syntax (pre-terms) *)
-
-(** We use a locally nameless representation for Fsub, where bound
-    variables are represented as natural numbers (de Bruijn indices)
-    and free variables are represented as [atom]s.  The type [atom],
-    defined in the [Atom] library, represents names: there are
-    infinitely many atoms, equality is decidable on atoms, and it is
-    possible to generate an atom fresh for any given finite set of
-    atoms.
-
-    We say that the definitions below define pre-types ([typ]) and
-    pre-expressions ([exp]), collectively pre-terms, since the
-    datatypes admit terms, such as [(typ_all typ_top (typ_bvar 3))],
-    where indices are unbound.  A term is locally closed when it
-    contains no unbound indices.
-
-    Note that indices for bound type variables are distinct from
-    indices for bound expression variables.  We make this explicit in
-    the definitions below of the opening operations. *)
 Inductive typ : Type :=
-  (* C P *)
-  | typ_capt : cap -> pretyp -> typ
-  (* X *)
-  | typ_bvar : nat -> typ
-  | typ_fvar : atom -> typ
-with pretyp : Type :=
-  | typ_top : pretyp
-  | typ_arrow : typ -> typ -> pretyp
-  | typ_all : typ -> typ -> pretyp.
+  | typ_var : var -> typ
+  | typ_top : typ
+  | typ_arr : typ -> typ -> typ
+  | typ_all : typ -> typ -> typ
+  | typ_box : typ -> typ
+  | typ_capt : cap -> typ -> typ.
+
+Coercion typ_var : var >-> typ.
+Notation "'⊤'" := typ_top (at level 80, no associativity).
+Notation "'∀' '(' S ')' T" := (typ_arr S T) (at level 60, S at next level, T at next level, right associativity).
+Notation "'∀' '[' R ']' T" := (typ_all R T) (at level 60, R at next level, T at next level, right associativity).
+Notation "'□' T" := (typ_box T) (at level 70, no associativity).
+Notation "C '#' R" := (typ_capt C R) (at level 65, R at next level, right associativity).
 
 Inductive exp : Type :=
   | exp_var : var -> exp
@@ -40,95 +24,71 @@ Inductive exp : Type :=
   | exp_app : var -> var -> exp
   | exp_let : exp -> exp -> exp
   | exp_tabs : typ -> exp -> exp
-  | exp_tapp : var -> typ -> exp.
+  | exp_tapp : var -> typ -> exp
+  | exp_box : var -> exp
+  | exp_unbox : cap -> var -> exp.
 
-(** We declare the constructors for indices and variables to be
-    coercions.  For example, if Coq sees a [nat] where it expects an
-    [exp], it will implicitly insert an application of [exp_bvar];
-    similar behavior happens for [atom]s.  Thus, we may write
-    [(exp_abs typ_top (exp_app 0 x))] instead of [(exp_abs typ_top
-    (exp_app (exp_bvar 0) (exp_fvar x)))]. *)
-
-Coercion typ_bvar : nat >-> typ.
-Coercion typ_fvar : atom >-> typ.
 Coercion exp_var : var >-> exp.
+Notation "'λ' '(' T ')' Γ" := (exp_abs T Γ) (at level 60, T at next level, Γ at next level, right associativity).
+Notation "'Λ' '[' R ']' Γ" := (exp_tabs R Γ) (at level 60, R at next level, Γ at next level, right associativity).
+Notation "x '@' y" := (exp_app x y) (at level 61, y at next level, left associativity).
+Notation "'let=' e1 'in' e2" := (exp_let e1 e2) (at level 59, e1 at next level, e2 at next level, right associativity).
+Notation "x  '@' '[' R ']'" := (exp_tapp x R) (at level 61, R at next level, left associativity).
+Notation "'box' Γ" := (exp_box Γ) (at level 70, Γ at next level, no associativity).
+Notation "C '⟜' x" := (exp_unbox  C x) (at level 60, x at next level, right associativity).
 
-(* Coercion cset_bvar : nat >-> cap. *)
-(* Coercion cset_fvar : atom >-> cap. *)
+Definition var_cv (v : var) : cap :=
+  match v with
+  | var_b _ => {}
+  | var_f x => `cset_fvar` x
+  end.
 
-(* ********************************************************************** *)
-(** * #<a name="open"></a># Opening terms *)
-
-(** Opening replaces an index with a term.  This operation is required
-    if we wish to work only with locally closed terms when going under
-    binders (e.g., the typing rule for [exp_abs]).  It also
-    corresponds to informal substitution for a bound variable, which
-    occurs in the rule for beta reduction.
-
-    We need to define three functions for opening due the syntax of
-    Fsub, and we name them according to the following convention.
-      - [tt]: Denotes an operation involving types appearing in types.
-      - [te]: Denotes an operation involving types appearing in
-        expressions.
-      - [ee]: Denotes an operation involving expressions appearing in
-        expressions.
-
-    The notation used below for decidable equality on atoms and
-    natural numbers (e.g., [K === J]) is defined in the [Metatheory]
-    library.  The order of arguments to each "open" function is the
-    same.  For example, [(open_tt_rec K U T)] can be read as
-    "substitute [U] for index [K] in [T]."
-
-    Note that we assume that [U] is locally closed (and similarly for
-    the other opening functions).  This assumption simplifies the
-    implementations of opening by letting us avoid shifting.  Since
-    bound variables are indices, there is no need to rename variables
-    to avoid capture.  Finally, we assume that these functions are
-    initially called with index zero and that zero is the only unbound
-    index in the term.  This eliminates the need to possibly subtract
-    one in the case of indices. *)
-
-Definition cv (T : typ) : cap :=
+Definition typ_cv (T : typ) : cap :=
   match T with
-  | typ_bvar n => {}      (* TODO is there a better way to do this? *)
-  | typ_fvar x => `cset_fvar` x
-  | typ_capt C _ => C
+  | typ_var v => var_cv v
+  | C # R => C
+  | ⊤ => {}
+  | ∀ (S') T => {}
+  | ∀ [R] T => {}
+  | □ T => {}
+  end.
+
+Definition open_vt (K : nat) (U : typ) (v : var) : typ :=
+  match v with
+  | var_b J => if K === J then U else J
+  | var_f X => X
   end.
 
 Fixpoint open_tt_rec (K : nat) (U : typ) (T : typ) {struct T} : typ :=
   match T with
-  | typ_bvar J => if K === J then U else typ_bvar J
-  | typ_fvar X => typ_fvar X
-  | typ_capt C P => typ_capt (open_cset K (cv U) C) (open_tpt_rec K U P)
-  end
-with open_tpt_rec (K : nat) (U : typ) (T : pretyp)  {struct T} : pretyp :=
-  match T with
-  | typ_top => typ_top
-  | typ_arrow T1 T2 => typ_arrow (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
-  | typ_all T1 T2 => typ_all (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
+  | C # R => C # open_tt_rec K U R
+  | typ_var v => open_vt K U v
+  | ⊤ => ⊤
+  | ∀ (T1) T2 => ∀ (open_tt_rec K U T1) (open_tt_rec (S K) U T2)
+  | ∀ [T1] T2 => ∀ [open_tt_rec K U T1] (open_tt_rec (S K) U T2)
+  | □ T => □ (open_tt_rec K U T)
   end.
 
-Fixpoint open_te_rec (K : nat) (U : typ) (e : exp) {struct e} : exp :=
-  match e with
+Fixpoint open_te_rec (K : nat) (U : typ) (Γ : exp) {struct Γ} : exp :=
+  match Γ with
   | exp_var v => exp_var v
-  | exp_abs V e1 => exp_abs (open_tt_rec K U V) (open_te_rec (S K) U e1)
-  | exp_app f x => exp_app f x
-  | exp_let e C => exp_let (open_te_rec K U e) (open_te_rec (S K) U C)
-  | exp_tabs V e1 => exp_tabs (open_tt_rec K U V)  (open_te_rec (S K) U e1)
-  | exp_tapp x V => exp_tapp x (open_tt_rec K U V)
+  | λ (V) e1 => λ (open_tt_rec K U V) (open_te_rec (S K) U e1)
+  | f @ x => exp_app f x
+  | let= e1 in e2 => let= (open_te_rec K U e1) in (open_te_rec (S K) U e2)
+  | Λ [V] e1 => Λ [open_tt_rec K U V] (open_te_rec (S K) U e1)
+  | x @ [V] => x @ [open_tt_rec K U V]
+  | box x => box x
+  | C ⟜ x => open_cset K (typ_cv U) C ⟜ x
   end.
 
 Fixpoint open_ct_rec (k : nat) (c : cap) (T : typ)  {struct T} : typ :=
   match T with
-  | typ_bvar i => i
-  | typ_fvar x => x
-  | typ_capt C P => typ_capt (open_cset k c C) (open_cpt_rec k c P)
-  end
-with open_cpt_rec (k : nat) (c : cap) (T : pretyp)  {struct T} : pretyp :=
-  match T with
-  | typ_top => typ_top
-  | typ_arrow T1 T2 => typ_arrow (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
-  | typ_all T1 T2 => typ_all (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
+  | typ_var v => v
+  | C # R => open_cset k c C # open_ct_rec k c R
+  | ⊤ => ⊤
+  | ∀ (T1) T2 => ∀ (open_ct_rec k c T1) (open_ct_rec (S k) c T2)
+  | ∀ [T1] T2 => ∀ [open_ct_rec k c T1] (open_ct_rec (S k) c T2)
+  | □ T => □ (open_ct_rec k c T)
   end.
 
 Definition open_vv (k : nat) (z : atom) (v : var) : var :=
@@ -137,118 +97,60 @@ Definition open_vv (k : nat) (z : atom) (v : var) : var :=
   | var_f x => x
   end.
 
-Fixpoint open_ve_rec (k : nat) (z : atom) (c : cap) (e : exp)  {struct e} : exp :=
-  match e with
+Fixpoint open_ve_rec (k : nat) (z : atom) (c : cap) (Γ : exp)  {struct Γ} : exp :=
+  match Γ with
   | exp_var v => open_vv k z v
-  | exp_abs t e1 => exp_abs (open_ct_rec k c t) (open_ve_rec (S k) z c e1)
-  | exp_app f x => exp_app (open_vv k z f) (open_vv k z x)
-  | exp_let e C => exp_let (open_ve_rec k z c e) (open_ve_rec (S k) z c C)
-  | exp_tabs t e1 => exp_tabs (open_ct_rec k c t) (open_ve_rec (S k) z c e1)
-  | exp_tapp x t => exp_tapp (open_vv k z x) (open_ct_rec k c t)
+  | λ (t) e1 => λ (open_ct_rec k c t) (open_ve_rec (S k) z c e1)
+  | f @ x => open_vv k z f @ open_vv k z x
+  | let= Γ in C => let= open_ve_rec k z c Γ in open_ve_rec (S k) z c C
+  | Λ [t] e1 => exp_tabs (open_ct_rec k c t) (open_ve_rec (S k) z c e1)
+  | x @ [t] => exp_tapp (open_vv k z x) (open_ct_rec k c t)
+  | box x => box open_vv k z x
+  | C ⟜ x => open_cset k (`cset_fvar` z) C ⟜ open_vv k z x
   end.
-
-
-(** Many common applications of opening replace index zero with an
-    expression or variable.  The following definitions provide
-    convenient shorthands for such uses.  Note that the order of
-    arguments is switched relative to the definitions above.  For
-    example, [(open_tt T X)] can be read as "substitute the variable
-    [X] for index [0] in [T]" and "open [T] with the variable [X]."
-    Recall that the coercions above let us write [X] in place of
-    [(typ_fvar X)], assuming that [X] is an [atom]. *)
 
 Definition open_tt T U := open_tt_rec 0 U T.
-Definition open_tpt T U := open_tpt_rec 0 U T.
-Definition open_te e U := open_te_rec 0 U e.
-Definition open_ve e x c := open_ve_rec 0 x c e.
+Definition open_te Γ U := open_te_rec 0 U Γ.
+Definition open_ve Γ x c := open_ve_rec 0 x c Γ.
 Definition open_ct T c := open_ct_rec 0 c T.
-Definition open_cpt T c := open_cpt_rec 0 c T.
 
-Definition free_for_cv_var (v : var) : cap :=
-  match v with
-  | var_f x => (`cset_fvar` x)
-  | var_b _ => {}
+Fixpoint exp_cv (Γ : exp) : cap :=
+  match Γ with
+  | exp_var v => var_cv v
+  | λ (t) e1 => exp_cv e1
+  | f @ x => var_cv f `u` var_cv x
+  | let= Γ in C => exp_cv Γ `u` exp_cv C
+  | Λ [t] e1 => exp_cv e1
+  | x @ [t] => var_cv x
+  | box x => {}
+  | C ⟜ x => cset_set (`cset_fvars` C) {}N (`cset_uvar` C) `u` var_cv x
   end.
-
-(** The definition of "fv" used in typing jdmgnts*)
-Fixpoint free_for_cv (e : exp) : cap :=
-  match e with
-  | exp_var v => free_for_cv_var v
-  | exp_abs t e1 => (free_for_cv e1)
-  | exp_app f x => (cset_union (free_for_cv_var f) (free_for_cv_var x))
-  | exp_let e C => (cset_union (free_for_cv e) (free_for_cv C))
-  | exp_tabs t e1 => (free_for_cv e1)
-  | exp_tapp x t => (free_for_cv_var x)
-  end.
-
-(* ********************************************************************** *)
-(** * #<a name="lc"></a># Local closure *)
-
-(** Recall that [typ] and [exp] define pre-terms; these datatypes
-    admit terms that contain unbound indices.  A term is locally
-    closed, or syntactically well-formed, when no indices appearing in
-    it are unbound.  The proposition [(type T)] holds when a type [T]
-    is locally closed, and [(expr e)] holds when an expression [e] is
-    locally closed.
-
-    The inductive definitions below formalize local closure such that
-    the resulting induction principles serve as structural induction
-    principles over (locally closed) types and (locally closed)
-    expressions.  In particular, unlike the situation with pre-terms,
-    there are no cases for indices.  Thus, these induction principles
-    correspond more closely to informal practice than the ones arising
-    from the definitions of pre-terms.
-
-    The interesting cases in the inductive definitions below are those
-    that involve binding constructs, e.g., [typ_all].  Intuitively, to
-    check if the pre-term [(typ_all T1 T2)] is locally closed we much
-    check that [T1] is locally closed, and that [T2] is locally closed
-    when opened with a variable.  However, there is a choice as to how
-    many variables to quantify over.  One possibility is to quantify
-    over only one variable ("existential" quantification), as in
-<<
-  type_all : forall X T1 T2,
-      type T1 ->
-      type (open_tt T2 X) ->
-      type (typ_all T1 T2)
->>  or we could quantify over as many variables as possible ("universal"
-    quantification), as in
-<<
-  type_all : forall T1 T2,
-      type T1 ->
-      (forall X : atom, type (open_tt T2 X)) ->
-      type (typ_all T1 T2)
->>  It is possible to show that the resulting relations are equivalent.
-    The former makes it easy to build derivations, while the latter
-    provides a strong induction principle.  McKinna and Pollack used
-    both forms of this relation in their work on formalizing Pure Type
-    Systems.
-
-    We take a different approach here and use "cofinite
-    quantification": we quantify over all but finitely many variables.
-    This approach provides a convenient middle ground: we can build
-    derivations reasonably easily and get reasonably strong induction
-    principles.  With some work, one can show that the definitions
-    below are equivalent to ones that use existential, and hence also
-    universal, quantification. *)
 
 Inductive type : typ -> Prop :=
-  | type_var : forall X,
-      type (typ_fvar X)
-  | type_capt : forall C P,
+  | type_pure : forall R,
+      pure_type R ->
+      type R
+  | type_capt : forall C R,
       capt C ->
-      pretype P ->
-      type (typ_capt C P)
-with pretype : pretyp -> Prop :=
-  | type_top : pretype typ_top
-  | type_arrow : forall L T1 T2,
-    type T1 ->
-    (forall X : atom, X `notin` L -> type (open_ct T2 (`cset_fvar` X))) ->
-    pretype (typ_arrow T1 T2)
-  | type_all : forall L T1 T2,
-    type T1 ->
-    (forall X : atom, X `notin` L -> type (open_tt T2 X)) ->
-    pretype (typ_all T1 T2).
+      pure_type R ->
+      type (C # R)
+with pure_type : typ -> Prop :=
+  | type_var : forall X : atom,
+      pure_type X
+  | type_top : pure_type typ_top
+  | type_arr : forall L S' T,
+      type S' ->
+      (forall X : atom, X `notin` L -> type (open_ct T (`cset_fvar` X))) ->
+      pure_type (∀ (S') T)
+  | type_all : forall L R T,
+      pure_type R ->
+      (forall X : atom, X `notin` L -> type (open_tt T X)) ->
+      pure_type (∀ [R] T)
+  | type_box : forall T,
+      type T ->
+      pure_type (□ T).
+
+Coercion type_pure : pure_type >-> type.
 
 Inductive expr : exp -> Prop :=
   | expr_var : forall (x : atom),
@@ -256,355 +158,223 @@ Inductive expr : exp -> Prop :=
   | expr_abs : forall L T e1,
       type T ->
       (forall x : atom, x `notin` L -> expr (open_ve e1 x (`cset_fvar` x))) ->
-      expr (exp_abs T e1)
+      expr (λ (T) e1)
   | expr_app : forall (f x : atom),
-      expr (exp_app f x)
-  | expr_let : forall L e k,
-      expr e ->
-      (forall x : atom, x `notin` L -> expr (open_ve k x (`cset_fvar` x))) ->
-      expr (exp_let e k)
-  | expr_tabs : forall L T e1,
-      type T ->
+      expr (f @ x)
+  | expr_let : forall L e1 e2,
+      expr e1 ->
+      (forall x : atom, x `notin` L -> expr (open_ve e2 x (`cset_fvar` x))) ->
+      expr (let= e1 in e2)
+  | expr_tabs : forall L R e1,
+      pure_type R ->
       (forall X : atom, X `notin` L -> expr (open_te e1 X)) ->
-      expr (exp_tabs T e1)
+      expr (Λ [R] e1)
   | expr_tapp : forall (x : atom) V,
       type V ->
-      expr (exp_tapp x V).
-
-(* ********************************************************************** *)
-(** * #<a name="env"></a># Environments *)
-
-(** In our presentation of System F with subtyping, we use a single
-    environment for both typing and subtyping assumptions.  We
-    formalize environments by representing them as association lists
-    (lists of pairs of keys and values) whose keys are atoms.
-
-    The [Metatheory] and [Environment] libraries provide functions,
-    predicates, tactics, notations and lemmas that simplify working
-    with environments.  The [Environment] library treats environments
-    as lists of type [list (atom * A)].
-
-    Since environments map [atom]s, the type [A] should encode whether
-    a particular binding is a typing or subtyping assumption.  Thus,
-    we instantiate [A] with the type [binding], defined below. *)
+      expr (x @ [V])
+  | expr_box : forall x : atom,
+      expr (box x)
+  | expr_unbox : forall C (x : atom),
+      capt C ->
+      expr (C ⟜ x).
 
 Inductive binding : Type :=
   | bind_sub : typ -> binding
   | bind_typ : typ -> binding.
 
-(** A binding [(X, bind_sub T)] records that a type variable [X] is a
-    subtype of [T], and a binding [(x, bind_typ U)] records that an
-    expression variable [x] has type [U].
-
-    We define an abbreviation [env] for the type of environments, and
-    an abbreviation [empty] for the empty environment.
-
-    Note: Each instance of [Notation] below defines an abbreviation
-    since the left-hand side consists of a single identifier that is
-    not in quotes.  These abbreviations are used for both parsing (the
-    left-hand side is equivalent to the right-hand side in all
-    contexts) and printing (the right-hand side is pretty-printed as
-    the left-hand side).  Since [nil] is normally a polymorphic
-    constructor whose type argument is implicit, we prefix the name
-    with "[@]" to signal to Coq that we are going to supply arguments
-    to [nil] explicitly. *)
-
 Notation env := (list (atom * binding)).
-Notation empty := (@nil (atom * binding)).
-
-(** We also define a notation that makes it convenient to write one
-    element lists.  This notation is useful because of our convention
-    for building environments; see the examples below. *)
+Notation "∅" := (@nil (atom * binding)).
 
 Notation "[ x ]" := (x :: nil).
 
-(** #<b>#Examples:#</b># We use a convention where environments are
-    never built using a cons operation [((x, a) :: E)] where [E] is
-    non-[nil].  This makes the shape of environments more uniform and
-    saves us from excessive fiddling with the shapes of environments.
-    For example, Coq's tactics sometimes distinguish between consing
-    on a new binding and prepending a one element list, even though
-    the two operations are convertible with each other.
-
-    Consider the following environments written in informal notation.
-<<
-  1. (empty environment)
-  2. x : T
-  3. x : T, Y <: S
-  4. E, x : T, F
->>  In the third example, we have an environment that binds an
-    expression variable [x] to [T] and a type variable [Y] to [S].
-    In Coq, we would write these environments as follows.
-<<
-  1. empty
-  2. [(x, bind_typ T)]
-  3. [(Y, bind_sub S)] ++ [(x, bind_typ T)]
-  4. F ++ [(x, bind_typ T)] ++ E
->> The symbol "[++]" denotes list concatenation and associates to the
-    right.  (That notation is defined in Coq's [List] library.)  Note
-    that in Coq, environments grow on the left, since that is where
-    the head of a list is. *)
-
-
-(* ********************************************************************** *)
-(** * #<a name="wf"></a># Well-formedness *)
-
-(** A type [T] is well-formed with respect to an environment [E],
-    denoted [(wf_typ E T)], when [T] is locally-closed and its free
-    variables are bound in [E].  We need this relation in order to
-    restrict the subtyping and typing relations, defined below, to
-    contain only well-formed types.  (This relation is missing in the
-    original statement of the POPLmark Challenge.)
-
-    Note: It is tempting to define the premise of [wf_typ_var] as [(X
-    `in` dom E)], since that makes the rule easier to apply (no need
-    to guess an instantiation for [U]).  Unfortunately, this is
-    incorrect.  We need to check that [X] is bound as a type-variable,
-    not an expression-variable; [(dom E)] does not distinguish between
-    the two kinds of bindings. *)
-
-(** For our current calculus, we disallow type variables from showing up in capture
-  sets -- only term variables are allowed. *)
-Inductive bound (x : atom) (T : typ) (E : env) : Prop :=
+Inductive bound (x : atom) (T : typ) (Γ : env) : Prop :=
   | bound_typ :
-    binds x (bind_typ T) E ->
-    bound x T E
+      binds x (bind_typ T) Γ ->
+      bound x T Γ
   | bound_sub :
-    binds x (bind_sub T) E ->
-    bound x T E.
+      binds x (bind_sub T) Γ ->
+      bound x T Γ.
 
-Definition allbound (E : env) (fvars : atoms) : Prop :=
-  forall x, x `in`A fvars -> exists T, bound x T E.
+Definition allbound (Γ : env) (fvars : atoms) : Prop :=
+  forall x,
+    x `in`A fvars ->
+    exists T, bound x T Γ.
 
-Inductive wf_cset : env -> atoms -> cap -> Prop :=
-  | wf_concrete_cset : forall E A fvars univ,
-    allbound E fvars ->
-    fvars `c`A A ->
-    wf_cset E A (cset_set fvars {}N univ).
+Reserved Notation "Γ '⊢ₛ' C 'wf'" (at level 40, C at next level, no associativity).
 
-Definition wf_cset_in (E : env) (C : cap) : Prop :=
-  wf_cset E (dom E) C.
+Inductive wf_cset : env -> cap -> Prop :=
+  | wf_concrete_cset : forall Γ fvars univ,
+    allbound Γ fvars ->
+    fvars `c`A dom Γ ->
+    wf_cset Γ (cset_set fvars {}N univ)
+where "Γ '⊢ₛ' C 'wf'" := (wf_cset Γ C).
 
-(* Wellformedness of types where locally bound variables are only
-   allowed in positive positions. *)
-Inductive wf_typ : env -> atoms -> atoms -> typ -> Prop :=
-  | wf_typ_var : forall U E Ap Am (X : atom),
-      binds X (bind_sub U) E ->
-      X `in`A Ap ->
-      wf_typ E Ap Am (typ_fvar X)
-  | wf_typ_capt : forall E Ap Am C P,
-      wf_cset E Ap C ->
-      wf_pretyp E Ap Am P ->
-      wf_typ E Ap Am (typ_capt C P)
-with wf_pretyp : env -> atoms -> atoms -> pretyp -> Prop :=
-  | wf_typ_top : forall E Ap Am,
-      wf_pretyp E Ap Am typ_top
-  | wf_typ_arrow : forall L E Ap Am T1 T2,
-      wf_typ E Am Ap T1 ->
-      (forall X : atom, X `notin` L ->
-                  wf_typ ([(X, bind_typ T1)] ++ E)
-                          (Ap `union` singleton X)
-                          Am
-                          (open_ct T2 (`cset_fvar` X))) ->
-      wf_pretyp E Ap Am (typ_arrow T1 T2)
-  | wf_typ_all : forall L E Ap Am T1 T2,
-      wf_typ E Am Ap T1 ->
-      (forall X : atom, X `notin` L ->
-                  wf_typ ([(X, bind_sub T1)] ++ E)
-                          (Ap `u`A {X}A)
-                          (Am `u`A {X}A) (open_tt T2 X)) ->
-      wf_pretyp E Ap Am (typ_all T1 T2).
+Reserved Notation "Γ '⊢' T 'wf'" (at level 40, T at next level, no associativity).
 
-Definition wf_typ_in (E : env) (T : typ) : Prop :=
-  wf_typ E (dom E) (dom E) T.
+Inductive wf_typ : env -> typ -> Prop :=
+  | wf_typ_var : forall Γ X T,
+      binds X (bind_sub T) Γ ->
+      Γ ⊢ X wf
+  | wf_typ_top : forall Γ,
+      Γ ⊢ ⊤ wf
+  | wf_typ_arr : forall Γ S T,
+      Γ ⊢ S wf ->
+      (forall x : atom, ([(x, bind_typ S)] ++ Γ) ⊢ T wf) ->
+      Γ ⊢ ∀ (S) T wf
+  | wf_typ_all : forall Γ R T,
+      Γ ⊢ R wf ->
+      pure_type R ->
+      (forall X : atom, ([(X, bind_sub R)] ++ Γ) ⊢ T wf) ->
+      Γ ⊢ ∀ [R] T wf
+  | wf_typ_box : forall Γ T,
+      Γ ⊢ T wf ->
+      Γ ⊢ □ T wf
+  | wf_typ_capt : forall Γ C R,
+      Γ ⊢ₛ C wf ->
+      Γ ⊢ R wf ->
+      pure_type R ->
+      Γ ⊢ C # R wf
+where "Γ '⊢' T 'wf'" := (wf_typ Γ T).
 
-Definition wf_pretyp_in (E : env) (U : pretyp) : Prop :=
-  wf_pretyp E (dom E) (dom E) U.
+Notation "* ∈ C" := (`* in` C) (at level 80, no associativity).
+Notation "x '∈' L" := (x `in` L) (at level 80, no associativity).
+Notation "x '∉' L" := (x `notin` L) (at level 80, no associativity).
 
-Hint Unfold wf_typ_in : core.
-Hint Unfold wf_pretyp_in : core.
-
-(** An environment E is well-formed, denoted [(wf_env E)], if each
-    atom is bound at most at once and if each binding is to a
-    well-formed type.  This is a stronger relation than the [ok]
-    relation defined in the [Environment] library.  We need this
-    relation in order to restrict the subtyping and typing relations,
-    defined below, to contain only well-formed environments.  (This
-    relation is missing in the original statement of the POPLmark
-    Challenge.)  *)
+Reserved Notation "Γ '⊢' 'wf'" (at level 40, no associativity).
+Reserved Notation "Γ '⊢ₛ' C1 '<:' C2" (at level 40, C1 at next level, C2 at next level, no associativity). 
+Reserved Notation "Γ '⊢' T1 '<:' T2" (at level 40, T1 at next level, T2 at next level, no associativity).
+Reserved Notation "Γ '⊢' e ':' T" (at level 40, e at next level, T at next level, no associativity).
+Reserved Notation "S '∷' Γ" (at level 40, Γ at next level, no associativity).
+Reserved Notation "Γ '⊢' E ':' S '⇒' T" (at level 40, E at next level, S at next level, T at next level, no associativity).
+Reserved Notation "Σ1 '-->' Σ2" (at level 40, Σ2 at next level, no associativity).
 
 Inductive wf_env : env -> Prop :=
   | wf_env_empty :
-      wf_env empty
-  | wf_env_sub : forall (E : env) (X : atom) (T : typ),
-      wf_env E ->
-      wf_typ_in E T ->
-      X `notin` dom E ->
-      wf_env ([(X, bind_sub T)] ++ E)
-  | wf_env_typ : forall (E : env) (x : atom) (T : typ),
-      wf_env E ->
-      wf_typ_in E T ->
-      x `notin` dom E ->
-      wf_env ([(x, bind_typ T)] ++ E).
-
-(* ********************************************************************** *)
-(** * #<a name="sub"></a># Subtyping *)
+      ∅ ⊢ wf
+  | wf_env_sub : forall (Γ : env) (X : atom) (T : typ),
+      Γ ⊢ wf ->
+      Γ ⊢ T wf ->
+      X ∉ dom Γ ->
+      ([(X, bind_sub T)] ++ Γ) ⊢ wf
+  | wf_env_typ : forall (Γ : env) (x : atom) (T : typ),
+      Γ ⊢ wf ->
+      Γ ⊢ T wf ->
+      x ∉ dom Γ ->
+      ([(x, bind_typ T)] ++ Γ) ⊢ wf
+where "Γ '⊢' 'wf'" := (wf_env Γ).
 
 Inductive subcapt : env -> cap -> cap -> Prop :=
-  | subcapt_universal : forall E C xs,
-      wf_cset_in E (cset_set xs {}N true) ->
-      wf_cset_in E C ->
-      subcapt E C (cset_set xs {}N true)
-  | subcapt_in : forall E x xs b,
-      wf_cset_in E (`cset_fvar` x) ->
-      wf_cset_in E (cset_set xs {}N b) ->
-      x `in` xs ->
-      subcapt E (`cset_fvar` x) (cset_set xs {}N b)
-  | subcapt_in_univ : forall E D,
-      wf_cset_in E D ->
-      `* in` D ->
-      subcapt E {*} D
-  | subcapt_var : forall E x T C,
-      binds x (bind_typ T) E ->
-      subcapt E (cv T) C ->
-      subcapt E (`cset_fvar` x) C
-  | subcapt_tvar : forall E x T C,
-      binds x (bind_sub T) E ->
-      subcapt E (cv T) C ->
-      subcapt E (`cset_fvar` x) C
-  | subcapt_set : forall E xs b D,
-      wf_cset_in E D ->
-      AtomSet.F.For_all (fun x => subcapt E (`cset_fvar` x) D) xs ->
+  | subcapt_universal : forall Γ C xs,
+      Γ ⊢ₛ cset_set xs {}N true wf ->
+      Γ ⊢ₛ C wf ->
+      Γ ⊢ₛ C <: cset_set xs {}N true
+  | subcapt_in : forall Γ x xs b,
+      Γ ⊢ₛ `cset_fvar` x wf ->
+      Γ ⊢ₛ cset_set xs {}N b wf ->
+      x ∈ xs ->
+      Γ ⊢ₛ `cset_fvar` x <: cset_set xs {}N b
+  | subcapt_in_univ : forall Γ D,
+      Γ ⊢ₛ D wf ->
+      * ∈ D ->
+      Γ ⊢ₛ {*} <: D
+  | subcapt_var : forall Γ x T C,
+      binds x (bind_typ T) Γ ->
+      Γ ⊢ₛ typ_cv T <: C ->
+      Γ ⊢ₛ `cset_fvar` x <: C
+  | subcapt_tvar : forall Γ x T C,
+      binds x (bind_sub T) Γ ->
+      Γ ⊢ₛ typ_cv T <: C ->
+      Γ ⊢ₛ `cset_fvar` x <: C
+  | subcapt_set : forall Γ xs b D,
+      Γ ⊢ₛ D wf ->
+      AtomSet.F.For_all (fun x => Γ ⊢ₛ `cset_fvar` x <: D) xs ->
       implb b (`* mem` D) = true ->
-      subcapt E (cset_set xs {}N b) D.
-
-(** The definition of subtyping is straightforward.  It uses the
-    [binds] relation from the [Environment] library (in the
-    [sub_trans_tvar] case) and cofinite quantification (in the
-    [sub_all] case). *)
+      Γ ⊢ₛ cset_set xs {}N b <: D
+where "Γ '⊢ₛ' C1 <: C2" := (subcapt Γ C1 C2).
 
 Inductive sub : env -> typ -> typ -> Prop :=
-
-  (* Instead of having rules for refl and trans, the original Fsub calculus special cases
-     those rules to type variables. Refl and Trans are then defined externally in sub_reflexivity
-     and sub_transitivity. *)
-  | sub_refl_tvar : forall E (X : atom),
-      wf_env E ->
-      wf_typ_in E X ->
-      sub E X X
-
-  | sub_trans_tvar : forall U E T X,
-      binds X (bind_sub U) E ->
-      sub E U T ->
-      sub E X T
-
-  | sub_capt : forall E C1 C2 P1 P2,
-      subcapt E C1 C2 ->
-      sub_pre E P1 P2 ->
-      sub E (typ_capt C1 P1) (typ_capt C2 P2)
-
-with sub_pre : env -> pretyp -> pretyp -> Prop :=
-  (*
-      cv(S, E) = {}
-      -------------
-      E ⊢ S <: ⊤
-  *)
-  | sub_top : forall E S,
-      wf_env E ->
-      wf_pretyp_in E S ->
-      sub_pre E S typ_top
-
-  (*
-      E ⊢ T₁ <: S₁    E, x: T₁ ⊢ S₂ <: T₂
-      ------------------------------------
-          E ⊢ ∀(x: S₁)S₂ <: ∀(x: T₁)T₂
-
-      New: Here we open S2 and T2 with x
-  *)
-  | sub_arrow : forall L E S1 S2 T1 T2,
-      sub E T1 S1 ->
-      wf_typ_in E T1 ->
-      wf_typ_in E S1 ->
-      (forall x : atom, x `notin` L ->
-          wf_typ ([(x, bind_typ T1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T2 (`cset_fvar` x))) ->
-      (forall x : atom, x `notin` L ->
-          wf_typ ([(x, bind_typ S1)] ++ E) (dom E `union` singleton x) (dom E) (open_ct S2 (`cset_fvar` x))) ->
-      (forall x : atom, x `notin` L ->
-          sub ([(x, bind_typ T1)] ++ E) (open_ct S2 (`cset_fvar` x)) (open_ct T2 (`cset_fvar` x))) ->
-      sub_pre E (typ_arrow S1 S2) (typ_arrow T1 T2)
-
-  (*
-      E ⊢ T₁ <: S₁    E, X<:T₁ ⊢ S₂ <: T₂
-      ------------------------------------
-        E ⊢ ∀[X<:S₁]S₂ <: ∀[X<:T₁]T₂
-  *)
-  | sub_all : forall L E S1 S2 T1 T2,
-      sub E T1 S1 ->
-      wf_typ_in E T1 ->
-      wf_typ_in E S1 ->
-      (forall X : atom, X `notin` L ->
-          wf_typ ([(X, bind_sub T1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt T2 X)) ->
-      (forall X : atom, X `notin` L ->
-          wf_typ ([(X, bind_sub S1)] ++ E) (dom E `u`A {X}A) (dom E `u`A {X}A) (open_tt S2 X)) ->
-      (forall X : atom, X `notin` L ->
-          sub ([(X, bind_sub T1)] ++ E) (open_tt S2 X) (open_tt T2 X)) ->
-      sub_pre E (typ_all S1 S2) (typ_all T1 T2).
-
-
-(* ********************************************************************** *)
-(** * #<a name="typing_doc"></a># Typing *)
+  | sub_refl_tvar : forall Γ (X : atom),
+      Γ ⊢ wf ->
+      Γ ⊢ X wf ->
+      Γ ⊢ X <: X
+  | sub_trans_tvar : forall U Γ T X,
+      binds X (bind_sub U) Γ ->
+      Γ ⊢ U <: T ->
+      Γ ⊢ X <: T
+  | sub_capt : forall Γ C1 C2 R1 R2,
+      Γ ⊢ₛ C1 <: C2 ->
+      Γ ⊢ R1 <: R2 ->
+      Γ ⊢ (C1 # R1) <: (C2 # R2)
+  | sub_top : forall Γ T,
+      Γ ⊢ wf ->
+      Γ ⊢ T wf ->
+      Γ ⊢ T <: ⊤
+  | sub_arr : forall L Γ S1 S2 T1 T2,
+      Γ ⊢ S2 <: S1 ->
+      (forall x : atom, x ∉ L -> ([(x, bind_typ S1)] ++ Γ) ⊢ open_ct T1 (`cset_fvar` x) <: open_ct T2 (`cset_fvar` x)) ->
+      Γ ⊢ (∀ (S1) T1) <: (∀ (S2) T2)
+  | sub_all : forall L Γ R1 R2 T1 T2,
+      Γ ⊢ R2 <: R1 ->
+      (forall X : atom, X ∉ L -> ([(X, bind_sub R1)] ++ Γ) ⊢ open_tt T1 X <: open_tt T2 X) ->
+      Γ ⊢ (∀ [R1] T1) <: (∀ [R2] T2)
+  | sub_box : forall Γ T1 T2,
+      Γ ⊢ T1 <: T2 ->
+      Γ ⊢ (□ T1) <: (□ T2)
+where "Γ '⊢' T1 '<:' T2" := (sub Γ T1 T2).
 
 Inductive typing : env -> exp -> typ -> Prop :=
-  | typing_var_tvar : forall E (x X : atom),
-      wf_env E ->
-      binds x (bind_typ X) E ->
-      typing E x (typ_fvar X)
-  | typing_var : forall E x C P,
-      wf_env E ->
-      binds x (bind_typ (typ_capt C P)) E ->
-      typing E x (typ_capt (`cset_fvar` x) P)
-  | typing_abs : forall L E V e1 T1,
-      wf_typ_in E V ->
-      (forall x : atom, x `notin` L ->
-          wf_typ ([(x, bind_typ V)] ++ E) (dom E `union` singleton x) (dom E) (open_ct T1 (`cset_fvar` x))) ->
-      (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ V)] ++ E) (open_ve e1 x (`cset_fvar` x)) (open_ct T1 (`cset_fvar` x))) ->
-      typing E (exp_abs V e1) (typ_capt (free_for_cv e1) (typ_arrow V T1))
-  | typing_app : forall T1 E (f x : atom) T2 Cf,
-      typing E f (typ_capt Cf (typ_arrow T1 T2)) ->
-      typing E x T1 ->
-      typing E (exp_app f x) (open_ct T2 (`cset_fvar` x))
-  | typing_let : forall L T1 T2 E e k,
-      typing E e T1 ->
-      (forall x : atom, x `notin` L ->
-        typing ([(x, bind_typ T1)] ++ E) (open_ve k x (`cset_fvar` x)) T2) ->
-      typing E (exp_let e k) T2
-  | typing_tabs : forall L E V e1 T1,
-      wf_typ_in E V ->
-      (forall x : atom, x `notin` L ->
-        wf_typ ([(x, bind_sub V)] ++ E) (dom E) (dom E) (open_tt T1 x)) ->
-      (forall X : atom, X `notin` L ->
-        typing ([(X, bind_sub V)] ++ E) (open_te e1 X) (open_tt T1 X)) ->
-      typing E (exp_tabs V e1) (typ_capt (free_for_cv e1) (typ_all V T1))
-  | typing_tapp : forall T1 E (x : atom) T T2 C,
-      typing E x (typ_capt C (typ_all T1 T2)) ->
-      sub E T T1 ->
-      typing E (exp_tapp x T) (open_tt T2 T)
-  | typing_sub : forall S E e T,
-      typing E e S ->
-      sub E S T ->
-      typing E e T.
-
-(* ********************************************************************** *)
-(** * #<a name="values"></a># Values *)
+  | typing_var_tvar : forall Γ (x X : atom),
+      Γ ⊢ wf ->
+      binds x (bind_typ X) Γ ->
+      Γ ⊢ x : (`cset_fvar` x # X)
+  | typing_var : forall Γ x C R,
+      Γ ⊢ wf ->
+      binds x (bind_typ (C # R)) Γ ->
+      Γ ⊢ x : (`cset_fvar` x # R)
+  | typing_abs : forall L Γ V e1 T1,
+      Γ ⊢ V wf ->
+      (forall x : atom, x ∉ L ->
+        ([(x, bind_typ V)] ++ Γ) ⊢ open_ve e1 x (`cset_fvar` x) : open_ct T1 (`cset_fvar` x)) ->
+      Γ ⊢ (λ (V) e1) : (exp_cv e1 # ∀ (V) T1)
+  | typing_app : forall T1 Γ (f x : atom) T2 C,
+      Γ ⊢ f : (C # (∀ (T1) T2)) ->
+      Γ ⊢ x : T1 ->
+      Γ ⊢ (f @ x) : open_ct T2 (`cset_fvar` x)
+  | typing_let : forall L T1 T2 Γ e k,
+      Γ ⊢ e : T1 ->
+      (forall x : atom, x ∉ L ->
+        ([(x, bind_typ T1)] ++ Γ) ⊢ open_ve k x (`cset_fvar` x) : T2) ->
+      Γ ⊢ (let= e in k) : T2
+  | typing_tabs : forall L Γ V e1 T1,
+      Γ ⊢ V wf ->
+      (forall X : atom, X ∉ L ->
+        ([(X, bind_sub V)] ++ Γ) ⊢ open_te e1 X : open_tt T1 X) ->
+      Γ ⊢ (Λ [V] e1) : (exp_cv e1 # ∀ [V] T1)
+  | typing_tapp : forall T1 Γ (x : atom) T T2 C,
+      Γ ⊢ x : (C # ∀ [T1] T2) ->
+      Γ ⊢ T <: T1 ->
+      Γ ⊢ (x @ [T]) : open_tt T2 T
+  | typing_box : forall Γ (x : atom) C R,
+      Γ ⊢ x : (C # R) ->
+      `cset_fvars` C `subset` dom Γ ->
+      Γ ⊢ (box x) : (□ (C # R))
+  | typing_unbox : forall Γ (x : atom) C R,
+      Γ ⊢ x : (□ (C # R)) ->
+      `cset_fvars` C `subset` dom Γ ->
+      Γ ⊢ (C ⟜ x) : (C # R)
+  | typing_sub : forall S Γ e T,
+      Γ ⊢ e : S ->
+      Γ ⊢ S <: T ->
+      Γ ⊢ e : T
+where "Γ '⊢' e ':' T" := (typing Γ e T).
 
 Inductive value : exp -> Prop :=
   | value_abs : forall T e1,
-      expr (exp_abs T e1) ->
-      value (exp_abs T e1)
+      expr (λ (T) e1) ->
+      value (λ (T) e1)
   | value_tabs : forall T e1,
-      expr (exp_tabs T e1) ->
-      value (exp_tabs T e1).
+      expr (Λ [T] e1) ->
+      value (Λ [T] e1).
 
 Inductive answer : exp -> Prop :=
   | answer_val : forall v,
@@ -613,9 +383,6 @@ Inductive answer : exp -> Prop :=
   | answer_var : forall (x : atom),
       answer x.
 
-(* ********************************************************************** *)
-(** * #<a name="reduction"></a># Reduction *)
-
 Inductive store_frame : Type :=
   | store v : value v -> store_frame.
 
@@ -623,18 +390,18 @@ Definition store_ctx : Type := list (atom * store_frame).
 Definition stores (S : store_ctx) (x : atom) (v : exp) (v_value : value v) : Prop :=
     binds x (store v v_value) S.
 
-Inductive scope (e : exp) : Type :=
-  | mk_scope L : (forall x, x `notin` L -> expr (open_ve e x (`cset_fvar` x))) -> scope e.
+Inductive scope (Γ : exp) : Type :=
+  | mk_scope L : (forall x, x `notin` L -> expr (open_ve Γ x (`cset_fvar` x))) -> scope Γ.
 
 Inductive eval_frame : Type :=
-  | cont e : scope e -> eval_frame.
+  | cont Γ : scope Γ -> eval_frame.
 
 Definition eval_ctx : Type := (list eval_frame).
 
 Inductive state : Type :=
   | mk_state : store_ctx -> eval_ctx -> exp -> state.
 
-Notation "⟨ S | E | e ⟩" := (mk_state S E e) (at level 1).
+Notation "⟨ S | E | Γ ⟩" := (mk_state S E Γ) (at level 1).
 
 Inductive state_final : state -> Prop :=
   | final_state : forall S a,
@@ -642,74 +409,68 @@ Inductive state_final : state -> Prop :=
       state_final ⟨ S | nil | a ⟩.
 
 Inductive store_typing : store_ctx -> env -> Prop :=
-  | typing_store_nil : store_typing nil nil
-  | typing_store_cons : forall x T v v_value S E,
-      store_typing S E ->
-      typing E v T ->
-      x `notin` dom E ->
-      store_typing ([(x, store v v_value)] ++ S) ([(x, bind_typ T)] ++ E).
+  | typing_store_nil : nil ∷ nil
+  | typing_store_cons : forall x T v v_value S Γ,
+      S ∷ Γ ->
+      Γ ⊢ v : T ->
+      x ∉ dom Γ ->
+      ([(x, store v v_value)] ++ S) ∷ ([(x, bind_typ T)] ++ Γ)
+where "S '∷' Γ" := (store_typing S Γ).
 
-Inductive eval_typing (E : env) : eval_ctx -> typ -> typ -> Prop :=
+Inductive eval_typing (Γ : env) : eval_ctx -> typ -> typ -> Prop :=
   | typing_eval_nil : forall T U,
-      wf_env E ->
-      sub E T U ->
-      eval_typing E nil T U
-  | typing_eval_cons : forall L k (k_scope : scope k) K T U V,
-      (forall x, x `notin` L ->
-        typing ([(x, bind_typ T)] ++ E) (open_ve k x (`cset_fvar` x)) U) ->
-      eval_typing E K U V ->
-      eval_typing E (cont k k_scope :: K) T V.
+      Γ ⊢ wf ->
+      Γ ⊢ T <: U ->
+      Γ ⊢ nil : T ⇒ U
+  | typing_eval_cons : forall L k (k_scope : scope k) E T U V,
+      (forall x, x ∉ L ->
+        ([(x, bind_typ T)] ++ Γ) ⊢ open_ve k x (`cset_fvar` x) : U) ->
+      Γ ⊢ E : U ⇒ V ->
+      Γ ⊢ (cont k k_scope :: E) : T ⇒ V
+where "Γ '⊢' E ':' T '⇒' U" := (eval_typing Γ E T U).
 
 Inductive state_typing : state -> typ -> Prop :=
-  | typing_state : forall S K e E T U,
-      store_typing S E ->
-      eval_typing E K T U ->
-      typing E e T ->
-      state_typing ⟨ S | K | e ⟩ U.
+  | typing_state : forall S Γ E e T U,
+      S ∷ Γ ->
+      Γ ⊢ E : T ⇒ U ->
+      Γ ⊢ e : T ->
+      state_typing ⟨ S | E | e ⟩ U.
 
 Inductive red : state -> state -> Prop :=
   | red_lift : forall x v (v_value : value v) k (k_scope : scope k) S K,
-      x `~in`A dom S ->
-      red ⟨ S | cont k k_scope :: K | v ⟩
-          ⟨ [(x, store v v_value)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
+      x ∉ dom S ->
+          ⟨ S | cont k k_scope :: K | v ⟩
+      --> ⟨ [(x, store v v_value)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
   | red_let_var : forall (x : atom) v (v_value : value v) k (k_scope : scope k) S K,
       stores S x v v_value ->
-      red ⟨ S | cont k k_scope :: K | x ⟩
-          ⟨ S | K | open_ve k x (`cset_fvar` x) ⟩
+          ⟨ S | cont k k_scope :: K | x ⟩
+      --> ⟨ S | K | open_ve k x (`cset_fvar` x) ⟩
   | red_let_val : forall x v (v_value : value v) k (k_scope : scope k) S K,
-      x `~in`A dom S ->
-      red ⟨ S | K | exp_let v k ⟩
-          ⟨ [(x, store v v_value)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
+      x ∉ dom S ->
+          ⟨ S | K | let= v in k ⟩
+      --> ⟨ [(x, store v v_value)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
   | red_let_exp : forall e k (k_scope : scope k) S K,
-      red ⟨ S | K | exp_let e k ⟩
-          ⟨ S | cont k k_scope :: K | e ⟩
+          ⟨ S | K | let= e in k ⟩
+      --> ⟨ S | cont k k_scope :: K | e ⟩
   | red_app : forall f x U e v (v_value : value v) (abs_value : value (exp_abs U e)) S K,
-      stores S f (exp_abs U e) abs_value ->
+      stores S f (λ (U) e) abs_value ->
       stores S x v v_value ->
-      red ⟨ S | K | exp_app f x ⟩
-          ⟨ S | K | open_ve e x (`cset_fvar` x) ⟩
-  | red_tapp : forall x T U e (tabs_value : value (exp_tabs U e)) S K,
-      stores S x (exp_tabs U e) tabs_value ->
-      type T ->
-      red ⟨ S | K | exp_tapp x T ⟩
-          ⟨ S | K | open_te e T ⟩.
+          ⟨ S | K | f @ x ⟩
+      --> ⟨ S | K | open_ve e x (`cset_fvar` x) ⟩
+  | red_tapp : forall x R U e (tabs_value : value (Λ [U] e)) S K,
+      stores S x (Λ [U] e) tabs_value ->
+      pure_type R ->
+          ⟨ S | K | x @ [R] ⟩
+      --> ⟨ S | K | open_te e R ⟩
+  | red_open : forall C x y (box_value : value (box y)) S K,
+      stores S x (box y) box_value ->
+          ⟨ S | K | C ⟜ x ⟩
+      --> ⟨ S | K | y ⟩
+where "Σ1 --> Σ2" := (red Σ1 Σ2).
 
-(* ********************************************************************** *)
-(** * #<a name="auto"></a># Automation *)
-
-(** We declare most constructors as [Hint]s to be used by the [auto]
-    and [eauto] tactics.  We exclude constructors from the subtyping
-    and typing relations that use cofinite quantification.  It is
-    unlikely that [eauto] will find an instantiation for the finite
-    set [L], and in those cases, [eauto] can take some time to fail.
-    (A priori, this is not obvious.  In practice, one adds as hints
-    all constructors and then later removes some constructors when
-    they cause proof search to take too long.) *)
-
-Hint Constructors type pretype expr bound wf_cset wf_typ wf_pretyp wf_env value sub subcapt typing : core.
-Hint Resolve sub_top sub_refl_tvar sub_arrow : core.
-Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub : core.
-Hint Unfold wf_typ_in wf_pretyp_in wf_cset_in allbound : core.
+Hint Constructors type pure_type expr bound wf_cset wf_typ wf_env value sub subcapt typing : core.
+Hint Resolve sub_top sub_refl_tvar sub_arr sub_all sub_box : core.
+Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub typing_box : core.
 
 Local Ltac cset_unfold_union0 :=
   match goal with
@@ -719,12 +480,11 @@ Local Ltac cset_unfold_union0 :=
       rewrite cset_concrete_union
     | C =>
       let HA := match goal with
-                | H : wf_cset_in _ C |- _ => H
-                | H : wf_cset _ _ C |- _ => H
+                | H : wf_cset _ C |- _ => H
                 | _ =>
                   let H := fresh "WF" in
                   (* NOTE: avoid asserting (wf_cset _ _ C), it takes long to solve. *)
-                  assert (wf_cset_in _ C) as HA by eauto; H
+                  assert (wf_cset _ C) as HA by eauto; H
                 end
       in
       (* Invert, subst and clean up unnecessary hypothesis. *)
@@ -740,7 +500,7 @@ Ltac cset_unfold_union := repeat cset_unfold_union0.
 Ltac _csetsimpl_hook ::= cset_unfold_union.
 
 Local Lemma __test_cset_concrete_unfold : forall C xs us,
-  wf_cset_in nil C ->
-  wf_cset_in nil (C `u` (cset_set xs {}N us)) ->
-  exists xs' us', wf_cset_in nil (cset_set (xs' `u`A xs) {}N (us' || us)).
+  wf_cset nil C ->
+  wf_cset nil (C `u` (cset_set xs {}N us)) ->
+  exists xs' us', wf_cset nil (cset_set (xs' `u`A xs) {}N (us' || us)).
 Proof. intros * H; csetsimpl; eauto. Qed.
