@@ -3,6 +3,10 @@ Require Export Metatheory.
 Require Export CaptureSets.
 Require Import Coq.Program.Wf.
 
+Notation "* ∈ C" := (`* in` C) (at level 80, no associativity).
+Notation "x '∈' L" := (x `in` L) (at level 80, no associativity).
+Notation "x '∉' L" := (x `notin` L) (at level 80, no associativity).
+
 Inductive typ : Type :=
   | typ_var : var -> typ
   | typ_top : typ
@@ -141,11 +145,11 @@ with pure_type : typ -> Prop :=
   | type_top : pure_type typ_top
   | type_arr : forall L S' T,
       type S' ->
-      (forall X : atom, X `notin` L -> type (open_ct T (`cset_fvar` X))) ->
+      (forall X : atom, X ∉ L -> type (open_ct T (`cset_fvar` X))) ->
       pure_type (∀ (S') T)
   | type_all : forall L R T,
       pure_type R ->
-      (forall X : atom, X `notin` L -> type (open_tt T X)) ->
+      (forall X : atom, X ∉ L -> type (open_tt T X)) ->
       pure_type (∀ [R] T)
   | type_box : forall T,
       type T ->
@@ -158,17 +162,17 @@ Inductive expr : exp -> Prop :=
       expr x
   | expr_abs : forall L T e1,
       type T ->
-      (forall x : atom, x `notin` L -> expr (open_ve e1 x (`cset_fvar` x))) ->
+      (forall x : atom, x ∉ L -> expr (open_ve e1 x (`cset_fvar` x))) ->
       expr (λ (T) e1)
   | expr_app : forall (f x : atom),
       expr (f @ x)
   | expr_let : forall L e1 e2,
       expr e1 ->
-      (forall x : atom, x `notin` L -> expr (open_ve e2 x (`cset_fvar` x))) ->
+      (forall x : atom, x ∉ L -> expr (open_ve e2 x (`cset_fvar` x))) ->
       expr (let= e1 in e2)
   | expr_tabs : forall L R e1,
       pure_type R ->
-      (forall X : atom, X `notin` L -> expr (open_te e1 X)) ->
+      (forall X : atom, X ∉ L -> expr (open_te e1 X)) ->
       expr (Λ [R] e1)
   | expr_tapp : forall (x : atom) V,
       type V ->
@@ -220,12 +224,12 @@ Inductive wf_typ : env -> typ -> Prop :=
       Γ ⊢ ⊤ wf
   | wf_typ_arr : forall L Γ S T,
       Γ ⊢ S wf ->
-      (forall x : atom, x `notin` L -> ([(x, bind_typ S)] ++ Γ) ⊢ (open_ct T (`cset_fvar` x)) wf) ->
+      (forall x : atom, x ∉ L -> ([(x, bind_typ S)] ++ Γ) ⊢ (open_ct T (`cset_fvar` x)) wf) ->
       Γ ⊢ ∀ (S) T wf
   | wf_typ_all : forall L Γ R T,
       Γ ⊢ R wf ->
       pure_type R ->
-      (forall X : atom, X `notin` L -> ([(X, bind_sub R)] ++ Γ) ⊢ (open_tt T X) wf) ->
+      (forall X : atom, X ∉ L -> ([(X, bind_sub R)] ++ Γ) ⊢ (open_tt T X) wf) ->
       Γ ⊢ ∀ [R] T wf
   | wf_typ_box : forall Γ T,
       Γ ⊢ T wf ->
@@ -236,10 +240,6 @@ Inductive wf_typ : env -> typ -> Prop :=
       pure_type R ->
       Γ ⊢ C # R wf
 where "Γ '⊢' T 'wf'" := (wf_typ Γ T).
-
-Notation "* ∈ C" := (`* in` C) (at level 80, no associativity).
-Notation "x '∈' L" := (x `in` L) (at level 80, no associativity).
-Notation "x '∉' L" := (x `notin` L) (at level 80, no associativity).
 
 Reserved Notation "Γ '⊢' 'wf'" (at level 40, no associativity).
 Reserved Notation "Γ '⊢ₛ' C1 '<:' C2" (at level 40, C1 at next level, C2 at next level, no associativity). 
@@ -392,7 +392,7 @@ Definition stores (S : store_ctx) (x : atom) (v : exp) (v_value : value v) : Pro
     binds x (store v v_value) S.
 
 Inductive scope (Γ : exp) : Type :=
-  | mk_scope L : (forall x, x `notin` L -> expr (open_ve Γ x (`cset_fvar` x))) -> scope Γ.
+  | mk_scope L : (forall x, x ∉ L -> expr (open_ve Γ x (`cset_fvar` x))) -> scope Γ.
 
 Inductive eval_frame : Type :=
   | cont Γ : scope Γ -> eval_frame.
