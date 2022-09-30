@@ -126,6 +126,7 @@ Fixpoint exp_cv (Γ : exp) : cap :=
   | C ⟜ x => cset_set (`cset_fvars` C) {}N (`cset_uvar` C) `u` var_cv x
   end.
 
+(* REVIEW: should we rather define pure types as capture types with an empty capture set? *)
 Inductive type : typ -> Prop :=
   | type_pure : forall R,
       pure_type R ->
@@ -217,14 +218,14 @@ Inductive wf_typ : env -> typ -> Prop :=
       Γ ⊢ X wf
   | wf_typ_top : forall Γ,
       Γ ⊢ ⊤ wf
-  | wf_typ_arr : forall Γ S T,
+  | wf_typ_arr : forall L Γ S T,
       Γ ⊢ S wf ->
-      (forall x : atom, ([(x, bind_typ S)] ++ Γ) ⊢ T wf) ->
+      (forall x : atom, x `notin` L -> ([(x, bind_typ S)] ++ Γ) ⊢ (open_ct T (`cset_fvar` x)) wf) ->
       Γ ⊢ ∀ (S) T wf
-  | wf_typ_all : forall Γ R T,
+  | wf_typ_all : forall L Γ R T,
       Γ ⊢ R wf ->
       pure_type R ->
-      (forall X : atom, ([(X, bind_sub R)] ++ Γ) ⊢ T wf) ->
+      (forall X : atom, X `notin` L -> ([(X, bind_sub R)] ++ Γ) ⊢ (open_tt T X) wf) ->
       Γ ⊢ ∀ [R] T wf
   | wf_typ_box : forall Γ T,
       Γ ⊢ T wf ->
