@@ -1168,20 +1168,22 @@ Proof with eauto using var_cv_capt.
     apply NatSetNotin.notin_union...
 Qed.
 
-Lemma cset_fvars_var_var_is_fv_vv : forall v,
+Lemma cset_fvars_var_cv_is_fv_vv : forall v,
   `cset_fvars` (var_cv v) = fv_vv v.
 Proof with eauto*.
-  intros.
-  destruct v; simpl...
+  destruct v...
 Qed.
 
-(* REVIEW: not true anymore? exp_cv does not include variables behind a box while fv_ve does *)
-Lemma cset_fvars_exp_cv_is_fv_ve : forall e,
-  `cset_fvars` (exp_cv e) = fv_ve e.
-Proof with eauto using cset_fvars_var_var_is_fv_vv.
+Lemma cset_fvars_exp_cv_subset_fv_ve : forall e,
+  `cset_fvars` (exp_cv e) `subset` fv_ve e.
+Proof with eauto using cset_fvars_var_cv_is_fv_vv.
   intros.
-  induction e; simpl; f_equal...
-Abort.
+  induction e; simpl; f_equal; try fsetdec.
+  - destruct v; simpl; fsetdec.
+  - destruct v; destruct v0; fsetdec.
+  - destruct v; simpl; fsetdec.
+  - apply atomset_subset_union; destruct v; fsetdec.
+Qed.
 
 Lemma open_ve_rec_expr : forall u c e k,
   expr e ->
@@ -1731,20 +1733,22 @@ Proof with auto using subst_cset_useless_repetition.
   destruct v...
 Qed.
 
+Lemma notin_open_vv_fv_vv : forall k y z v, 
+  y `notin` (fv_vv v `union` singleton z) ->
+  y `notin` fv_vv (open_vv k z v).
+Proof with eauto*.
+  intros.
+  destruct v; simpl in *...
+  destruct (k === n); subst; simpl...
+Qed.
+
 Lemma notin_open_ve_rec_fv_ve : forall k y z C e,
   y `notin` (fv_ve e `union` singleton z) ->
   y `notin` fv_ve (open_ve_rec k z C e).
-Proof with eauto*.
+Proof with eauto using notin_open_vv_fv_vv.
   intros * y_notin_e_z.
   generalize dependent k.
-  induction e; intros k; simpl in *;
-  repeat match goal with
-  | v : var |- _ =>
-      destruct v; simpl in *; eauto*;
-      destruct (k === n); eauto*
-  | |- y `notin` (_ `union` _) => apply notin_union
-  | IH : y `notin` _ -> forall k, _ |- _ => apply IH; eauto*
-  end.
+  induction e; intros k; simpl in *...
   unfold open_cset.
   destruct c; simpl.
   destruct_set_mem k t0...

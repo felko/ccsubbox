@@ -130,7 +130,6 @@ Fixpoint exp_cv (Γ : exp) : cap :=
   | C ⟜ x => cset_set (`cset_fvars` C) {}N (`cset_uvar` C) `u` var_cv x
   end.
 
-(* REVIEW: should we rather define pure types as capture types with an empty capture set? *)
 Inductive type : typ -> Prop :=
   | type_pure : forall R,
       pure_type R ->
@@ -154,8 +153,6 @@ with pure_type : typ -> Prop :=
   | type_box : forall T,
       type T ->
       pure_type (□ T).
-
-Coercion type_pure : pure_type >-> type.
 
 Inductive expr : exp -> Prop :=
   | expr_var : forall (x : atom),
@@ -301,7 +298,7 @@ Inductive sub : env -> typ -> typ -> Prop :=
   | sub_trans_tvar : forall U Γ T X,
       binds X (bind_sub U) Γ ->
       Γ ⊢ U <: T ->
-      Γ ⊢ X <: T
+      Γ ⊢ ({} # X) <: T
   | sub_capt : forall Γ C1 C2 R1 R2,
       Γ ⊢ₛ C1 <: C2 ->
       Γ ⊢ R1 <: R2 ->
@@ -324,10 +321,6 @@ Inductive sub : env -> typ -> typ -> Prop :=
 where "Γ '⊢' T1 '<:' T2" := (sub Γ T1 T2).
 
 Inductive typing : env -> exp -> typ -> Prop :=
-  | typing_var_tvar : forall Γ (x X : atom),
-      Γ ⊢ wf ->
-      binds x (bind_typ X) Γ ->
-      Γ ⊢ x : (`cset_fvar` x # X)
   | typing_var : forall Γ x C R,
       Γ ⊢ wf ->
       binds x (bind_typ (C # R)) Γ ->
@@ -361,7 +354,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
       Γ ⊢ (box x) : (□ (C # R))
   | typing_unbox : forall Γ (x : atom) C R,
       Γ ⊢ x : (□ (C # R)) ->
-      `cset_fvars` C `subset` dom Γ ->
+      Γ ⊢ₛ C wf ->
       Γ ⊢ (C ⟜ x) : (C # R)
   | typing_sub : forall S Γ e T,
       Γ ⊢ e : S ->
@@ -471,7 +464,7 @@ where "Σ1 --> Σ2" := (red Σ1 Σ2).
 
 Hint Constructors type pure_type expr bound wf_cset wf_typ wf_env value sub subcapt typing : core.
 Hint Resolve sub_top sub_refl_tvar sub_arr sub_all sub_box : core.
-Hint Resolve typing_var_tvar typing_var typing_app typing_tapp typing_sub typing_box : core.
+Hint Resolve typing_var typing_app typing_tapp typing_box typing_unbox typing_sub : core.
 
 Local Ltac cset_unfold_union0 :=
   match goal with
