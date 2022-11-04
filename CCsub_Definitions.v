@@ -6,6 +6,7 @@ Require Import Coq.Program.Wf.
 Notation "* ∈ C" := (`* in` C) (at level 80, no associativity).
 Notation "x '∈' L" := (x `in` L) (at level 80, no associativity).
 Notation "x '∉' L" := (x `notin` L) (at level 80, no associativity).
+Notation "xs '⊆' ys" := (xs `subset` ys) (at level 80, no associativity).
 
 Inductive typ : Type :=
   | typ_var : var -> typ
