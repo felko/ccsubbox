@@ -6,26 +6,26 @@ Ltac destruct_union_mem H :=
   | _ `in`A _ => rewrite AtomSetFacts.union_iff in H; destruct H as [H|H]
   end.
 
-Hint Extern 1 (wf_typ_in ?E ?T) =>
+Hint Extern 1 (wf_typ ?Γ ?T) =>
 match goal with
-| H : wf_typ_in ?E (typ_capt _ ?P) |- _ =>
+| H : wf_typ ?Γ (typ_capt _ ?P) |- _ =>
   inversion H; subst; (match goal with
-                       | H : wf_pretyp_in ?E (typ_arrow ?T _) |- _ =>
+                       | H : wf_typ ?Γ (typ_arr ?T _) |- _ =>
                          inversion H; subst; assumption
                        end)
 end : core.
 
-Hint Extern 1 (wf_cset ?E (dom ?E) ?C) =>
+Hint Extern 1 (wf_cset ?Γ ?C) =>
 match goal with
-| H : typing ?E _ (typ_capt ?C _) |- _ =>
+| H : typing ?Γ _ (typ_capt ?C _) |- _ =>
   let P := fresh "P" in
   pose proof (proj2 (proj2 (typing_regular _ _ _ H))) as P; inversion P; assumption
 end : core.
 
 
-Hint Extern 1 (wf_env ?E) =>
+Hint Extern 1 (wf_env ?Γ) =>
 match goal with
-| H : sub_pre ?E _ _ |- _ => apply (proj1 (sub_pre_regular _ _ _ H))
+| H : sub ?Γ _ _ |- _ => apply (proj1 (sub_regular _ _ _ H))
 end : core.
 
 Ltac rewrite_set_facts_in H :=
