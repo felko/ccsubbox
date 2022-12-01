@@ -220,10 +220,10 @@ Inductive wf_typ : env -> typ -> Prop :=
       Γ ⊢ X wf
   | wf_typ_top : forall Γ,
       Γ ⊢ ⊤ wf
-  | wf_typ_arr : forall L Γ S T,
-      Γ ⊢ S wf ->
-      (forall x : atom, x ∉ L -> ([(x, bind_typ S)] ++ Γ) ⊢ (open_ct T (`cset_fvar` x)) wf) ->
-      Γ ⊢ ∀ (S) T wf
+  | wf_typ_arr : forall L Γ C R T,
+      Γ ⊢ (C # R) wf ->
+      (forall x : atom, x ∉ L -> ([(x, bind_typ (C # R))] ++ Γ) ⊢ (open_ct T (`cset_fvar` x)) wf) ->
+      Γ ⊢ ∀ (C # R) T wf
   | wf_typ_all : forall L Γ R T,
       Γ ⊢ R wf ->
       pure_type R ->
@@ -253,13 +253,14 @@ Inductive wf_env : env -> Prop :=
   | wf_env_sub : forall (Γ : env) (X : atom) (T : typ),
       Γ ⊢ wf ->
       Γ ⊢ T wf ->
+      pure_type T ->
       X ∉ dom Γ ->
       ([(X, bind_sub T)] ++ Γ) ⊢ wf
-  | wf_env_typ : forall (Γ : env) (x : atom) (T : typ),
+  | wf_env_typ : forall (Γ : env) (x : atom) (C : cap) (R : typ),
       Γ ⊢ wf ->
-      Γ ⊢ T wf ->
+      Γ ⊢ (C # R) wf ->
       x ∉ dom Γ ->
-      ([(x, bind_typ T)] ++ Γ) ⊢ wf
+      ([(x, bind_typ (C # R))] ++ Γ) ⊢ wf
 where "Γ '⊢' 'wf'" := (wf_env Γ).
 
 Inductive subcapt : env -> cap -> cap -> Prop :=
@@ -298,22 +299,30 @@ Inductive sub : env -> typ -> typ -> Prop :=
       Γ ⊢ X <: X
   | sub_trans_tvar : forall U Γ T X,
       binds X (bind_sub U) Γ ->
-      Γ ⊢ U <: T ->
+      Γ ⊢ ({} # U) <: T ->
       Γ ⊢ ({} # X) <: T
   | sub_capt : forall Γ C1 C2 R1 R2,
       Γ ⊢ₛ C1 <: C2 ->
       Γ ⊢ R1 <: R2 ->
+      pure_type R1 ->
+      pure_type R2 ->
       Γ ⊢ (C1 # R1) <: (C2 # R2)
   | sub_top : forall Γ T,
       Γ ⊢ wf ->
       Γ ⊢ T wf ->
+      pure_type T ->
       Γ ⊢ T <: ⊤
-  | sub_arr : forall L Γ S1 S2 T1 T2,
-      Γ ⊢ S2 <: S1 ->
-      (forall x : atom, x ∉ L -> ([(x, bind_typ S1)] ++ Γ) ⊢ open_ct T1 (`cset_fvar` x) <: open_ct T2 (`cset_fvar` x)) ->
-      Γ ⊢ (∀ (S1) T1) <: (∀ (S2) T2)
+  | sub_arr : forall L Γ C1 R1 C2 R2 T1 T2,
+      Γ ⊢ R2 <: R1 ->
+      pure_type R1 ->
+      pure_type R2 ->
+      Γ ⊢ₛ C2 <: C1 ->
+      (forall x : atom, x ∉ L -> ([(x, bind_typ (C1 # R1))] ++ Γ) ⊢ open_ct T1 (`cset_fvar` x) <: open_ct T2 (`cset_fvar` x)) ->
+      Γ ⊢ (∀ (C1 # R1) T1) <: (∀ (C2 # R2) T2)
   | sub_all : forall L Γ R1 R2 T1 T2,
       Γ ⊢ R2 <: R1 ->
+      pure_type R1 ->
+      pure_type R2 ->
       (forall X : atom, X ∉ L -> ([(X, bind_sub R1)] ++ Γ) ⊢ open_tt T1 X <: open_tt T2 X) ->
       Γ ⊢ (∀ [R1] T1) <: (∀ [R2] T2)
   | sub_box : forall Γ T1 T2,
@@ -326,11 +335,11 @@ Inductive typing : env -> exp -> typ -> Prop :=
       Γ ⊢ wf ->
       binds x (bind_typ (C # R)) Γ ->
       Γ ⊢ x : (`cset_fvar` x # R)
-  | typing_abs : forall L Γ V e1 T1,
-      Γ ⊢ V wf ->
+  | typing_abs : forall L Γ C R e1 T1,
+      Γ ⊢ (C # R) wf ->
       (forall x : atom, x ∉ L ->
-        ([(x, bind_typ V)] ++ Γ) ⊢ open_ve e1 x (`cset_fvar` x) : open_ct T1 (`cset_fvar` x)) ->
-      Γ ⊢ (λ (V) e1) : (exp_cv e1 # ∀ (V) T1)
+        ([(x, bind_typ (C # R))] ++ Γ) ⊢ open_ve e1 x (`cset_fvar` x) : open_ct T1 (`cset_fvar` x)) ->
+      Γ ⊢ (λ (C # R) e1) : (exp_cv e1 # ∀ (C # R) T1)
   | typing_app : forall T1 Γ (f x : atom) T2 C,
       Γ ⊢ f : (C # (∀ (T1) T2)) ->
       Γ ⊢ x : T1 ->
@@ -342,6 +351,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
       Γ ⊢ (let= e in k) : T2
   | typing_tabs : forall L Γ V e1 T1,
       Γ ⊢ V wf ->
+      pure_type V ->
       (forall X : atom, X ∉ L ->
         ([(X, bind_sub V)] ++ Γ) ⊢ open_te e1 X : open_tt T1 X) ->
       Γ ⊢ (Λ [V] e1) : (exp_cv e1 # ∀ [V] T1)

@@ -92,7 +92,7 @@ Qed.
 Lemma subst_contratrivia2 : forall u x C e,
   x `notin` (`cset_fvars` (free_for_cv e)) ->
   (free_for_cv e) = (free_for_cv (subst_ve x u C e)).
-Proof with eauto using cv_free_never_universal, subst_contratrivia2_var.
+Proof with eauto using cv_free__universal, subst_contratrivia2_var.
   intros * Hin.
   induction e; simpl in *...
   - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...

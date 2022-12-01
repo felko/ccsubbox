@@ -203,6 +203,7 @@ Proof with eauto.
     apply notin_fv_tt_open_ct in H1.
     apply notin_fv_ct_open_ct in H2.
     specialize (IHWfT ltac:(notin_solve)).
+    simpl in IHWfT.
     clear - H1 H2 IHWfT.
     fsetdec.
   - Case "∀ [R] T".
@@ -298,11 +299,15 @@ Lemma map_subst_tb_id : forall G Z P,
   G = map (subst_tb Z P) G.
 Proof with auto.
   intros G Z P H.
-  induction H; simpl; intros Fr; simpl_env...
-  rewrite <- IHwf_env...
-    rewrite <- subst_tt_fresh... eapply notin_fv_wf_typ; eauto.
-  rewrite <- IHwf_env...
-    rewrite <- subst_tt_fresh... eapply notin_fv_wf_typ; eauto.
+  induction H; intros Fr; simpl_env...
+  - rewrite <- IHwf_env...
+    simpl.
+    rewrite <- subst_tt_fresh...
+    eapply notin_fv_wf_typ; eauto.
+  - rewrite <- IHwf_env...
+    cbn [subst_tb].
+    rewrite <- subst_tt_fresh...
+    eapply notin_fv_wf_typ; eauto.
 Qed.
 
 (* ********************************************************************** *)
@@ -396,6 +401,9 @@ Proof with eauto*.
       * reflexivity.
       * destruct (k === n); simpl...
 Qed.
+
+TODO: Γ ⊢ e : T -> * ∉ cv e
+adjust subcapt_univ_through_subst_cb
 
 Lemma exp_cv_never_universal : forall e,
   expr e ->
@@ -588,14 +596,11 @@ Proof with eauto*.
   intros.
   induction H; intro.
   - inversion H; inversion H0.
-  - inversion H2; inversion H3; destruct (X == X0); inversion H5; subst...
+  - inversion H3; inversion H4; destruct (X == X0); inversion H6; subst...
     inversion H0; subst.
-    assert (X0 ∈ dom Γ) by (apply binds_In in H7; eauto* ).
-    apply (H1 H4).
+    assert (X0 ∈ dom Γ) by (apply binds_In in H8; eauto* ).
+    apply (H2 H5).
   - inversion H2; inversion H3; destruct (X == x); inversion H5; subst...
-    inversion H0; subst.
-    assert (x ∈ dom Γ) by (apply binds_In in H7; eauto* ).
-    apply (H1 H4).
 Qed.
 
 (* REVIEW: hard to prove *)
@@ -609,23 +614,22 @@ Proof with eauto*.
   generalize dependent x.
   induction H; intros.
   - inversion H0; inversion H.
-  - inversion H2; subst.
-    + inversion H3; subst.
+  - inversion H3; subst.
+    + inversion H4; subst.
       destruct (x == X); subst.
-      * inversion H5; subst.
-      * destruct (IHwf_env x X0 (bound_typ x X0 Γ H5)) as [S ?].
+      * inversion H6; subst.
+      * destruct (IHwf_env x X0 (bound_typ x X0 Γ H6)) as [S ?].
         exists S.
         assert (X0 <> X).
-        { pose proof (binds_In _ _ _ _ H4).
+        { pose proof (binds_In _ _ _ _ H5).
           fsetdec.
         }
         apply binds_tail; simpl...
-    + inversion H3; subst.
+    + inversion H4; subst.
       destruct (x == X); subst.
-      * inversion H3; inversion H5; subst.
-        destruct (X == X0); subst.
-        -- admit.
-        -- admit.
+      * inversion H6; inversion H7; subst.
+        destruct (X == X0); subst...
+        admit.
       * admit.
 Admitted.
 
@@ -648,11 +652,11 @@ Proof with eauto*.
   intros.
   induction H.
   - inversion H0; inversion H.
-  - inversion H0; inversion H3; destruct (x == X); subst;
+  - inversion H0; inversion H4; destruct (x == X); subst;
     rewrite_env (∅ ++ [(X, bind_sub T0)] ++ Γ);
     apply wf_typ_weakening; simpl_env...
   - inversion H0; inversion H3; destruct (x == x0); subst;
-    rewrite_env (∅ ++ [(x0, bind_typ T0)] ++ Γ);
+    rewrite_env (∅ ++ [(x0, bind_typ (C # R))] ++ Γ);
     apply wf_typ_weakening; simpl_env...
 Qed.
 
@@ -777,7 +781,7 @@ Proof with eauto using wf_cset_over_union; eauto*.
     assert (y `notin` L) by fsetdec.
     assert (~ y A`in` (exp_cv e1)).
     { pose proof (exp_cv_subset_fv_ve e1) as P... }
-    forwards SpH0: H1 y...
+    forwards SpH0: H2 y...
     pose proof (exp_cv_open_te_rec e1 0 y)...
     pose proof (exp_cv_closed e1).
     destruct (exp_cv e1) eqn:Hfcv1; subst...
@@ -794,7 +798,7 @@ Proof with eauto using wf_cset_over_union; eauto*.
     destruct (x == y). {
       csetdec.
     }
-    forwards (T & B): H6 x. {
+    forwards (T & B): H7 x. {
       fsetdec.
     }
     simpl_env in *.
@@ -1001,40 +1005,89 @@ Proof with simpl_env; eauto*.
   - Case "sub_capt".
     destruct (subcapt_regular _ _ _ H).
     repeat split...
-    + constructor...
-      admit.
-    + constructor...
-      admit.
   - Case "sub_arr".
     repeat split...
     + pick fresh x and apply wf_typ_arr...
-      apply H1.
-      fsetdec.
+      * apply wf_typ_capt...
+        applys subcapt_regular H2.
+      * apply H4.
+        fsetdec.
     + pick fresh x and apply wf_typ_arr...
-      rewrite_env (∅ ++ [(x, bind_typ S2)] ++ Γ).
-      eapply wf_typ_ignores_typ_bindings.
-      apply H1.
-      fsetdec.
+      * apply wf_typ_capt...
+        applys subcapt_regular H2.
+      * rewrite_env (∅ ++ [(x, bind_typ (C2 # R2))] ++ Γ).
+        eapply wf_typ_ignores_typ_bindings.
+        apply H4.
+        fsetdec.
   - Case "sub_all".
     repeat split...
     + pick fresh X and apply wf_typ_all...
-      * admit.
-      * apply H1.
-        fsetdec.
+      apply H3.
+      fsetdec.
     + pick fresh X and apply wf_typ_all...
-      * admit.
-      * rewrite_env (∅ ++ [(X, bind_sub R2)] ++ Γ).
-        eapply wf_typ_ignores_sub_bindings.
-        apply H1.
-        fsetdec.
-Admitted.
+      rewrite_env (∅ ++ [(X, bind_sub R2)] ++ Γ).
+      eapply wf_typ_ignores_sub_bindings.
+      apply H3.
+      fsetdec.
+Qed.
 
-Lemma typing_var_implies_binds : forall E (x : atom) T,
-  typing E x T ->
-  exists S, binds x (bind_typ S) E.
+Lemma typing_var_implies_binds : forall Γ (x : atom) T,
+  Γ ⊢ x : T ->
+  exists S, binds x (bind_typ S) Γ.
 Proof with eauto*.
   intros * Typ.
   dependent induction Typ...
+Qed.
+
+Lemma sub_pure : forall Γ S T,
+  Γ ⊢ S <: T ->
+  pure_type S <-> pure_type T.
+Proof with eauto*.
+  intros * Sub.
+  split.
+  - intro Hpure; induction Hpure; inversion Sub; subst...
+    + Case "type_arr".
+      pick fresh x and apply type_arr.
+      * apply type_capt...
+        eapply capt_from_wf_cset.
+        rename select (_ ⊢ₛ _ <: _) into SubCapt.
+        applys subcapt_regular SubCapt.
+      * specialize (H9 x ltac:(fsetdec)).
+        eapply type_from_wf_typ.
+        applys sub_regular H9.
+    + Case "type_all".
+      pick fresh X and apply type_all...
+      specialize (H7 X ltac:(fsetdec)).
+      eapply type_from_wf_typ.
+      rename select (_ ⊢ _ <: _) into Sub'.
+      applys sub_regular Sub'.
+    + Case "type_box".
+      apply type_box.
+      eapply type_from_wf_typ.
+      rename select (_ ⊢ _ <: _) into Sub'.
+      applys sub_regular Sub'.
+  - induction Sub; intro Hpure; inversion Hpure; subst...
+    1-5: pose proof (IHSub Hpure) as PU; inversion PU.
+    + Case "sub_arr".
+      pick fresh x and apply type_arr.
+      * apply type_capt...
+        eapply capt_from_wf_cset.
+        rename select (_ ⊢ₛ _ <: _) into SubCapt.
+        applys subcapt_regular SubCapt.
+      * specialize (H2 x ltac:(fsetdec)).
+        eapply type_from_wf_typ.
+        applys sub_regular H2.
+    + Case "type_all".
+      pick fresh X and apply type_all...
+      specialize (H1 X ltac:(fsetdec)).
+      eapply type_from_wf_typ.
+      rename select (_ ⊢ _ <: _) into Sub'.
+      applys sub_regular Sub'.
+    + Case "type_box".
+      apply type_box.
+      eapply type_from_wf_typ.
+      rename select (_ ⊢ _ <: _) into Sub'.
+      applys sub_regular Sub'.
 Qed.
 
 Lemma typing_regular : forall Γ e T,
@@ -1066,20 +1119,20 @@ Proof with simpl_env; auto*.
         apply Henv.
       * destruct (H1 x)...
     + constructor...
-      eapply typing_cv with (e := (exp_abs V e1)) (T := exp_cv e1 # ∀ (V) T1)...
+      eapply typing_cv with (e := (λ (C # R) e1)) (T := exp_cv e1 # ∀ (C # R) T1)...
       * apply typing_abs with (L := L)...
       * eapply wf_typ_arr; trivial.
         apply H1.
       * apply type_from_wf_typ in H.
         pick fresh x and apply type_arr...
-        eapply type_from_wf_typ with (Γ := [(x, bind_typ V)] ++ Γ).
+        eapply type_from_wf_typ with (Γ := [(x, bind_typ (C # R))] ++ Γ).
         apply H1.
         fsetdec.
   - Case "typing_app".
     destruct IHtyping1 as [_ [_ Hwf]].
     inversion Hwf; inversion H5; subst...
     repeat split...
-    apply wf_typ_open_capt with (S := T1)...
+    apply wf_typ_open_capt with (S := C1 # R0)...
     destruct (typing_var_implies_binds _ _ _ H0) as [T1' xBinds].
     constructor.
     + intros z zIn; assert (z = x) by (clear - zIn; fsetdec); subst; clear zIn.
@@ -1100,34 +1153,34 @@ Proof with simpl_env; auto*.
       apply H2.
   - Case "typing_tabs".
     pick fresh Y; assert (Y `notin` L) by fsetdec...
-    unshelve epose proof (H1 Y _) as H4...
+    unshelve epose proof (H2 Y _) as H4...
     inversion H4 as [Henv [Hexpr Hwf]]...
     repeat split...
     + inversion Henv...
-    + pick fresh X and apply expr_tabs.
-      * admit.
-      * destruct (H1 X)...
+    + pick fresh X and apply expr_tabs...
+      destruct (H2 X)...
     + constructor...
       eapply typing_cv with (e := (exp_tabs V e1)) (T := exp_cv e1 # ∀ [V] T1)...
       * apply typing_tabs with (L := L)...
       * eapply wf_typ_all; trivial.
-        -- admit.
-        -- apply H1.
+        apply H2.
       * apply type_from_wf_typ in H.
         pick fresh X and apply type_all...
-        -- admit.
-        -- eapply type_from_wf_typ with (Γ := [(X, bind_sub V)] ++ Γ).
-           apply H1.
-           fsetdec.
+        eapply type_from_wf_typ with (Γ := [(X, bind_sub V)] ++ Γ).
+        apply H2.
+        fsetdec.
   - Case "typing_tapp".
     destruct IHtyping as [HwfΓ [Hexpr Hwf]]...
     forwards (R1 & R2 & R3): sub_regular H0...
     repeat split...
     + constructor...
       eapply type_from_wf_typ with (Γ := Γ); apply R2.
-    + apply wf_typ_open_type with (R := T1)...
-      * inversion Hwf; subst...
-      * admit.
+    + apply wf_typ_open_type with (R := T1); inversion Hwf; subst...
+      rename select (pure_type _) into Hpure.
+      inversion Hpure; subst.
+      apply <- sub_pure.
+      * apply H4.
+      * apply H0. 
   - Case "typing_box".
     repeat split...
   - Case "typing_unbox".
@@ -1140,7 +1193,7 @@ Proof with simpl_env; auto*.
     destruct IHtyping as [HwfΓ [Hex Hwf]].
     repeat split...
     applys sub_regular H0.
-Admitted.
+Qed.
 
 Lemma value_regular : forall e,
   value e ->
@@ -1198,18 +1251,23 @@ Proof with eauto using wf_cset_over_union.
         destruct (x == y)...
         easy.
   - pick fresh y.
-    forwards HA: H1 y.
+    forwards HA: H2 y.
     + notin_solve.
     + forwards (? & ? & ?): exp_cv_open_te_rec e1 0 y.
-      clear Fr;fsetdec.
+      clear Fr; fsetdec.
     + destruct HA as (T & HA)...
       inversion HA.
       assert (x <> y) by notin_solve.
       destruct (x == y)...
       easy.
   - exfalso; clear - xIn; fsetdec.
-  - inversion Typ; subst.
-    destruct (AtomSet.F.union_1 xIn)...
+  - destruct (AtomSet.F.union_1 xIn)...
+    inversion Typ; subst.
+    inversion H2; subst.
+    + inversion H2.
+      eapply typing_var_implies_binds.
+    dependent induction H2.
+    eapply IHTyp...
     admit. 
 Admitted.
 

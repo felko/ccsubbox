@@ -490,7 +490,7 @@ Proof with eauto*.
   - binds_cases H; simpl in *; notin_simpl...
   - apply wf_typ_top.
   - pick fresh y and apply wf_typ_arr...
-    rewrite_env (([(y, bind_typ S)] ++ Ctx) ++ Γ).
+    rewrite_env (([(y, bind_typ (C # R))] ++ Ctx) ++ Γ).
     assert (x <> y) by (clear - Fr; fsetdec).
     apply H0.
     + fsetdec.
@@ -522,7 +522,7 @@ Proof with eauto*.
   generalize dependent Δ.
   induction Hwf; intros Δ EQ Hok; subst...
   - pick fresh x and apply wf_typ_arr...
-    rewrite_env (([(x, bind_typ S)] ++ Δ) ++ Θ ++ Γ).
+    rewrite_env (([(x, bind_typ (C # R))] ++ Δ) ++ Θ ++ Γ).
     apply H0...
     apply ok_cons...
   - pick fresh X and apply wf_typ_all...
@@ -555,7 +555,7 @@ Proof with simpl_env; eauto using wf_cset_ignores_sub_bindings.
     binds_cases H...
   - Case "∀ (S) T".
     pick fresh y and apply wf_typ_arr...
-    rewrite_env (([(y, bind_typ S)] ++ Δ) ++ [(X, bind_sub U)] ++ Γ).
+    rewrite_env (([(y, bind_typ (C # R))] ++ Δ) ++ [(X, bind_sub U)] ++ Γ).
     apply H1...
   - Case "∀ [R] T".
     pick fresh Y and apply wf_typ_all...
@@ -575,7 +575,7 @@ Proof with simpl_env; eauto using wf_cset_ignores_typ_bindings.
     binds_cases H...
   - Case "∀ (S) T".
     pick fresh y and apply wf_typ_arr...
-    rewrite_env (([(y, bind_typ S)] ++ Δ) ++ [(x, bind_typ U)] ++ Γ).
+    rewrite_env (([(y, bind_typ (C # R))] ++ Δ) ++ [(x, bind_typ U)] ++ Γ).
     apply H1...
   - Case "∀ [R] T".
     pick fresh Y and apply wf_typ_all...
@@ -606,7 +606,8 @@ Lemma wf_typ_from_binds_sub : forall x U Γ,
 Proof with eauto using wf_typ_weaken_head.
   intros x U E Hwf Hbinds.
   induction Hwf; binds_cases Hbinds...
-  inversion H3; subst...
+  rename select (_ = _) into EQ.
+  inversion EQ; subst...
 Qed.
 
 Lemma wf_typ_from_wf_env_typ : forall x T Γ,
@@ -741,16 +742,16 @@ Proof with simpl_env; eauto*.
       destruct (H y ltac:(fsetdec)) as [U Hbound].
       destruct_bound Hbound.
       * binds_cases Hbound...
-        exists (subst_tt Z (∀ (S) T) U).
+        exists (subst_tt Z (∀ (C # R) T) U).
         apply bound_typ.
         apply binds_head.
-        replace (bind_typ (subst_tt Z (∀ (S) T) U)) with (subst_tb Z (∀ (S) T) (bind_typ U)) by reflexivity.
+        replace (bind_typ (subst_tt Z (∀ (C # R) T) U)) with (subst_tb Z (∀ (C # R) T) (bind_typ U)) by reflexivity.
         apply binds_map, H4.
       * binds_cases Hbound...
-        exists (subst_tt Z (∀ (S) T) U).
+        exists (subst_tt Z (∀ (C # R) T) U).
         apply bound_sub.
         apply binds_head.
-        replace (bind_sub (subst_tt Z (∀ (S) T) U)) with (subst_tb Z (∀ (S) T) (bind_sub U)) by reflexivity.
+        replace (bind_sub (subst_tt Z (∀ (C # R                                   ) T) U)) with (subst_tb Z (∀ (C # R) T) (bind_sub U)) by reflexivity.
         apply binds_map, H4.
     + SCase "∀ [R] T".
       repeat rewrite dom_concat in H0; simpl in H0.
@@ -924,7 +925,7 @@ Proof with simpl_env;
     + unfold open_ct in *...
       rewrite <- subst_ct_open_ct_rec.
       2-4: eauto.
-      rewrite_env (map (subst_cb Z C) ([(y, bind_typ S)] ++ Δ) ++ Γ).
+      rewrite_env (map (subst_cb Z C) ([(y, bind_typ (C0 # R))] ++ Δ) ++ Γ).
       apply H0...
   - Case "∀ [R] T".
     pick fresh Y and apply wf_typ_all.
@@ -1004,7 +1005,7 @@ Proof with simpl_env; eauto.
   pick fresh x.
   rewrite (subst_ct_intro x)...
   rewrite_env (map (subst_cb x C) nil ++ Γ).
-  eapply wf_typ_subst_cb with (Q := S)...
+  eapply wf_typ_subst_cb with (Q := C0 # R)...
 Qed.
 
 Lemma wf_typ_subst_tb : forall Γ Δ Q Z P T,
@@ -1034,7 +1035,7 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
     pick fresh y and apply wf_typ_arr...
     unfold open_ct in *...
     rewrite <- subst_tt_open_ct_rec...
-    rewrite_env (map (subst_tb Z P) ([(y, bind_typ S)] ++ Δ) ++ Γ).
+    rewrite_env (map (subst_tb Z P) ([(y, bind_typ (C # R))] ++ Δ) ++ Γ).
     eapply H0...
   - Case "∀ [R] T".
     pick fresh Y and apply wf_typ_all...
@@ -1075,10 +1076,12 @@ Proof with eauto 6 using wf_typ_subst_tb.
   - apply wf_env_sub.
     + eapply IHΔ...
     + eapply wf_typ_subst_tb...
+    + apply subst_tt_pure_type... 
     + rewrite dom_concat, dom_map...
   - apply wf_env_typ.
-    + eapply IHΔ...
-    + eapply wf_typ_subst_tb...
+    + eapply IHΔ... 
+    + replace (subst_cset Z (typ_cv P) C # subst_tt Z P R) with (subst_tt Z P (C # R)) by reflexivity.
+      eapply wf_typ_subst_tb...
     + rewrite dom_concat, dom_map...
 Qed.
 
@@ -1094,10 +1097,12 @@ Proof with eauto using wf_typ_subst_cb.
   - apply wf_env_sub.
     + eapply IHΔ...
     + eapply wf_typ_subst_cb...
+    + apply subst_ct_pure_type...
     + rewrite dom_concat, dom_map...
   - apply wf_env_typ.
     + eapply IHΔ...
-    + eapply wf_typ_subst_cb...
+    + replace (subst_cset x C C0 # subst_ct x C R) with (subst_ct x C (C0 # R)) by reflexivity.
+      eapply wf_typ_subst_cb...
     + rewrite dom_concat, dom_map...
 Qed.
 
@@ -1114,7 +1119,7 @@ Proof with eauto.
     pick fresh y and apply wf_typ_arr...
     rewrite subst_ct_open_ct_var; [| notin_solve | eapply capt_from_wf_cset]...
     rewrite_nil_concat.
-    apply wf_typ_ignores_typ_bindings with (V := S); simpl.
+    apply wf_typ_ignores_typ_bindings with (V := C0 # R); simpl.
     apply H0.
     + fsetdec.
     + apply wf_env_typ...
@@ -1171,9 +1176,11 @@ Proof with eauto using wf_cset_strengthen.
         -- apply wf_typ_strengthen in H; [ apply H | ].
            clear - NotIn NotIn'.
            fsetdec.
+        -- assumption. 
         -- repeat rewrite dom_concat.
-           repeat rewrite dom_concat in H0; simpl in H0.
-           clear - H0; fsetdec.
+           rename select (y ∉ _) into yNotIn.
+           repeat rewrite dom_concat in yNotIn; simpl in yNotIn.
+           clear - yNotIn; fsetdec.
       * inversion EQ; subst.
   - induction Δ; simpl_env in *.
     + inversion EQ; subst...
@@ -1189,12 +1196,14 @@ Proof with eauto using wf_cset_strengthen.
            clear - NotIn NotIn'.
            fsetdec.
         -- repeat rewrite dom_concat.
-           repeat rewrite dom_concat in H0; simpl in H0.
-           clear - H0; fsetdec.
+           rename select (y ∉ _) into yNotIn.
+           repeat rewrite dom_concat in yNotIn; simpl in yNotIn.
+           clear - yNotIn; fsetdec.
 Qed.
 
 Lemma wf_env_narrowing : forall Γ Δ V U X,
   (Δ ++ [(X, bind_sub V)] ++ Γ) ⊢ wf ->
+  pure_type U ->
   Γ ⊢ U wf ->
   (Δ ++ [(X, bind_sub U)] ++ Γ) ⊢ wf.
 Proof with eauto using wf_typ_ignores_sub_bindings, wf_typ_ignores_typ_bindings.
@@ -1202,10 +1211,10 @@ Proof with eauto using wf_typ_ignores_sub_bindings, wf_typ_ignores_typ_bindings.
     inversion WfEnv; subst; simpl_env in *...
 Qed.
 
-Lemma wf_env_narrowing_typ : forall Γ Δ V U X,
+Lemma wf_env_narrowing_typ : forall Γ Δ V C R X,
   (Δ ++ [(X, bind_typ V)] ++ Γ) ⊢ wf ->
-  Γ ⊢ U wf ->
-  (Δ ++ [(X, bind_typ U)] ++ Γ) ⊢ wf.
+  Γ ⊢ (C # R) wf ->
+  (Δ ++ [(X, bind_typ (C # R))] ++ Γ) ⊢ wf.
 Proof with eauto using wf_typ_ignores_sub_bindings, wf_typ_ignores_typ_bindings.
   induction Δ; intros * WfEnv Wf;
     inversion WfEnv; subst; simpl_env in *...
