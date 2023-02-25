@@ -50,7 +50,7 @@ Definition var_cv (v : var) : cap :=
 
 Definition typ_cv (T : typ) : cap :=
   match T with
-  | typ_var v => var_cv v
+  | typ_var v => {}
   | C # R => C
   | ⊤ => {}
   | ∀ (S') T => {}
@@ -201,14 +201,13 @@ Inductive bound (x : atom) (T : typ) (Γ : env) : Prop :=
 Definition allbound (Γ : env) (fvars : atoms) : Prop :=
   forall x,
     x `in`A fvars ->
-    exists T, bound x T Γ.
+    exists T, binds x (bind_typ T) Γ.
 
 Reserved Notation "Γ '⊢ₛ' C 'wf'" (at level 40, C at next level, no associativity).
 
-Inductive wf_cset : env -> cap -> Prop :=
-  | wf_concrete_cset : forall Γ fvars univ,
+Inductive wf_cset (Γ : env) : cap -> Prop :=
+  | wf_concrete_cset : forall fvars univ,
     allbound Γ fvars ->
-    fvars `c`A dom Γ ->
     wf_cset Γ (cset_set fvars {}N univ)
 where "Γ '⊢ₛ' C 'wf'" := (wf_cset Γ C).
 
@@ -277,14 +276,14 @@ Inductive subcapt : env -> cap -> cap -> Prop :=
       Γ ⊢ₛ D wf ->
       * ∈ D ->
       Γ ⊢ₛ {*} <: D
-  | subcapt_var : forall Γ x T C,
-      binds x (bind_typ T) Γ ->
-      Γ ⊢ₛ typ_cv T <: C ->
-      Γ ⊢ₛ `cset_fvar` x <: C
-  | subcapt_tvar : forall Γ x T C,
+  | subcapt_var : forall Γ x C1 R C2,
+      binds x (bind_typ (C1 # R)) Γ ->
+      Γ ⊢ₛ C1 <: C2 ->
+      Γ ⊢ₛ `cset_fvar` x <: C2
+  (* | subcapt_tvar : forall Γ x T C,
       binds x (bind_sub T) Γ ->
       Γ ⊢ₛ typ_cv T <: C ->
-      Γ ⊢ₛ `cset_fvar` x <: C
+      Γ ⊢ₛ `cset_fvar` x <: C *)
   | subcapt_set : forall Γ xs b D,
       Γ ⊢ₛ D wf ->
       AtomSet.F.For_all (fun x => Γ ⊢ₛ `cset_fvar` x <: D) xs ->
@@ -358,6 +357,7 @@ Inductive typing : env -> exp -> typ -> Prop :=
   | typing_tapp : forall T1 Γ (x : atom) T T2 C,
       Γ ⊢ x : (C # ∀ [T1] T2) ->
       Γ ⊢ T <: T1 ->
+      ~ `* in` (typ_cv T1) ->
       Γ ⊢ (x @ [T]) : open_tt T2 T
   | typing_box : forall Γ (x : atom) C R,
       Γ ⊢ x : (C # R) ->

@@ -76,7 +76,7 @@ Fixpoint subst_tt (Z : atom) (U : typ) (T : typ) {struct T} : typ :=
   match T with
   | var_b J => J
   | var_f X => if X == Z then U else X
-  | C # R => subst_cset Z (typ_cv U) C # subst_tt Z U R
+  | C # R => C # subst_tt Z U R
   | ⊤ => typ_top
   | ∀ (S') T => ∀ (subst_tt Z U S') (subst_tt Z U T)
   | ∀ [R] T => ∀ [subst_tt Z U R] (subst_tt Z U T)
@@ -555,9 +555,6 @@ Proof with auto*.
     destruct (a == Z)...
     contradict H.
     fsetdec.
-  - Case "c # T".
-    apply subst_cset_fresh.
-    fsetdec.
 Qed.
 
 (** Substitution commutes with opening under certain conditions.  This
@@ -571,8 +568,7 @@ Proof with eauto.
   intros.
   induction H...
   induction R; simpl...
-  - destruct v; simpl...
-  - inversion H...
+  inversion H...
 Qed.
 
 Hint Resolve type_implies_capt_cv : core.
@@ -581,22 +577,17 @@ Lemma cv_subst_correspondence : forall x S T,
   typ_cv (subst_tt x S T) =
   subst_cset x (typ_cv S) (typ_cv T).
 Proof with eauto*.
-  intros.
+  intros *.
   destruct T; simpl...
-  1: destruct v; simpl in *; unfold subst_cset;
-     [ destruct_set_mem x {a}A; destruct (a == x); subst;
-       [ replace ({x}A `\`A x) with {}A by fsetdec;
-         csetdec
-       | fsetdec
-       | fsetdec
-       | fsetdec ]
-     | destruct_set_mem x {}A;
-       [ exfalso; fsetdec
-       | eauto* ] ].
+  1: destruct v; simpl; unfold subst_cset;
+     [ destruct (a == x); subst; simpl | idtac ];
+     assert (AtomSet.F.mem x {}A = false) by (destruct_set_mem x {}A; fsetdec);
+     rewrite H; eauto*; admit.
   all: unfold subst_cset;
        destruct_set_mem x {}A;
        [ exfalso; fsetdec
        | eauto* ].
+  destruct_set_mem x c.
 Qed.
 
 Lemma subst_tt_open_tt_rec : forall T1 T2 X P k,
@@ -942,20 +933,19 @@ Proof.
 Qed.
 
 Lemma subst_te_open_te_rec : forall e T X U k,
-  type U ->
+  pure_type U ->
   subst_te X U (open_te_rec k T e) =
     open_te_rec k (subst_tt X U T) (subst_te X U e).
 Proof with eauto*.
 intros.
 generalize dependent k.
   induction e; intros k; simpl; f_equal; auto using subst_tt_open_tt_rec.
-  rewrite cv_subst_correspondence.
-  apply subst_cset_open_cset.
-  apply type_implies_capt_cv, H.
+  rewrite cv_subst_correspondence...
+  apply subst_cset_open_cset...
 Qed.
 
 Lemma subst_te_open_te : forall e T X U,
-  type U ->
+  pure_type U ->
   subst_te X U (open_te e T) = open_te (subst_te X U e) (subst_tt X U T).
 Proof with auto*.
   intros.
@@ -965,7 +955,7 @@ Qed.
 
 Lemma subst_te_open_te_var : forall (X Y:atom) U e,
   Y <> X ->
-  type U ->
+  pure_type U ->
   open_te (subst_te X U e) Y = subst_te X U (open_te e Y).
 Proof with auto*.
   intros X Y U e Neq WU.
@@ -976,11 +966,17 @@ Proof with auto*.
 Qed.
 
 Lemma subst_te_intro_rec : forall X e U k,
-  X `notin` (fv_te e `u`A fv_ce e) ->
+  X ∉ (fv_te e `u`A fv_ce e) ->
   open_te_rec k U e = subst_te X U (open_te_rec k X e).
 Proof.
   induction e; intros U k Fr; simpl in *; f_equal;
-    auto using subst_cset_intro,subst_tt_intro_rec.
+    auto using subst_cset_intro, subst_tt_intro_rec.
+  induction U; simpl.
+  1-5: unfold open_cset, subst_cset; csetsimpl;
+       destruct_set_mem k c; destruct_set_mem X c;
+       fsetdec.
+  Search (subst_cset _ _ (open_cset _ _ _)).
+  rewrite subst_cset_open_cset.
 Qed.
 
 Lemma subst_te_intro : forall X e U,

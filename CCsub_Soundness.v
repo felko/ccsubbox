@@ -9,29 +9,6 @@ Require Import CCsub_Substitution.
 
 Set Nested Proofs Allowed.
 
-Tactic Notation "destructs" constr(E) :=
-  destruct ltac:(applys E).
-Tactic Notation "destructs" constr(E) "as" simple_intropattern(P) :=
-  destruct ltac:(applys E) as P.
-Tactic Notation "destructs" constr(E0) constr(A1) :=
-  destructs (>> E0 A1).
-Tactic Notation "destructs" constr(E0) constr(A1) "as" simple_intropattern(P) :=
-  destructs (>> E0 A1) as P.
-Tactic Notation "destructs" constr(E0) constr(A1) constr(A2) :=
-  destructs (>> E0 A1 A2).
-Tactic Notation "destructs" constr(E0) constr(A1) constr(A2) "as" simple_intropattern(P) :=
-  destructs (>> E0 A1 A2) as P.
-Tactic Notation "destructs" constr(E0) constr(A1) constr(A2) constr(A3) :=
-  destructs (>> E0 A1 A2 A3).
-Tactic Notation "destructs" constr(E0) constr(A1) constr(A2) constr(A3) "as" simple_intropattern(P) :=
-  destructs (>> E0 A1 A2 A3) as P.
-Tactic Notation "destructs" constr(E0) constr(A1) constr(A2) constr(A3) constr(A4) "as" simple_intropattern(P) :=
-  destructs (>> E0 A1 A2 A3 A4) as P.
-Tactic Notation "destructs" constr(E0) constr(A1) constr(A2) constr(A3) constr(A4) constr(A5) "as" simple_intropattern(P) :=
-  destructs (>> E0 A1 A2 A3 A4 A5) as P.
-Tactic Notation "destructs" constr(E0) constr(A1) constr(A2) constr(A3) constr(A4) constr(A5) constr(A6) "as" simple_intropattern(P) :=
-  destructs (>> E0 A1 A2 A3 A4 A5 A6) as P.
-
 (* ********************************************************************** *)
 (** * #<a name="preservation"></a># Preservation *)
 
