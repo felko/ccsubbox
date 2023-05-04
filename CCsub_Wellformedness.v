@@ -193,9 +193,6 @@ Lemma cv_wf : forall Γ T,
 Proof with simpl_env; eauto using empty_cset_wf.
   intros * HC.
   inversion HC; simpl; subst...
-  constructor.
-  intros y yIn.
-  rewrite AtomSetFacts.singleton_iff in yIn; symmetry in yIn; subst...
 Qed.
 
 
@@ -630,22 +627,47 @@ Proof with eauto.
 Qed.
 *)
 
-Lemma wf_typ_env_bind_typ : forall x U Γ Δ,
-  (Δ ++ [(x, bind_typ U)] ++ Γ) ⊢ wf ->
-  Γ ⊢ U wf.
-Proof with eauto.
-  intros * H.
-  assert (([(x, bind_typ U)] ++ Γ) ⊢ wf) as HA by eauto.
-  inversion HA...
+Lemma wf_typ_env_bind_typ : forall x U Γ,
+  Γ ⊢ wf ->
+  binds x (bind_typ U) Γ ->
+  exists C R, U = C # R /\ Γ ⊢ (C # R) wf.
+Proof with eauto using wf_typ_weaken_head.
+  intros * WfEnv Binds.
+  induction WfEnv.
+  - inversion Binds.
+  - binds_cases Binds.
+    rename select (binds x _ _) into Binds.
+    destruct (IHWfEnv Binds) as [C [R [EQ WfCR]]].
+    exists C, R.
+    split...
+  - binds_cases Binds.
+    + rename select (binds x _ _) into Binds.
+      destruct (IHWfEnv Binds) as [D [Q [EQ WfCR]]].
+      exists D, Q.
+      split...
+    + exists C, R.
+      inversion select (bind_typ _ = bind_typ _).
+      split...
 Qed.
 
-Lemma wf_typ_env_bind_sub : forall X U Γ Δ,
-  (Δ ++ [(X, bind_sub U)] ++ Γ) ⊢ wf ->
-  Γ ⊢ U wf.
-Proof with eauto.
-  intros * H.
-  assert (([(X, bind_sub U)] ++ Γ) ⊢ wf) as HA by eauto.
-  inversion HA...
+Lemma wf_typ_env_bind_sub : forall X U Γ,
+  Γ ⊢ wf ->
+  binds X (bind_sub U) Γ ->
+  pure_type U /\ Γ ⊢ U wf.
+Proof with eauto using wf_typ_weaken_head. 
+  intros * WfEnv Binds.
+  induction WfEnv.
+  - inversion Binds.
+  - binds_cases Binds.
+    + rename select (binds X _ _) into Binds.
+      destruct (IHWfEnv Binds) as [PureU WfU].
+      split...
+    + inversion select (bind_sub _ = bind_sub _).
+      split... 
+  - binds_cases Binds.
+    rename select (binds X _ _) into Binds.
+    destruct (IHWfEnv Binds) as [PureU WfU].
+    split...
 Qed.
 
 (* Hint Resolve wf_cv_env_bind_typ : core. *)
@@ -658,19 +680,24 @@ Hint Resolve wf_typ_env_bind_sub : core.
 Ltac destruct_union_mem H :=
   rewrite AtomSetFacts.union_iff in H; destruct H as [H|H].
 
-Lemma wf_cset_subst_tb : forall Γ Δ Q Z D P C,
+(* REVIEW: there is something weird with subst_tb:
+  - subst_tb X (C # P) (bind_sub X) = bind_sub (C # P)
+  - subst_tb X P (bind_typ X) = bind_typ P
+  breaks the invariant that P in bind_sub P is a pure type
+  and T in bind_typ T is not a captured type.
+  Possible solution: make bind_typ take a captured type like
+  bind_typ C P instead of bind_typ (C # P), and force the second
+  argument of subst_tb to be a pure type.
+ *)
+Lemma wf_cset_subst_tb : forall Γ Δ Q Z P C,
   (Δ ++ [(Z, bind_sub Q)] ++ Γ) ⊢ₛ C wf ->
-  Γ ⊢ (D # P) wf ->
+  Γ ⊢ P wf ->
+  pure_type P ->
   ok (Δ ++ [(Z, bind_sub Q)] ++ Γ) ->
-  (map (subst_tb Z (D # P)) Δ ++ Γ) ⊢ₛ (subst_cset Z D C) wf.
+  (map (subst_tb Z P) Δ ++ Γ) ⊢ₛ C wf.
 Proof with simpl_env; eauto*.
-  intros * HwfC HwfDP Hok.
+  intros * HwfC HwfP PureP Hok.
   destruct HwfC as [fvars univ Hb].
-  inversion HwfDP; subst.
-  rename select (Γ ⊢ₛ D wf) into HwfD.
-  rename select (Γ ⊢ P wf) into HwfP.
-  rename select (pure_type P) into HpureP.
-  destruct HwfD as [fvars' univ' Hb'].
   unfold subst_cset.
   repeat rewrite dom_concat in Hb; simpl in Hb.
   destruct_set_mem Z fvars.
@@ -678,34 +705,31 @@ Proof with simpl_env; eauto*.
     unfold cset_union; csetsimpl.
     constructor...
     intros y yIn.
-    destruct_union_mem yIn.
-    + destruct (Hb' y yIn) as [S B]...
-    + destruct (Hb y ltac:(clear - yIn; fsetdec)) as [S B].
-      binds_cases B.
-      * exists S.
-        rename select (binds y _ _) into B.
-        inversion B; subst.
-        destruct (y == Z); try (contradict e; clear - yIn; fsetdec).
-        apply binds_tail...
-      * exists (subst_tt Z (cset_set fvars' {}N univ' # P) S).
-        replace (bind_typ (subst_tt Z (cset_set fvars' {}N univ' # P) S))
-           with (subst_tb Z (cset_set fvars' {}N univ' # P) (bind_typ S))
-             by reflexivity.
+    destruct (Hb y yIn) as [T Binds].
+    binds_cases Binds.
+    + exists T.
+      apply binds_tail...
+      inversion select (binds y _ _).
+      destruct (y == Z)...
+    + exists (subst_tt Z P T).
+      replace (bind_typ (subst_tt Z P T))
+         with (subst_tb Z P (bind_typ T))
+           by reflexivity.
         apply binds_head, binds_map.
         assumption.
   - Case "Z ∉ fvars".
     constructor.
     intros y yIn.
-    destruct (Hb y yIn) as [S B].
-    binds_cases B.
-    + exists S.
+    destruct (Hb y yIn) as [T Binds].
+    binds_cases Binds.
+    + exists T.
       apply binds_tail...
       inversion H...
       destruct (y == Z); try (subst; clear - ZIn yIn; exfalso; apply (ZIn yIn)).
       assumption.
-    + exists (subst_tt Z (cset_set fvars' {}N univ' # P) S).
-      replace (bind_typ (subst_tt Z (cset_set fvars' {}N univ' # P) S))
-         with (subst_tb Z (cset_set fvars' {}N univ' # P) (bind_typ S))
+    + exists (subst_tt Z P T).
+      replace (bind_typ (subst_tt Z P T))
+         with (subst_tb Z P (bind_typ T))
           by reflexivity.
       apply binds_head, binds_map.
       assumption.
@@ -911,10 +935,9 @@ Proof with simpl_env; eauto using wf_typ_weaken_head, type_from_wf_typ, wf_cset_
   - Case "C # R".
     simpl.
     apply wf_typ_capt...
-    + assert ((map (subst_tb Z P) Δ ++ Γ) ⊢ subst_tt Z P R wf) by (eapply IHHwfT; eauto* ).
-      admit.
-    + apply subst_tt_pure_type...
-Admitted.
+    assert ((map (subst_tb Z P) Δ ++ Γ) ⊢ subst_tt Z P R wf) by (eapply IHHwfT; eauto* ).
+    apply subst_tt_pure_type...
+Qed.
 
 Lemma wf_typ_open_type : forall Γ U R T,
   ok Γ ->
@@ -946,8 +969,8 @@ Proof with eauto 6 using wf_typ_subst_tb.
     + apply subst_tt_pure_type... 
     + rewrite dom_concat, dom_map...
   - apply wf_env_typ.
-    + eapply IHΔ... 
-    + replace (subst_cset Z (typ_cv P) C # subst_tt Z P R) with (subst_tt Z P (C # R)) by reflexivity.
+    + eapply IHΔ...
+    + replace (C # subst_tt Z P R) with (subst_tt Z P (C # R)) by reflexivity.
       eapply wf_typ_subst_tb...
     + rewrite dom_concat, dom_map...
 Qed.

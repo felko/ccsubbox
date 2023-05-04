@@ -613,10 +613,10 @@ Proof with eauto*.
   - inversion H2; inversion H3; destruct (X == x); inversion H5; subst...
 Qed.
 
-(* REVIEW: hard to prove *)
+(* REVIEW: hard to prove
 Lemma wf_env_bound_to_var_implies_var_bind_sub : forall Γ x (X : atom),
   Γ ⊢ wf ->
-  bound x X Γ ->
+  bound x X Γ -> (* binds x (bind_sub X) Γ *)
   exists S, binds X (bind_sub S) Γ.
 Proof with eauto*.
   intros.
@@ -641,7 +641,7 @@ Proof with eauto*.
         destruct (X == X0); subst...
         admit.
       * admit.
-Admitted.
+Admitted. *)
 
 Lemma subcapt_empty : forall Γ C,
   Γ ⊢ₛ C wf ->
@@ -670,29 +670,20 @@ Proof with eauto*.
     apply wf_typ_weakening; simpl_env...
 Qed.
 
-(*
+(* TODO: idk
 Lemma typing_var_bind_typ : forall Γ (x : atom) T,
-  Γ ⊢ x : T ->
-  exists S, Γ ⊢ S <: T /\ binds x (bind_typ S) Γ.
+  Γ ⊢ x : (C # P) ->
+  exists D Q, Γ ⊢ Q <: P
+     /\ binds x (bind_typ (D # Q)) Γ
+     /\ Γ ⊢ₛ (`cset_fvar` x) <: C
+     /\ (Γ ⊢ₛ D <: C \/ x ∈ `cset_fvars` C).
 Proof with eauto*.
   intros.
   dependent induction H.
-  - Case "typing_var_tvar".
-    exists (C # X).
+  - Case "typing_var".
+    exists (C # R).
     split...
-    apply sub_capt...
-    + apply subcapt_empty.
-      apply wf_concrete_cset.
-      * intros y xIn; assert (y = x) by fsetdec; subst; clear xIn.
-        exists ({} # X).
-        apply bound_typ, H0.
-      * enough (x ∈ dom Γ) by fsetdec.
-        apply binds_In in H0; assumption.
-    + apply sub_refl_tvar...
-      assert (Γ ⊢ ({} # X) wf) by (apply bound_in_wf_env_implies_wf_typ with (x := x); eauto* ).
-      inversion H1; subst.
-      apply H6.
-  - Case "typing_var".  
+
       * unfold wf_cset.
         intros y x0In.
         destruct (y == x); try (contradict n; fsetdec); subst.
@@ -1000,8 +991,10 @@ Proof with simpl_env; eauto*.
       * apply wf_typ_capt...
         rename select (_ ⊢ₛ _ <: _) into SubCapt.
         applys subcapt_regular SubCapt.
-      * rename select (forall x, _ -> _ /\ _ /\ _) into IHSubT.
-        apply IHSubT.
+      * rename select (forall x : atom, x ∉ L -> ([(x, bind_typ (C2 # R2))] ++ Γ) ⊢ wf /\ _ /\ _) into IHSsubT.
+        rewrite_nil_concat.
+        eapply wf_typ_ignores_typ_bindings.
+        apply IHSsubT.
         fsetdec.
     + pick fresh x and apply wf_typ_arr...
       * apply wf_typ_capt...
@@ -1015,8 +1008,10 @@ Proof with simpl_env; eauto*.
   - Case "sub_all".
     repeat split...
     + pick fresh X and apply wf_typ_all...
-      rename select (forall x, _ -> _ /\ _ /\ _) into IHSubT.
-      apply IHSubT.
+      rename select (forall x, _ -> _ /\ _ /\ _) into IHSsubT.
+      rewrite_nil_concat.
+      eapply wf_typ_ignores_sub_bindings.
+      apply IHSsubT.
       fsetdec.
     + pick fresh X and apply wf_typ_all...
       rewrite_env (∅ ++ [(X, bind_sub R2)] ++ Γ).
@@ -1034,20 +1029,48 @@ Proof with eauto*.
   dependent induction Typ...
 Qed.
 
-Lemma sub_pure : forall Γ S T,
+(* REVIEW: not provable???????? *)
+(*
+Lemma sub_tvar : forall Γ X U,
+  Γ ⊢ wf ->
+  binds X (bind_sub U) Γ ->
+  Γ ⊢ X <: U.
+Proof with eauto*.
+  intros * Wf.
+  generalize dependent U.
+  generalize dependent X.
+  induction Wf; intros Y U Binds.
+  - inversion Binds.
+  - binds_cases Binds; simpl_env in *.
+    + assert (Neq : X <> Y) by fsetdec. 
+      clear Fr.
+      rewrite_env (∅ ++ [(X, bind_sub T)] ++ Γ).
+      apply sub_weakening...
+      apply wf_env_sub...
+    + rename select (bind_sub _ = bind_sub _) into Eq.
+      injection Eq as Eq; subst.
+Admitted.
+*)
+
+Lemma sub_pure_type : forall Γ S T,
   Γ ⊢ S <: T ->
   pure_type S <-> pure_type T.
 Proof with eauto*.
   intros * Sub.
   split.
-  - intro Hpure; induction Hpure; inversion Sub; subst...
+  - intros PureS.
+    induction Sub; inversion PureS; subst...
+    + apply IHSub.
+      forwards (WfEnv & _ & _): sub_regular Sub.
+      applys wf_typ_env_bind_sub...
     + Case "type_arr".
       pick fresh x and apply type_arr.
       * apply type_capt...
         eapply capt_from_wf_cset.
         rename select (_ ⊢ₛ _ <: _) into SubCapt.
         applys subcapt_regular SubCapt.
-      * specialize (H9 x ltac:(fsetdec)).
+      * rename select (forall x : atom, x ∉ L -> _ ⊢ _ <: _) into IHSubCodomain.
+        specialize (IHSubCodomain x ltac:(fsetdec)).
         eapply type_from_wf_typ.
         rename select (_ ⊢ _ <: _) into SubT.
         applys sub_regular SubT.
@@ -1063,8 +1086,8 @@ Proof with eauto*.
       eapply type_from_wf_typ.
       rename select (_ ⊢ _ <: _) into Sub'.
       applys sub_regular Sub'.
-  - induction Sub; intro Hpure; inversion Hpure; subst...
-    1-5: pose proof (IHSub Hpure) as PU; inversion PU.
+  - intros PureT.
+    induction Sub; inversion PureT; subst...
     + Case "sub_arr".
       pick fresh x and apply type_arr.
       * apply type_capt...
@@ -1087,6 +1110,19 @@ Proof with eauto*.
       eapply type_from_wf_typ.
       rename select (_ ⊢ _ <: _) into Sub'.
       applys sub_regular Sub'.
+Qed.
+
+Lemma sub_capt_type : forall Γ S T,
+  Γ ⊢ S <: T ->
+  (exists C R, S = C # R) <-> (exists C R, T = C # R).
+Proof with eauto*.
+  intros * Sub.
+  induction Sub; split; intros [C [R EQ]]; try inversion EQ; subst...
+  - assert (WfEnv : Γ ⊢ wf) by (applys sub_regular Sub).
+    assert (PureU : pure_type U) by (applys wf_typ_env_bind_sub WfEnv H).
+    assert (PureCapt : pure_type (C # R)) by (apply (proj1 (sub_pure_type _ _ _ Sub) PureU)).
+    inversion PureCapt.
+  - inversion select (pure_type (_ # _)). 
 Qed.
 
 Lemma typing_regular : forall Γ e T,
@@ -1147,7 +1183,7 @@ Proof with simpl_env; auto*.
       destruct (IH x ltac:(fsetdec)) as [_ [_ WfT2]].
       assert (Γ ⊢ T2 wf).
       { rewrite_env (∅ ++ Γ).
-        eapply wf_typ_strengthen with (x := x) (U := T1)...
+        eapply wf_typ_strengthen with (x := x) (U := C1 # T1)...
       }
       assumption.
   - Case "typing_tabs".
@@ -1173,20 +1209,25 @@ Proof with simpl_env; auto*.
     destruct IHTyp as [HwfΓ [Hexpr Hwf]]...
     rename select (_ ⊢ _ <: _) into Sub.
     forwards (R1 & R2 & R3): sub_regular Sub...
+    assert (PureQ : pure_type Q).
+    { enough (PureQT : pure_type (∀ [Q] T)) by (inversion PureQT; assumption).
+      enough (TypeCQT : type (C # ∀ [Q] T)) by (inversion TypeCQT; subst; [ inversion H | assumption ]).
+      eapply type_from_wf_typ, Hwf.
+    }
+    assert (PureP : pure_type P) by (apply (proj2 (sub_pure_type _ _ _ Sub) PureQ)).
     repeat split...
-    + constructor...
-      eapply type_from_wf_typ with (Γ := Γ); apply R2.
-    + apply wf_typ_open_type with (R := T1); inversion Hwf; subst...
-      rename select (pure_type _) into Hpure.
-      inversion Hpure; subst.
-      apply <- sub_pure.
-      * eassumption.
-      * apply Sub. 
+    apply wf_typ_open_type with (R := Q); inversion Hwf; subst...
   - Case "typing_box".
     repeat split...
+    apply wf_typ_capt...
+    apply type_box.
+    eapply type_from_wf_typ.
+    applys IHTyp.
   - Case "typing_unbox".
     destruct IHTyp as [HwfΓ [Hex Hwf]].
-    inversion Hwf; rename select (_ ⊢ (_ # _) wf) into WfCR; inversion WfCR; subst.
+    inversion Hwf; rename select (_ ⊢ (_ # _) wf) into WfEbCR;
+    inversion WfEbCR; rename select (_ ⊢ (□ C # R) wf) into WfbCR;
+    inversion WfbCR; subst.
     repeat split...
     apply expr_unbox.
     eapply capt_from_wf_cset...

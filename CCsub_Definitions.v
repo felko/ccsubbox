@@ -172,9 +172,9 @@ Inductive expr : exp -> Prop :=
       pure_type R ->
       (forall X : atom, X ∉ L -> expr (open_te e1 X)) ->
       expr (Λ [R] e1)
-  | expr_tapp : forall (x : atom) V,
-      type V ->
-      expr (x @ [V])
+  | expr_tapp : forall (x : atom) R,
+      pure_type R ->
+      expr (x @ [R])
   | expr_box : forall x : atom,
       expr (box x)
   | expr_unbox : forall C (x : atom),
@@ -298,8 +298,8 @@ Inductive sub : env -> typ -> typ -> Prop :=
       Γ ⊢ X <: X
   | sub_trans_tvar : forall U Γ T X,
       binds X (bind_sub U) Γ ->
-      Γ ⊢ ({} # U) <: T ->
-      Γ ⊢ ({} # X) <: T
+      Γ ⊢ U <: T ->
+      Γ ⊢ X <: T
   | sub_capt : forall Γ C1 C2 R1 R2,
       Γ ⊢ₛ C1 <: C2 ->
       Γ ⊢ R1 <: R2 ->
@@ -316,13 +316,13 @@ Inductive sub : env -> typ -> typ -> Prop :=
       pure_type R1 ->
       pure_type R2 ->
       Γ ⊢ₛ C2 <: C1 ->
-      (forall x : atom, x ∉ L -> ([(x, bind_typ (C1 # R1))] ++ Γ) ⊢ open_ct T1 (`cset_fvar` x) <: open_ct T2 (`cset_fvar` x)) ->
+      (forall x : atom, x ∉ L -> ([(x, bind_typ (C2 # R2))] ++ Γ) ⊢ open_ct T1 (`cset_fvar` x) <: open_ct T2 (`cset_fvar` x)) ->
       Γ ⊢ (∀ (C1 # R1) T1) <: (∀ (C2 # R2) T2)
   | sub_all : forall L Γ R1 R2 T1 T2,
       Γ ⊢ R2 <: R1 ->
       pure_type R1 ->
       pure_type R2 ->
-      (forall X : atom, X ∉ L -> ([(X, bind_sub R1)] ++ Γ) ⊢ open_tt T1 X <: open_tt T2 X) ->
+      (forall X : atom, X ∉ L -> ([(X, bind_sub R2)] ++ Γ) ⊢ open_tt T1 X <: open_tt T2 X) ->
       Γ ⊢ (∀ [R1] T1) <: (∀ [R2] T2)
   | sub_box : forall Γ T1 T2,
       Γ ⊢ T1 <: T2 ->
@@ -343,10 +343,10 @@ Inductive typing : env -> exp -> typ -> Prop :=
       Γ ⊢ f : (C # (∀ (T1) T2)) ->
       Γ ⊢ x : T1 ->
       Γ ⊢ (f @ x) : open_ct T2 (`cset_fvar` x)
-  | typing_let : forall L T1 T2 Γ e k,
-      Γ ⊢ e : T1 ->
+  | typing_let : forall L C1 T1 T2 Γ e k,
+      Γ ⊢ e : (C1 # T1) ->
       (forall x : atom, x ∉ L ->
-        ([(x, bind_typ T1)] ++ Γ) ⊢ open_ve k x (`cset_fvar` x) : T2) ->
+        ([(x, bind_typ (C1 # T1))] ++ Γ) ⊢ open_ve k x (`cset_fvar` x) : T2) ->
       Γ ⊢ (let= e in k) : T2
   | typing_tabs : forall L Γ V e1 T1,
       Γ ⊢ V wf ->
@@ -354,17 +354,16 @@ Inductive typing : env -> exp -> typ -> Prop :=
       (forall X : atom, X ∉ L ->
         ([(X, bind_sub V)] ++ Γ) ⊢ open_te e1 X : open_tt T1 X) ->
       Γ ⊢ (Λ [V] e1) : (exp_cv e1 # ∀ [V] T1)
-  | typing_tapp : forall T1 Γ (x : atom) T T2 C,
-      Γ ⊢ x : (C # ∀ [T1] T2) ->
-      Γ ⊢ T <: T1 ->
-      ~ `* in` (typ_cv T1) ->
-      Γ ⊢ (x @ [T]) : open_tt T2 T
+  | typing_tapp : forall Γ (x : atom) P Q T C,
+      Γ ⊢ x : (C # ∀ [Q] T) ->
+      Γ ⊢ P <: Q ->
+      Γ ⊢ (x @ [P]) : open_tt T P
   | typing_box : forall Γ (x : atom) C R,
       Γ ⊢ x : (C # R) ->
       `cset_fvars` C `subset` dom Γ ->
-      Γ ⊢ (box x) : (□ (C # R))
+      Γ ⊢ (box x) : ({} # □ (C # R))
   | typing_unbox : forall Γ (x : atom) C R,
-      Γ ⊢ x : (□ (C # R)) ->
+      Γ ⊢ x : ({} # □ (C # R)) ->
       Γ ⊢ₛ C wf ->
       Γ ⊢ (C ⟜ x) : (C # R)
   | typing_sub : forall S Γ e T,

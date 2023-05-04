@@ -573,12 +573,17 @@ Qed.
 
 Hint Resolve type_implies_capt_cv : core.
 
+(*
 Lemma cv_subst_correspondence : forall x S T,
-  typ_cv (subst_tt x S T) =
+  typ_cv (subst_tt x S T) = typ_cv T `\`A x ->
   subst_cset x (typ_cv S) (typ_cv T).
 Proof with eauto*.
   intros *.
   destruct T; simpl...
+  - destruct v; simpl; unfold subst_cset;
+    [ destruct (a == x); subst; simpl | idtac ].
+    assert (AtomSet.F.mem x {}A = false) by (destruct_set_mem x {}A; fsetdec).
+    rewrite H.
   1: destruct v; simpl; unfold subst_cset;
      [ destruct (a == x); subst; simpl | idtac ];
      assert (AtomSet.F.mem x {}A = false) by (destruct_set_mem x {}A; fsetdec);
@@ -589,6 +594,7 @@ Proof with eauto*.
        | eauto* ].
   destruct_set_mem x c.
 Qed.
+*)
 
 Lemma subst_tt_open_tt_rec : forall T1 T2 X P k,
   type P ->
@@ -656,10 +662,6 @@ Proof with auto*.
       destruct (k === n); subst...
       simpl.
       destruct (X == X); try (contradict n; reflexivity)...
-  - Case "c # P" .
-    unfold subst_cset.
-    destruct_set_mem X c.
-    exfalso; fsetdec.
 Qed.
 
 (** The next lemma is a direct corollary of the immediately preceding
@@ -940,9 +942,13 @@ Proof with eauto*.
 intros.
 generalize dependent k.
   induction e; intros k; simpl; f_equal; auto using subst_tt_open_tt_rec.
+  rename select (pure_type U) into Hpure.
+  destruct Hpure; simpl in *.
+  (*
   rewrite cv_subst_correspondence...
   apply subst_cset_open_cset...
-Qed.
+  *)
+Admitted.
 
 Lemma subst_te_open_te : forall e T X U,
   pure_type U ->
@@ -975,9 +981,8 @@ Proof.
   1-5: unfold open_cset, subst_cset; csetsimpl;
        destruct_set_mem k c; destruct_set_mem X c;
        fsetdec.
-  Search (subst_cset _ _ (open_cset _ _ _)).
   rewrite subst_cset_open_cset.
-Qed.
+Admitted.
 
 Lemma subst_te_intro : forall X e U,
   X `notin` (fv_te e `u`A fv_ce e) ->
@@ -1024,12 +1029,8 @@ Proof with auto using open_cset_capt, open_ct_rec_type.
   intros.
   generalize dependent k.
   induction T; intros k; simpl; f_equal...
-  - destruct v...
-    destruct (a == X); subst...
-  - assert (C = subst_cset X (typ_cv P) C) by (apply subst_cset_fresh; eauto*).
-    rewrite H1 at 2.
-    apply subst_cset_open_cset.
-    inversion H...
+  destruct v...
+  destruct (a == X); subst...
 Qed.
 
 (* T[0 !-> C][X !-> P] = T[X !-> P][0 !-> C] *)
@@ -1367,7 +1368,6 @@ Proof with eauto using subst_ct_open_tt_rec_fresh, subst_cset_open_cset_fresh.
   induction e; intros * Hc1 Hc2 Hfv; simpl; f_equal...
   apply subst_cset_open_cset_fresh...
   induction P; simpl in *...
-  destruct v0...
 Qed.
 
 Lemma subst_ve_open_te : forall e P z u c,
@@ -1655,10 +1655,11 @@ Proof with eauto*.
     unfold subst_cset. simpl.
     destruct v; simpl.
     - destruct_set_mem x {a}A...
+      admit.
     - destruct_set_mem x {}A...
   }
   all: unfold subst_cset; destruct_set_mem x {}A; auto; exfalso; fsetdec.
-Qed.
+Admitted.
 
 (** More substitution lemmas *)
 Lemma subst_ct_open_tt_rec : forall c z P t k,
