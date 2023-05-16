@@ -126,15 +126,13 @@ Inductive syn_cat_agree : typ -> typ -> Prop :=
 Lemma sub_of_tvar : forall Γ P (X : atom),
   Γ ⊢ P <: X ->
   exists (Y : atom), P = Y.
-Proof.
+Proof with eauto*.
   intros * Sub.
   assert (PureP : pure_type P).
   { applys sub_pure_type Sub.
     constructor.
   }
   dependent induction Sub...
-  * exists X; trivial.
-  * inversion PureP.
 Qed.
 
 (*
@@ -230,18 +228,7 @@ Lemma typing_narrowing_typ : forall D Q Γ Δ X C P e T,
 Proof with eauto*.
   intros * Typ Sub.
   assert (CsubD_PsubQ_WfC_WfD_PureP_PureQ : Γ ⊢ₛ C <: D /\ Γ ⊢ P <: Q /\ Γ ⊢ₛ C wf /\ Γ ⊢ₛ D wf /\ pure_type P /\ pure_type Q).
-  { dependent induction Sub...
-    destruct (IHSub D Q {} U)...
-    repeat split...
-    - assert (WfEU : Γ ⊢ ({} # U) wf) by (applys sub_regular Sub; assumption ).
-      inversion WfEU; subst.
-      rename select (Γ ⊢ U wf) into WfU.
-      apply sub_transitivity with (Q := U).
-      + eapply type_from_wf_typ...
-      + apply sub_tvar...
-      + applys IHSub...
-    - intros x xIn; exfalso; clear - xIn; fsetdec.
-  }
+  { dependent induction Sub... }
   destruct CsubD_PsubQ_WfC_WfD_PureP_PureQ as [CsubD [PsubQ [WfC [WfD [PureP PureQ]]]]].
   dependent induction Typ.
   - Case "typing_var".
@@ -249,7 +236,7 @@ Proof with eauto*.
     binds_cases Binds; simpl_env in *.
     + eapply typing_var...
       eapply wf_env_narrowing_typ...
-    + injection H1 as ReqQ C0eqD; subst.
+    + inversion select (bind_typ _ = bind_typ _); subst.
       apply typing_sub with (S := `cset_fvar` x # P).
       * apply typing_var with (C := C)...
         eapply wf_env_narrowing_typ...
@@ -267,19 +254,22 @@ Proof with eauto*.
     + simpl_env in *.
       eapply wf_typ_ignores_typ_bindings...
     + rewrite_parenthesise_binding.
-      eapply H1...
+      rename select (forall x : atom, x ∉ L -> forall (D0 : cap), _) into IH.
+      eapply IH...
   - Case "typing_app".
     eapply typing_app...
   - Case "typing_let".
     pick fresh y and apply typing_let...
     rewrite_parenthesise_binding.
-    eapply H0...
+    rename select (forall x : atom, x ∉ L -> forall (D0 : cap), _) into IH.
+    eapply IH...
   - Case "typing_tabs".
     pick fresh Y and apply typing_tabs...
     + simpl_env in *.
       eapply wf_typ_ignores_typ_bindings...
     + rewrite_parenthesise_binding.
-      eapply H2...
+      rename select (forall X0 : atom, X0 ∉ L -> forall (D0 : cap), _) into IH.
+      eapply IH...
   - Case "typing_tapp".
     eapply typing_tapp...
     eapply sub_narrowing_typ...
@@ -321,11 +311,11 @@ Proof with auto.
     rename select (forall x : atom, x ∉ L0 -> _) into Sub'.
     specialize (Sub' y ltac:(fsetdec)).
     repeat split...
-    + applys sub_regular Sub'.
-    + rewrite_nil_concat.
-      eapply sub_narrowing_typ with (CQ := C) (Q:= R)...
+    rewrite_nil_concat.
+    eapply wf_typ_ignores_typ_bindings.
+    applys sub_regular Sub'.
   - Case "typing_sub".
-    eauto using (sub_transitivity T).
+    eauto using (sub_transitivity_type T).
 Qed.
 
 Lemma typing_inv_tabs : forall Γ S1 e1 T,
@@ -347,13 +337,9 @@ Proof with simpl_env; auto.
     intros Y ?.
     repeat split...
     rewrite_nil_concat.
-    + eapply typing_narrowing with (Q := S1)...
-    + rename select (forall X : atom, X ∉ L0 -> _) into Sub'.
-      specialize (Sub' Y ltac:(fsetdec)).
-      rewrite_nil_concat.
-      apply sub_narrowing with (Q := S1)...
+    eapply typing_narrowing with (Q := S1)...
   - Case "typing_sub".
-    eauto using (sub_transitivity T).
+    eauto using (sub_transitivity_type T).
 Qed.
 
 Lemma typing_inv_let : forall Γ e k T,

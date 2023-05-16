@@ -48,16 +48,6 @@ Definition var_cv (v : var) : cap :=
   | var_f x => `cset_fvar` x
   end.
 
-Definition typ_cv (T : typ) : cap :=
-  match T with
-  | typ_var v => {}
-  | C # R => C
-  | ⊤ => {}
-  | ∀ (S') T => {}
-  | ∀ [R] T => {}
-  | □ T => {}
-  end.
-
 Definition open_vt (K : nat) (U : typ) (v : var) : typ :=
   match v with
   | var_b J => if K === J then U else J
@@ -83,7 +73,7 @@ Fixpoint open_te_rec (K : nat) (U : typ) (Γ : exp) {struct Γ} : exp :=
   | Λ [V] e1 => Λ [open_tt_rec K U V] (open_te_rec (S K) U e1)
   | x @ [V] => x @ [open_tt_rec K U V]
   | box x => box x
-  | C ⟜ x => open_cset K (typ_cv U) C ⟜ x
+  | C ⟜ x => C ⟜ x
   end.
 
 Fixpoint open_ct_rec (k : nat) (c : cap) (T : typ)  {struct T} : typ :=
@@ -190,18 +180,10 @@ Notation "∅" := (@nil (atom * binding)).
 
 Notation "[ x ]" := (x :: nil).
 
-Inductive bound (x : atom) (T : typ) (Γ : env) : Prop :=
-  | bound_typ :
-      binds x (bind_typ T) Γ ->
-      bound x T Γ
-  | bound_sub :
-      binds x (bind_sub T) Γ ->
-      bound x T Γ.
-
 Definition allbound (Γ : env) (fvars : atoms) : Prop :=
   forall x,
     x `in`A fvars ->
-    exists T, binds x (bind_typ T) Γ.
+    exists C R, binds x (bind_typ (C # R)) Γ.
 
 Reserved Notation "Γ '⊢ₛ' C 'wf'" (at level 40, C at next level, no associativity).
 
@@ -280,10 +262,6 @@ Inductive subcapt : env -> cap -> cap -> Prop :=
       binds x (bind_typ (C1 # R)) Γ ->
       Γ ⊢ₛ C1 <: C2 ->
       Γ ⊢ₛ `cset_fvar` x <: C2
-  (* | subcapt_tvar : forall Γ x T C,
-      binds x (bind_sub T) Γ ->
-      Γ ⊢ₛ typ_cv T <: C ->
-      Γ ⊢ₛ `cset_fvar` x <: C *)
   | subcapt_set : forall Γ xs b D,
       Γ ⊢ₛ D wf ->
       AtomSet.F.For_all (fun x => Γ ⊢ₛ `cset_fvar` x <: D) xs ->
@@ -339,10 +317,10 @@ Inductive typing : env -> exp -> typ -> Prop :=
       (forall x : atom, x ∉ L ->
         ([(x, bind_typ (C # R))] ++ Γ) ⊢ open_ve e1 x (`cset_fvar` x) : open_ct T1 (`cset_fvar` x)) ->
       Γ ⊢ (λ (C # R) e1) : (exp_cv e1 # ∀ (C # R) T1)
-  | typing_app : forall T1 Γ (f x : atom) T2 C,
-      Γ ⊢ f : (C # (∀ (T1) T2)) ->
-      Γ ⊢ x : T1 ->
-      Γ ⊢ (f @ x) : open_ct T2 (`cset_fvar` x)
+  | typing_app : forall D Q Γ (f x : atom) T C,
+      Γ ⊢ f : (C # (∀ (D # Q) T)) ->
+      Γ ⊢ x : (D # Q) ->
+      Γ ⊢ (f @ x) : open_ct T (`cset_fvar` x)
   | typing_let : forall L C1 T1 T2 Γ e k,
       Γ ⊢ e : (C1 # T1) ->
       (forall x : atom, x ∉ L ->
@@ -378,7 +356,10 @@ Inductive value : exp -> Prop :=
       value (λ (T) e1)
   | value_tabs : forall T e1,
       expr (Λ [T] e1) ->
-      value (Λ [T] e1).
+      value (Λ [T] e1)
+  | value_box : forall e1,
+      expr (box e1) ->
+      value (box e1).
 
 Inductive answer : exp -> Prop :=
   | answer_val : forall v,
@@ -388,19 +369,16 @@ Inductive answer : exp -> Prop :=
       answer x.
 
 Inductive store_frame : Type :=
-  | store v : value v -> store_frame.
+  | store (v : exp) : store_frame.
 
 Definition store_ctx : Type := list (atom * store_frame).
-Definition stores (S : store_ctx) (x : atom) (v : exp) (v_value : value v) : Prop :=
-    binds x (store v v_value) S.
+Definition stores (S : store_ctx) (x : atom) (v : exp) : Prop :=
+    binds x (store v) S.
 
-Inductive scope (Γ : exp) : Type :=
-  | mk_scope L : (forall x, x ∉ L -> expr (open_ve Γ x (`cset_fvar` x))) -> scope Γ.
+Inductive scope (k : exp) : Type :=
+  | mk_scope : forall L, (forall x, x ∉ L -> expr (open_ve k x (`cset_fvar` x))) -> scope k.
 
-Inductive eval_frame : Type :=
-  | cont Γ : scope Γ -> eval_frame.
-
-Definition eval_ctx : Type := (list eval_frame).
+Definition eval_ctx : Type := (list exp).
 
 Inductive state : Type :=
   | mk_state : store_ctx -> eval_ctx -> exp -> state.
@@ -414,65 +392,68 @@ Inductive state_final : state -> Prop :=
 
 Inductive store_typing : store_ctx -> env -> Prop :=
   | typing_store_nil : nil ∷ nil
-  | typing_store_cons : forall x T v v_value S Γ,
+  | typing_store_cons : forall x C R v S Γ,
       S ∷ Γ ->
-      Γ ⊢ v : T ->
+      value v ->
+      Γ ⊢ v : (C # R) ->
       x ∉ dom Γ ->
-      ([(x, store v v_value)] ++ S) ∷ ([(x, bind_typ T)] ++ Γ)
+      ([(x, store v)] ++ S) ∷ ([(x, bind_typ (C # R))] ++ Γ)
 where "S '∷' Γ" := (store_typing S Γ).
 
 Inductive eval_typing (Γ : env) : eval_ctx -> typ -> typ -> Prop :=
-  | typing_eval_nil : forall T U,
-      Γ ⊢ wf ->
-      Γ ⊢ T <: U ->
-      Γ ⊢ nil : T ⇒ U
-  | typing_eval_cons : forall L k (k_scope : scope k) E T U V,
+  | typing_eval_nil : forall C1 R1 C2 R2,
+      Γ ⊢ (C1 # R1) <: (C2 # R2) ->
+      Γ ⊢ nil : (C1 # R1) ⇒ (C2 # R2)
+  | typing_eval_cons : forall L k E C1 R1 C2 R2 C3 R3,
+      scope k ->
       (forall x, x ∉ L ->
-        ([(x, bind_typ T)] ++ Γ) ⊢ open_ve k x (`cset_fvar` x) : U) ->
-      Γ ⊢ E : U ⇒ V ->
-      Γ ⊢ (cont k k_scope :: E) : T ⇒ V
+        ([(x, bind_typ (C1 # R1))] ++ Γ) ⊢ open_ve k x (`cset_fvar` x) : (C2 # R2)) ->
+      Γ ⊢ E : (C2 # R2) ⇒ (C3 # R3) ->
+      Γ ⊢ (k :: E) : (C1 # R1) ⇒ (C3 # R3)
 where "Γ '⊢' E ':' T '⇒' U" := (eval_typing Γ E T U).
 
 Inductive state_typing : state -> typ -> Prop :=
-  | typing_state : forall S Γ E e T U,
+  | typing_state : forall S Γ E e C1 R1 C2 R2,
       S ∷ Γ ->
-      Γ ⊢ E : T ⇒ U ->
-      Γ ⊢ e : T ->
-      state_typing ⟨ S | E | e ⟩ U.
+      Γ ⊢ E : (C1 # R1) ⇒ (C2 # R2) ->
+      Γ ⊢ e : (C1 # R1) ->
+      state_typing ⟨ S | E | e ⟩ (C2 # R2).
 
 Inductive red : state -> state -> Prop :=
-  | red_lift : forall x v (v_value : value v) k (k_scope : scope k) S K,
+  | red_lift : forall x v k S K,
+      value v ->
       x ∉ dom S ->
-          ⟨ S | cont k k_scope :: K | v ⟩
-      --> ⟨ [(x, store v v_value)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
-  | red_let_var : forall (x : atom) v (v_value : value v) k (k_scope : scope k) S K,
-      stores S x v v_value ->
-          ⟨ S | cont k k_scope :: K | x ⟩
+          ⟨ S | k :: K | v ⟩
+      --> ⟨ [(x, store v)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
+  | red_let_var : forall (x : atom) v k S K,
+      stores S x v ->
+          ⟨ S | k :: K | x ⟩
       --> ⟨ S | K | open_ve k x (`cset_fvar` x) ⟩
-  | red_let_val : forall x v (v_value : value v) k (k_scope : scope k) S K,
+  | red_let_val : forall x v k S K,
+      value v ->
       x ∉ dom S ->
           ⟨ S | K | let= v in k ⟩
-      --> ⟨ [(x, store v v_value)] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
+      --> ⟨ [(x, store v )] ++ S | K | open_ve k x (`cset_fvar` x) ⟩
   | red_let_exp : forall e k (k_scope : scope k) S K,
           ⟨ S | K | let= e in k ⟩
-      --> ⟨ S | cont k k_scope :: K | e ⟩
-  | red_app : forall f x U e v (v_value : value v) (abs_value : value (exp_abs U e)) S K,
-      stores S f (λ (U) e) abs_value ->
-      stores S x v v_value ->
+      --> ⟨ S | k :: K | e ⟩
+  | red_app : forall f x U e v S K,
+      stores S f (λ (U) e) ->
+      stores S x v ->
           ⟨ S | K | f @ x ⟩
       --> ⟨ S | K | open_ve e x (`cset_fvar` x) ⟩
-  | red_tapp : forall x R U e (tabs_value : value (Λ [U] e)) S K,
-      stores S x (Λ [U] e) tabs_value ->
+  | red_tapp : forall x R U e S K,
+      stores S x (Λ [U] e) ->
       pure_type R ->
           ⟨ S | K | x @ [R] ⟩
       --> ⟨ S | K | open_te e R ⟩
-  | red_open : forall C x y (box_value : value (box y)) S K,
-      stores S x (box y) box_value ->
+  | red_open : forall C x y S K,
+      stores S x (box y) ->
           ⟨ S | K | C ⟜ x ⟩
       --> ⟨ S | K | y ⟩
 where "Σ1 --> Σ2" := (red Σ1 Σ2).
 
-Hint Constructors type pure_type expr bound wf_cset wf_typ wf_env value sub subcapt typing : core.
+Hint Constructors type pure_type expr wf_cset wf_typ wf_env value sub subcapt typing : core.
 Hint Resolve sub_top sub_refl_tvar sub_arr sub_all sub_box : core.
 Hint Resolve typing_var typing_app typing_tapp typing_box typing_unbox typing_sub : core.
 
