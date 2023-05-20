@@ -468,7 +468,6 @@ Tactic Notation "subst_mem_singleton" "<-" hyp(H) :=
     | _ `in`A _ => rewrite AtomSetFacts.singleton_iff in H; symmetry in H; subst
   end.
 
-(* REVIEW: does not make sense anymore? *)
 Lemma subcapt_through_subst_tt : forall Γ P Q Δ X C D,
   (Δ ++ [(X, bind_sub Q)] ++ Γ) ⊢ wf ->
   (Δ ++ [(X, bind_sub Q)] ++ Γ) ⊢ₛ C <: D ->
@@ -520,33 +519,3 @@ Proof with eauto using wf_env_subst_tb, wf_cset_subst_tb, wf_typ_subst_tb with f
     intros y yIn.
     eapply H1...
 Qed.
-
-(* (* ********************************************************************** *) *)
-(* (** ** Narrowing and transitivity (3) *) *)
-
-(* TODO: move to CCsub_Lemmas.v
-typ_cv_free_never_universal *)
-
-(* TODO: remove? if typing_through_subst_ve is indeed not useful
-Lemma subcapt_univ_through_subst_cb : forall Δ Γ x u P T,
-  (Δ ++ [(x, bind_typ (exp_cv u # P))] ++ Γ) ⊢ₛ (typ_cv T) wf ->
-  (map (subst_cb x (exp_cv u)) Δ ++ Γ) ⊢ₛ {*} <: (typ_cv (subst_ct x (exp_cv u) T)) ->
-  (Δ ++ [(x, bind_typ (typ_capt (exp_cv u) P))] ++ Γ) ⊢ₛ {*} <: (typ_cv T).
-Proof with eauto.
-  intros * Wf ScUniv.
-  forwards UIn: univ_supercapt_inversion ScUniv.
-  destruct T; simpl in *; try congruence; unfold subst_cset in UIn.
-  1: destruct v...
-  unfold subst_cset in UIn.
-  (* forwards: cv_free_never_universal u. *)
-  find_and_destroy_set_mem.
-  + destruct (exp_cv u).
-    destruct b; try congruence...
-    inversion Wf; subst.
-    csetsimpl.
-    apply subcapt_in_univ; trivial.
-    (* REVIEW: unsolvable? previously used cv_never_universal which is not true anymore *)
-    admit.
-  + apply subcapt_in_univ; trivial.
-Admitted.
-*)

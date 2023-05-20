@@ -122,43 +122,6 @@ Proof with auto.
   intros. apply notin_fv_ct_open_ct_rec with (k := 0) (C := C)...
 Qed.
 
-(* Lemma notin_fv_ct_open_ct_rec : forall (Y X : atom) T k, *)
-(*   X `notin` fv_ct (open_ct_rec k Y T) -> *)
-(*   X <> Y -> *)
-(*   X `notin` fv_ct T *)
-(* with notin_fv_ct_open_cpt_rec : forall (Y X : atom) T k, *)
-(*   X `notin` fv_cpt (open_cpt_rec k Y T) -> *)
-(*   X <> Y -> *)
-(*   X `notin` fv_cpt T. *)
-(* Proof with eauto*. *)
-(* ------ *)
-(*   intros Y X T. *)
-(*   induction T ; simpl ; intros k H Fr ; try apply notin_union; eauto. *)
-(*   - apply notin_cset_fvars_open_cset with (k := k) (C := Y)... *)
-(*     discriminate. *)
-(*   - apply notin_fv_ct_open_cpt_rec with (k := k) (Y := Y)... *)
-(* ------ *)
-(*   intros Y X T. *)
-(*   induction T ; simpl ; intros k H Fr ; try apply notin_union; eauto. *)
-(*   - apply notin_fv_ct_open_ct_rec with (Y := Y) (k := k)... *)
-(*   - apply notin_fv_ct_open_ct_rec with (Y := Y) (k := S k)... *)
-(*   - apply notin_fv_ct_open_ct_rec with (Y := Y) (k := k)... *)
-(*   - apply notin_fv_ct_open_ct_rec with (Y := Y) (k := S k)... *)
-(* Qed. *)
-
-(* Lemma notin_fv_ct_open_ct : forall (Y X : atom) T, *)
-(*   X `notin` fv_ct (open_ct T Y) -> *)
-(*   X <> Y -> *)
-(*   X `notin` fv_ct T *)
-(* with notin_fv_ct_open_cpt : forall (Y X : atom) T, *)
-(*   X `notin` fv_cpt (open_cpt T Y) -> *)
-(*   X <> Y -> *)
-(*   X `notin` fv_cpt T. *)
-(* Proof with eauto*. *)
-(*   intros. apply notin_fv_ct_open_ct_rec with (k := 0) (Y := Y)... *)
-(*   intros. apply notin_fv_ct_open_cpt_rec with (k := 0) (Y := Y)... *)
-(* Qed. *)
-
 Lemma notin_fv_wf_cset : forall Γ (x : atom) C,
   Γ ⊢ₛ C wf ->
   x ∉ dom Γ ->
@@ -218,187 +181,9 @@ Proof with eauto using notin_fv_wf_cset.
     fsetdec.
 Qed.
 
-(* Lemma notin_fv_ct_open_tt_rec : forall k (Y X : atom) T, *)
-(*   X `notin` fv_ct (open_tt_rec k Y T) -> *)
-(*   X `notin` fv_ct T *)
-(* with notin_fv_cpt_open_tpt_rec : forall k (Y X : atom) T, *)
-(*   X `notin` fv_cpt (open_tpt_rec k Y T) -> *)
-(*   X `notin` fv_cpt T. *)
-(* Proof. *)
-(* ------ *)
-(*   intros k Y X T. unfold open_tt. *)
-(*   generalize k. *)
-(*   induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto. *)
-(* ------ *)
-(*   intros k Y X T. unfold open_tt. *)
-(*   generalize k. *)
-(*   induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto. *)
-(* Qed. *)
-
 (* ********************************************************************** *)
 (** * #<a name="cvfree"></a># Lemmas about free variables -- in particular properties of [free_for_cv] *)
 (** TODO Maybe have a separate file for free_for_cv lemmas **)
-
-(* REVIEW: none of these are true anymore, since exp_cv could be universal.
-
-Lemma exp_cv_open_ve_rec_same_uvar : forall k x C e,
-  `cset_uvar` (exp_cv (open_ve_rec k x C e)) = `cset_uvar` (exp_cv e).
-Proof with eauto*.
-  intros.
-  revert k.
-  induction e; intros k; simpl.
-  - destruct v; simpl in *...
-    destruct (k === n)...
-  - apply IHe.
-  - destruct v; simpl.
-    + destruct v0; simpl.
-      * reflexivity.
-      * destruct (k === n); simpl...
-    + destruct v0; simpl.
-      * destruct (k === n); simpl...
-      * destruct (k === n); destruct (k === n0); simpl...
-  - f_equal.
-    + apply IHe1.
-    + apply IHe2.
-  - apply IHe.
-  - destruct v; simpl.
-    + reflexivity.
-    + destruct (k === n); simpl...
-  - reflexivity.
-  - f_equal.
-    + unfold open_cset.
-      destruct_set_mem k c.
-    + destruct v; simpl.
-      * reflexivity.
-      * destruct (k === n); simpl...
-Qed.
-
-Lemma typ_cv_never_universal : forall o
-
-Lemma exp_cv_open_te_rec_same_uvar : forall k T e,
-  type T ->
-  `cset_uvar` (exp_cv (open_te_rec k T e)) = `cset_uvar` (exp_cv e).
-Proof with eauto*.
-  intros.
-  revert k.
-  induction e; intros k; simpl...
-  - f_equal.
-    + apply IHe1.
-    + apply IHe2.
-  - f_equal.
-    destruct v; simpl.
-    + unfold open_cset.
-      destruct_set_mem k c.
-    destruct v; simpl;
-      repeat rewrite orb_false_r;
-      unfold open_cset;
-      destruct_set_mem k c;
-      destruct c eqn:Hc;
-      simpl...
-    + unfold typ_cv.
-      destruct T eqn:HeqT...
-      * destruct v...
-      * exfalso.
-        inversion H; inversion H0.
-        destruct c0.
-  - destruct v; simpl in *...
-    destruct (k === n)...
-  - apply IHe.
-  - destruct v; simpl.
-    + destruct v0; simpl.
-      * reflexivity.
-      * destruct (k === n); simpl...
-    + destruct v0; simpl.
-      * destruct (k === n); simpl...
-      * destruct (k === n); destruct (k === n0); simpl...
-  - f_equal.
-    + apply IHe1.
-    + apply IHe2.
-  - apply IHe.
-  - destruct v; simpl.
-    + reflexivity.
-    + destruct (k === n); simpl...
-  - reflexivity.
-  - f_equal.
-    + unfold open_cset.
-      destruct_set_mem k c.
-    + destruct v; simpl.
-      * reflexivity.
-      * destruct (k === n); simpl...
-Qed.
-
-TODO: Γ ⊢ e : T -> * ∉ cv e
-adjust subcapt_univ_through_subst_cb
-
-Lemma exp_cv_never_universal : forall e,
-  expr e ->
-  ~ `* in` (exp_cv e).
-Proof with eauto*.
-  intros.
-  induction H; simpl...
-  - pick fresh x and specialize H1.
-    erewrite <- exp_cv_open_ve_rec_same_uvar.
-    apply H1.
-  - pick fresh x and specialize H1.
-    intro.
-    destruct (`cset_uvar` (exp_cv e1)) eqn:He1...
-    destruct (`cset_uvar` (exp_cv e2)) eqn:He2...
-    erewrite <- exp_cv_open_ve_rec_same_uvar with (k := 0) (x := x) (C := `cset_fvar` x) in He2.
-    apply (H1 He2).
-  - pick fresh X and specialize H1.
-    erewrite <- exp_cv_open_te_rec_same_uvar.
-    apply H1.
-    appl 
-    destruct (exp_cv (open_ve_rec 0 x (`cset_fvar` x) e2)) eqn:Hu.
-    inversion Hu; subst.
-    assert (`cset_uvar` (exp_cv (open_ve_rec 0 x (`cset_fvar` x) e2)) = `cset_uvar` (cset_set t t0 true)).
-    { Unset Printing Notations. f_equal.
-
-    }
-    replace ( * ∈ exp_cv (open_ve_rec 0 x (`cset_fvar` x) e2)) with (`cset_uvar` (exp_cv (open_ve e2 x (`cset_fvar` x)))).
-    Unset Printing Notations.
-    
-    erewrite <- exp_cv_open_ve_rec_same_uvar.
-    enough (`cset_uvar` (exp_cv e2) = false).
-  induction H;
-    repeat match goal with
-    | [v : var |- _] =>
-        destruct v;
-        simpl;
-        eauto*
-    end;
-    try discriminate...
-  simpl.
-  - destruct (exp_cv e1) eqn:Hfc1;
-    destruct (exp_cv e2) eqn:Hfc2...
-    csetdec.
-  -  
-Qed.
-
-Lemma cv_free_has_universal_false : forall e,
-  `* mem` (free_for_cv e) = false.
-Proof.
-  intros.
-  destruct (`* mem` (free_for_cv e)) eqn:EQ; trivial.
-  pose proof (cv_free_never_universal e).
-  intuition.
-Qed.
-
-Lemma cv_free_var_is_bvar_free : forall v,
-  NatSet.F.Empty (`cset_bvars` (free_for_cv_var v)).
-Proof with eauto.
-  intros.
-  destruct v; simpl; fnsetdec.
-Qed.
-
-Lemma cv_free_is_bvar_free : forall e,
-  NatSet.F.Empty (`cset_bvars` (free_for_cv e)).
-Proof with eauto using cv_free_var_is_bvar_free.
-  induction e; simpl...
-  - intros x. apply NatSetNotin.notin_union; apply cv_free_var_is_bvar_free.
-  - intros x. apply NatSetNotin.notin_union; [ apply IHe1 | apply IHe2 ].
-Qed.
-*)
 
 Lemma var_cv_open : forall v k (y : atom),
   cset_subset_prop (var_cv v) (var_cv (open_vv k y v)).
@@ -466,36 +251,6 @@ Proof with eauto using var_cv_closed.
   - rewrite (var_cv_closed v); csetdec.
 Qed.
 
-(* REVIEW: hard to prove
-Lemma wf_env_bound_to_var_implies_var_bind_sub : forall Γ x (X : atom),
-  Γ ⊢ wf ->
-  bound x X Γ -> (* binds x (bind_sub X) Γ *)
-  exists S, binds X (bind_sub S) Γ.
-Proof with eauto*.
-  intros.
-  generalize dependent X.
-  generalize dependent x.
-  induction H; intros.
-  - inversion H0; inversion H.
-  - inversion H3; subst.
-    + inversion H4; subst.
-      destruct (x == X); subst.
-      * inversion H6; subst.
-      * destruct (IHwf_env x X0 (bound_typ x X0 Γ H6)) as [S ?].
-        exists S.
-        assert (X0 <> X).
-        { pose proof (binds_In _ _ _ _ H5).
-          fsetdec.
-        }
-        apply binds_tail; simpl...
-    + inversion H4; subst.
-      destruct (x == X); subst.
-      * inversion H6; inversion H7; subst.
-        destruct (X == X0); subst...
-        admit.
-      * admit.
-Admitted. *)
-
 Lemma subcapt_empty : forall Γ C,
   Γ ⊢ₛ C wf ->
   Γ ⊢ₛ {} <: C.
@@ -506,45 +261,6 @@ Proof with eauto*.
   exfalso.
   fsetdec.
 Qed.
-
-(* TODO: idk
-Lemma typing_var_bind_typ : forall Γ (x : atom) T,
-  Γ ⊢ x : (C # P) ->
-  exists D Q, Γ ⊢ Q <: P
-     /\ binds x (bind_typ (D # Q)) Γ
-     /\ Γ ⊢ₛ (`cset_fvar` x) <: C
-     /\ (Γ ⊢ₛ D <: C \/ x ∈ `cset_fvars` C).
-Proof with eauto*.
-  intros.
-  dependent induction H.
-  - Case "typing_var".
-    exists (C # R).
-    split...
-
-      * unfold wf_cset.
-        intros y x0In.
-        destruct (y == x); try (contradict n; fsetdec); subst.
-        exists X.
-        apply bound_typ, H0.
-      * enough (x ∈ dom Γ) by fsetdec.
-        eapply binds_In, H0.
-    + destruct (wf_env_bound_to_var_implies_var_bind_sub Γ x X H (bound_typ x X Γ H0)) as [S ?].
-      apply wf_typ_var with (T := S), H1.
-  - Case "typing_var".
-    exists (C # R).
-    split...
-    apply sub_capt.
-    + admit. (* REVIEW: unprovable *)
-    + admit. (* REVIEW: need reflexivity here which has not yet been proven *)
-  - Case "typing_sub".
-    admit.
-Admitted.*)
-
-(*
-Γ ⊢ e : T ->
-x ∈ fv_ve e ->
-exists S, binds x (bind_typ S) Γ.
-*)
 
 (** This should be easily true: free variables
     are all bound if a term has a type.... *)
@@ -641,66 +357,6 @@ Proof with eauto using wf_cset_over_union; eauto*.
     inversion H; subst.
     apply wf_concrete_cset...
 Qed. 
-
-(*
-Lemma subst_commutes_with_free_for_cv : forall x u C e,
-  x `notin` (`cset_fvars` (free_for_cv e)) ->
-  (subst_cset x C (free_for_cv e)) = (free_for_cv (subst_ve x u C e)).
-Proof with eauto.
-  intros *.
-  intro Fr.
-  induction e.
-  - simpl.
-    unfold subst_cset.
-    find_and_destroy_set_mem.
-    + notin_solve.
-    + easy.
-  - simpl in *.
-    assert (a <> x) by fsetdec.
-    destruct (a == x); try easy.
-    cbv.
-    destruct_if.
-    + rewrite <- AtomSetFacts.mem_iff in Heqb. exfalso. fsetdec.
-    + reflexivity.
-  - apply IHe...
-  - simpl in *.
-    pose proof (cv_free_never_universal e1).
-    pose proof (cv_free_never_universal e2).
-    destruct (free_for_cv e1); try easy.
-    destruct (free_for_cv e2); try easy.
-    rewrite <- IHe1...
-    rewrite <- IHe2...
-    rewrite subst_cset_distributive_across_union.
-    reflexivity.
-  - apply IHe...
-  - apply IHe...
-  - apply IHe...
-  - simpl in *.
-    pose proof (cv_free_never_universal e1).
-    pose proof (cv_free_never_universal e2).
-    destruct (free_for_cv e1); try easy.
-    destruct (free_for_cv e2); try easy.
-    rewrite <- IHe1...
-    rewrite <- IHe2...
-    rewrite subst_cset_distributive_across_union.
-    reflexivity.
-  - simpl in *.
-    cbv.
-    replace (AtomSet.F.mem x {}A) with false by fset_mem_dec.
-    reflexivity.
-Qed.
-
-Lemma free_for_cv_subst_ee_cset_irrelevancy: forall x u C D t,
-  free_for_cv (subst_ee x u C t) =
-  free_for_cv (subst_ee x u D t).
-Proof with eauto.
-  induction t; simpl; eauto.
-  - rewrite IHt1.
-    rewrite IHt2...
-  - rewrite IHt1.
-    rewrite IHt2...
-Qed.
-*)
 
 Lemma bind_typ_notin_fv_tt : forall x S Γ T,
   binds x (bind_typ S) Γ ->
@@ -829,29 +485,6 @@ Proof with eauto*.
   intros * Typ.
   dependent induction Typ...
 Qed.
-
-(* REVIEW: not provable???????? *)
-(*
-Lemma sub_tvar : forall Γ X U,
-  Γ ⊢ wf ->
-  binds X (bind_sub U) Γ ->
-  Γ ⊢ X <: U.
-Proof with eauto*.
-  intros * Wf.
-  generalize dependent U.
-  generalize dependent X.
-  induction Wf; intros Y U Binds.
-  - inversion Binds.
-  - binds_cases Binds; simpl_env in *.
-    + assert (Neq : X <> Y) by fsetdec. 
-      clear Fr.
-      rewrite_env (∅ ++ [(X, bind_sub T)] ++ Γ).
-      apply sub_weakening...
-      apply wf_env_sub...
-    + rename select (bind_sub _ = bind_sub _) into Eq.
-      injection Eq as Eq; subst.
-Admitted.
-*)
 
 Lemma sub_pure_type : forall Γ S T,
   Γ ⊢ S <: T ->

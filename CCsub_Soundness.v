@@ -47,52 +47,6 @@ Ltac impossible_typing Typ :=
         end ]
   end.
 
-(*
-Lemma typing_var_strengthen : forall E (x y : atom) U T,
-  typing ([(y, bind_typ U)] ++ E) x T ->
-  x <> y ->
-  exists S, typing E x S /\ sub ([(y, bind_typ U)] ++ E) S T /\ y `~in`A fv_ct S.
-Proof with eauto*.
-  intros * Typ Neq.
-  dependent induction Typ.
-  - Case "typing_var_tvar".
-    exists X.
-    inversion H0.
-    destruct (x == y); try (contradict e; apply Neq).
-    repeat split...
-    apply sub_refl_tvar...
-    apply wf_env_bound_implies_wf_typ with (x := x)...
-  - Case "typing_var".
-    exists (typ_capt (`cset_fvar` x) P).
-    inversion H0.
-    destruct (x == y); try (contradict e; apply Neq).
-    assert (WfCP : wf_typ_in E (typ_capt C P)) by (apply wf_env_bound_implies_wf_typ with (x := x); eauto* ).
-    inversion WfCP; subst.
-    assert (WfxP : wf_typ_in E (typ_capt (`cset_fvar` x) P)).
-    { apply wf_typ_capt...
-      apply wf_cset_from_binds with (b := typ_capt C P)...
-    }
-    repeat split.
-    + apply typing_var with (C := C)...
-    + apply sub_reflexivity with (Ap := dom ([(y, bind_typ U)] ++ E)) (Am := dom ([(y, bind_typ U)] ++ E))...
-      rewrite_env (empty ++ [(y, bind_typ U)] ++ E).
-      apply wf_typ_in_weakening...
-    + simpl.
-      apply notin_union.
-      * apply notin_singleton...
-      * inversion H; subst.
-        apply wf_pretyp_in_notin_fv_cpt with (E := E)...
-  - Case "typing_sub".
-    destruct (IHTyp E x y U eq_refl eq_refl Neq) as [R [Typ' [Sub' NotIn]]].
-    exists R.
-    repeat split.
-    + apply Typ'.
-    + rewrite_env (empty ++ E).
-      apply sub_transitivity with (Q := S)...
-    + apply NotIn.
-Qed.  
-*)
-
 Lemma stores_implies_value : forall S Γ x v,
   S ∷ Γ ->
   stores S x v ->
@@ -228,30 +182,6 @@ Proof with eauto*.
       inversion WfEnv'; subst.
       apply wf_typ_weakening...
 Qed.
-
-(*
-Lemma typing_abs_typ_arrow_implies_sub_param : forall E U e C T1 T2,
-  typing E (exp_abs U e) (typ_capt C (typ_arrow T1 T2)) ->
-  sub E T1 U.
-Proof with eauto*.
-  intros * Typ.
-  destruct (typing_regular _ _ _ Typ) as [WfE [_ WfT]].
-  inversion WfT; subst.
-  eremember (exp_abs U e) as abs.
-  eremember (typ_capt C (typ_arrow T1 T2)) as S.
-  rename WfT into WfS.
-  assert (Sub : sub E S (typ_capt C (typ_arrow T1 T2))).
-  { subst.
-    eapply sub_reflexivity with (Ap := dom E) (Am := dom E)...
-  }
-  clear HeqS.
-  induction Typ; inversion Heqabs; subst.
-  - inversion Sub; subst...
-    inversion H11...
-  - eapply IHTyp...
-    apply sub_transitivity with (Q := T)...
-Qed.
-*)
 
 Lemma store_typing_preserves_dom : forall S Γ,
   S ∷ Γ ->
