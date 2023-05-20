@@ -477,6 +477,45 @@ Proof with eauto*.
   dependent induction Typ...
 Qed.
 
+Lemma subst_cset_cv_var_commutes_with_subst_vv : forall x u v,
+  subst_cset x (`cset_fvar` u) (var_cv v)
+  = var_cv (subst_vv x u v).
+Proof with eauto*.
+  unfold subst_cset.
+  destruct v; simpl;
+    [ destruct (a == x); subst; destruct_set_mem x {x}A
+    | destruct_set_mem x {}A
+    ]; csetdec.
+Qed.
+
+Lemma subst_cset_cv_commutes_with_susbt_ve : forall x u e,
+    subst_cset x (`cset_fvar` u) (exp_cv e)
+  = exp_cv (subst_ve x u (`cset_fvar` u) e).
+Proof with auto using subst_cset_cv_var_commutes_with_subst_vv.
+  induction e; simpl...
+  - rewrite subst_cset_union.
+    f_equal...
+  - rewrite subst_cset_union.
+    f_equal...
+  - unfold subst_cset.
+    destruct_set_mem x {}A...
+    exfalso; fsetdec.
+  - rewrite subst_cset_union.
+    f_equal...
+    unfold subst_cset.
+    destruct_set_mem x (`cset_fvars` c)...
+    csetdec.
+Qed.
+
+Lemma subst_cset_empty : forall x c,
+  subst_cset x c {} = {}.
+Proof with eauto*.
+  intros.
+  unfold subst_cset.
+  destruct_set_mem x {}A; [exfalso; fsetdec|].
+  reflexivity.
+Qed.
+
 Lemma sub_pure_type : forall Γ S T,
   Γ ⊢ S <: T ->
   pure_type S <-> pure_type T.
@@ -749,8 +788,6 @@ Hint Extern 1 (capt ?C) =>
 Hint Extern 1 (expr ?e) =>
   match goal with
   | H: typing _ _ ?e _ |- _ => apply (proj1 (proj2 (typing_regular _ _ _ _ H)))
-  (* | H: red ?e _ |- _ => apply (proj1 (red_regular _ _ H)) *)
-  (* | H: red _ ?e |- _ => apply (proj2 (red_regular _ _ H)) *)
   end
 : core.
 
