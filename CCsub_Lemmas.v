@@ -21,15 +21,6 @@ Proof.
   congruence.
 Qed.
 
-Lemma binds_sub_unique : forall T1 T2 X E,
-  binds X (bind_sub T1) E ->
-  binds X (bind_sub T2) E ->
-  T1 = T2.
-Proof.
-  intros* Hb1 Hb2.
-  congruence.
-Qed.
-
 Lemma binds_typ_unique : forall T1 T2 X E,
   binds X (bind_typ T1) E ->
   binds X (bind_typ T2) E ->

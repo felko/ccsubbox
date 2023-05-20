@@ -72,22 +72,6 @@ Proof with eauto with fsetdec.
       inversion SDE...
 Qed.
 
-Lemma subcapt_from_binds : forall R x C Γ,
-  Γ ⊢ wf ->
-  binds x (bind_typ (C # R)) Γ ->
-  Γ ⊢ₛ (`cset_fvar` x) <: C.
-Proof with eauto.
-  intros* ? Binds.
-  eapply wf_cset_from_binds in Binds as WfC...
-  destruct C...
-  eapply wf_typ_from_binds_typ in Binds as WfT...
-  inversion WfT;
-    inversion select (wf_cset _ _);
-    subst.
-  eapply subcapt_var...
-  eapply subcapt_reflexivity...
-Qed.
-
 (* Substituting the same capture set preserves subcapturing *)
 Lemma subcapt_through_subst_cset : forall x D Q C Δ Γ C1 C2 ,
   (Δ ++ [(x, bind_typ (D # Q))] ++ Γ) ⊢ₛ C1 <: C2 ->

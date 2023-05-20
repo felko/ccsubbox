@@ -312,7 +312,6 @@ Proof with simpl_env;
            eauto 6 using wf_env_subst_tb,
                          wf_typ_subst_tb,
                          sub_through_subst_tt,
-                         subcapt_from_binds,
                          wf_typ_from_binds_typ,
                          wf_typ_ignores_sub_bindings,
                          wf_typ_ignores_typ_bindings.
