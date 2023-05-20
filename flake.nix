@@ -24,10 +24,7 @@
           nativeBuildInputs = with pkgs; [
             coq
             coq-dpdgraph
-            (python310.withPackages (pyPkgs: with pyPkgs; [
-              fire
-              python-lsp-server
-            ]))
+            python310
           ];
           shellHook = ''
             export COQ_DPDGRAPH_LIB=${coq-dpdgraph}/lib/coq/user-contrib/dpdgraph/
