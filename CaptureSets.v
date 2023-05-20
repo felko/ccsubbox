@@ -4,7 +4,6 @@
 
 Require Import Metatheory.
 Require Import Tactics.
-Require Import TaktikZ.
 
 Require Import OrderedTypeEx.
 Require Import OrderedType.

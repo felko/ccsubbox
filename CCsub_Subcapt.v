@@ -3,8 +3,6 @@ Require Import LibTactics.
 Require Export CCsub_Hints.
 Require Export CCsub_Lemmas.
 
-Local Ltac hint := idtac.
-
 Lemma subcapt_weakening : forall Γ Θ Δ C D,
   (Δ ++ Γ) ⊢ₛ C <: D ->
   (Δ ++ Θ ++ Γ) ⊢ wf ->

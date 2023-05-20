@@ -1,5 +1,4 @@
 Require Import Coq.Program.Equality.
-Require Import TaktikZ.
 Require Import Lia.
 
 Require Import CCsub_Subcapt.

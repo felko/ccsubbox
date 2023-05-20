@@ -1,5 +1,4 @@
 Require Import Coq.Program.Equality.
-Require Import TaktikZ.
 Require Import LibTactics.
 Require Export CCsub_Hints.
 Require Import CCsub_Subcapt.
