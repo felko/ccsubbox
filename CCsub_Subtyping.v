@@ -185,38 +185,40 @@ Proof with simpl_env;
     eapply IH...
 Qed.
 
-Lemma sub_transitivity_pure : forall Q Γ S T,
-  pure_type Q ->
-  Γ ⊢ S <: Q ->
-  Γ ⊢ Q <: T ->
-  Γ ⊢ S <: T
-with sub_transitivity_type : forall Q Γ S T,
-  type Q ->
-  Γ ⊢ S <: Q ->
-  Γ ⊢ Q <: T ->
-  Γ ⊢ S <: T.
+Lemma sub_transitivity_mut :
+     (forall Q, type Q -> transitivity_on Q)
+  /\ (forall Q, pure_type Q -> transitivity_on Q).
 Proof with eauto using subcapt_transitivity.
-Ltac inductionThenInversion Rel1 Rel2 :=
-  induction Rel1; try discriminate; inversion EQ; subst; intros T' Rel2; inversion Rel2; subst.
-{ clear sub_transitivity_pure.
-  intros * PureQ SsubQ QsubT.
-  generalize dependent T.
-  generalize dependent S.
-  generalize dependent Γ.
-  remember Q as Q' in |-.
-  generalize dependent Q'.
-  induction PureQ; try (rename T into T2); intros Q' EQ Γ S SsubQ.
+  Ltac inductionThenInversion Rel1 Rel2 :=
+    induction Rel1; try discriminate; subst; intros T' Rel2; inversion Rel2; subst.
+  apply type_mutind; unfold transitivity_on; eauto.
+  - Case "type_capt".
+    intros * PC PR IH * SsubQ QsubT.
+    dependent induction QsubT; subst.
+    + SCase "sub_capt".
+      inversion SsubQ; subst.
+      * SSCase "sub_trans_tvar".
+        contradict SsubQ; intros XsubCR.
+        assert (PureCR : pure_type (C # R))
+            by (applys sub_pure_type XsubCR; auto).
+        inversion PureCR.
+      * SSCase "sub_capt".
+        apply sub_capt...
+    + SCase "sub_top".
+      inversion select (pure_type (_ # _)).
   - Case "type_var".
-    inductionThenInversion SsubQ QsubT...
+    intros * SsubQ QsubT.
+    dependent induction SsubQ; eauto.
   - Case "type_top".
-    inductionThenInversion SsubQ QsubT...
+    intros * SsubQ QsubT. dependent induction SsubQ; inversion QsubT; intros; eauto.
   - Case "type_arr".
-    inductionThenInversion SsubQ QsubT.
+    intros * TypeS IH1 TypeT * IH2 * SsubQ QsubT.
+    dependent induction SsubQ; inversion QsubT; intros.
     + SCase "sub_trans_tvar / sub_top".
       apply sub_top...
-    + SCase "sub_trans_tvar / sub_arr".
+    + SCase "sub_trans_tvar / sub_arr". subst.
       eapply sub_trans_tvar...
-    + SCase "sub_arr / sub_top".
+    + SCase "sub_arr / sub_top". subst.
       rename select (forall x : atom, x ∉ L0 -> _ ⊢ _ <: _) into T1subT2.
       apply sub_top...
       * econstructor...
@@ -229,21 +231,23 @@ Ltac inductionThenInversion Rel1 Rel2 :=
         eapply type_from_wf_typ.
         specialize (T1subT2 x ltac:(fsetdec)).
         applys sub_regular T1subT2.
-    + SCase "sub_arr / sub_arr".
+    + SCase "sub_arr / sub_arr". subst.
+      assert (IH : Γ ⊢ (C3 # R3) <: (C1 # R1)). {
+        apply IH1...
+      }
       pick fresh x and apply sub_arr; try auto.
-      * apply sub_transitivity_type with (Q := R2)...
-      * apply subcapt_transitivity with (D := C2)...
+      * inversion IH...
+      * inversion IH...
       * rename select (forall x : atom, x ∉ L0 -> ([(x, bind_typ (C2 # R2))] ++ _) ⊢ _ <: _) into T1subT2.
         specialize (T1subT2 x ltac:(fsetdec)).
         rename select (forall x : atom, x ∉ L1 -> ([(x, bind_typ (C3 # R3))] ++ _) ⊢ _ <: _) into T2subT3.
         specialize (T2subT3 x ltac:(fsetdec)).
-        apply sub_transitivity_type with (Q := open_ct T2 (`cset_fvar` x)); try auto.
+        apply IH2 with (X := x); [fsetdec | | auto].
         rewrite_nil_concat.
-        apply sub_narrowing_typ_aux with (CQ := C2) (Q := R2).
-        -- apply T1subT2.
-        -- auto.
+        apply sub_narrowing_typ_aux with (CQ := C2) (Q := R2)...
   - Case "type_all".
-    inductionThenInversion SsubQ QsubT.
+    intros * TypeS IH1 TypeT * IH2 * SsubQ QsubT.
+    dependent induction SsubQ; inversion QsubT; subst.
     + SCase "sub_trans_tvar / sub_top".
       apply sub_top...
     + SCase "sub_trans_tvar / sub_all".
@@ -264,54 +268,27 @@ Ltac inductionThenInversion Rel1 Rel2 :=
         applys sub_regular T1subT2.
     + SCase "sub_all / sub_all".
       pick fresh X and apply sub_all; try auto.
-      * apply sub_transitivity_type with (Q := R)...
       * rename select (forall x : atom, x ∉ L0 -> _ ⊢ _ <: _) into T1subT2.
         specialize (T1subT2 X ltac:(fsetdec)).
         rename select (forall x : atom, x ∉ L1 -> _ ⊢ _ <: _) into T2subT3.
         specialize (T2subT3 X ltac:(fsetdec)).
-        apply sub_transitivity_type with (Q := open_tt T2 X).
-        -- auto.
-        -- rewrite_nil_concat.
-           eapply sub_narrowing_aux with (Q := R)...
-           intros Δ S T SsubR RsubT.
-           eapply IHPureQ...
-        -- apply T2subT3.
+        apply IH2 with (X := X); [fsetdec | | auto].
+        rewrite_nil_concat.
+        eapply sub_narrowing_aux with (Q := R)...
   - Case "type_box".
-    inductionThenInversion SsubQ QsubT.
-    + SCase "sub_trans_tvar / sub_top".
-      apply sub_top...
-    + SCase "sub_trans_tvar / sub_box".
-      eapply sub_trans_tvar...
-    + SCase "sub_box / sub_top".
-      apply sub_top...
-    + SCase "sub_box / sub_box".
-      apply sub_box.
-      eapply sub_transitivity_type...
-}
-{ clear sub_transitivity_type.
-  intros * TypeQ SsubQ QsubT.
-  inversion TypeQ; subst.
-  - Case "type_pure".
-    apply sub_transitivity_pure with (Q := Q); assumption.
-  - Case "type_capt".
-    dependent induction QsubT; subst.
-    + SCase "sub_capt".
-      inversion SsubQ; subst.
-      * SSCase "sub_trans_tvar".
-        contradict SsubQ; intros XsubCR.
-        assert (PureCR : pure_type (C # R))
-            by (applys sub_pure_type XsubCR; auto).
-        inversion PureCR.
-      * SSCase "sub_capt".
-        apply sub_capt.
-        -- apply subcapt_transitivity with (D := C)...
-        -- apply sub_transitivity_pure with (Q := R)...
-        -- assumption.
-        -- assumption.
-    + SCase "sub_top".
-      inversion select (pure_type (_ # _)).
-}
-Admitted.
+    intros * TypeT IH * SsubQ QsubT.
+    dependent induction SsubQ; inversion QsubT; subst; eauto.
+Qed.
+
+Lemma sub_transitivity : forall Q Γ S T,
+  type Q ->
+  Γ ⊢ S <: Q ->
+  Γ ⊢ Q <: T ->
+  Γ ⊢ S <: T.
+Proof with eauto*.
+  intros.
+  apply (proj1 sub_transitivity_mut Q)...
+Qed.
 
 Lemma sub_narrowing : forall Q Γ Δ Z P S T,
   pure_type P ->
@@ -321,7 +298,7 @@ Lemma sub_narrowing : forall Q Γ Δ Z P S T,
 Proof with auto.
   intros.
   eapply sub_narrowing_aux; eauto; unfold transitivity_on; intros.
-  eapply sub_transitivity_type with (Q := Q)...
+  eapply sub_transitivity with (Q := Q)...
 Qed.
 
 Lemma sub_narrowing_typ : forall Γ Δ x CP P CQ Q S T,

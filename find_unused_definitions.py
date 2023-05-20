@@ -16,20 +16,18 @@ import graphlib
 COQ_DPDGRAPH_LIB = os.getenv("COQ_DPDGRAPH_LIB")
 
 ROOTS = {
-    'CCsub_Infrastructure.typeN_weakening',
-    'CCsub_Infrastructure.subst_tt_type',
-    'CCsub_Infrastructure.subst_ct_type',
-    'CCsub_Infrastructure.open_tt_rec_pure_typeN_aux',
-    'CCsub_Infrastructure.open_ct_rec_pure_typeN_aux',
+    # 'CCsub_Infrastructure.typeN_weakening',
+    # 'CCsub_Infrastructure.subst_tt_type',
+    # 'CCsub_Infrastructure.subst_ct_type',
+    # 'CCsub_Infrastructure.open_tt_rec_pure_typeN_aux',
+    # 'CCsub_Infrastructure.open_ct_rec_pure_typeN_aux',
     'CCsub_Wellformedness.__test_wf_cset_singleton2',
     'CCsub_Wellformedness.__test_wf_cset_singleton1',
     'CCsub_Lemmas.test_subcapt_regular',
-    'CCsub_Lemmas.subcapt_empty',
-    'CCsub_Lemmas.binds_sub_unique',
-    'CCsub_Subcapt.subcapt_from_binds',
-    'CCsub_Subtyping.sub_transitivity_pure',
+    # 'CCsub_Lemmas.subcapt_empty',
+    # 'CCsub_Lemmas.binds_sub_unique',
+    # 'CCsub_Subcapt.subcapt_from_binds',
     'CCsub_Substitution.capture_prediction',
-    'CCsub_Substitution.capure_prediction',
     'CCsub_Soundness.preservation',
     'CCsub_Soundness.progress',
 }

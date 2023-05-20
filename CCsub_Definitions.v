@@ -145,6 +145,10 @@ with pure_type : typ -> Prop :=
       type T ->
       pure_type (□ T).
 
+Scheme type_mut := Induction for type Sort Prop
+  with pure_mut := Induction for pure_type Sort Prop.
+Combined Scheme type_mutind from type_mut, pure_mut.
+
 Inductive expr : exp -> Prop :=
   | expr_var : forall (x : atom),
       expr x

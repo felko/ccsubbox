@@ -110,7 +110,7 @@ Proof with eauto using wf_env_narrowing, wf_typ_ignores_sub_bindings, sub_narrow
     apply typing_unbox...
     eapply wf_cset_narrowing...
   - Case "typing_sub".
-    apply typing_sub with (S := S)... 
+    apply typing_sub with (S := S)...
 Qed.
 
 Lemma typing_narrowing_typ : forall D Q Γ Δ X C P e T,
@@ -207,7 +207,7 @@ Proof with auto.
     eapply wf_typ_ignores_typ_bindings.
     applys sub_regular Sub'.
   - Case "typing_sub".
-    eauto using (sub_transitivity_type T).
+    eauto using (sub_transitivity T).
 Qed.
 
 Lemma typing_inv_tabs : forall Γ S1 e1 T,
@@ -231,7 +231,7 @@ Proof with simpl_env; auto.
     rewrite_nil_concat.
     eapply typing_narrowing with (Q := S1)...
   - Case "typing_sub".
-    eauto using (sub_transitivity_type T).
+    eauto using (sub_transitivity T).
 Qed.
 
 Lemma typing_inv_let : forall Γ e k T,

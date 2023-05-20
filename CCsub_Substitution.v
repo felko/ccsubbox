@@ -32,7 +32,7 @@ Proof with subst; simpl; eauto.
     enough (WfC0R0 : Γ ⊢ (C0 # R0) wf) by (inversion WfC0R0; auto).
     applys sub_regular Sub.
   - forwards: IHTyp...
-    apply (sub_transitivity_type T)...
+    apply (sub_transitivity T)...
 Qed.
 
 Lemma values_have_precise_captures : forall Γ v C R,
@@ -90,7 +90,7 @@ Proof with simpl; eauto*.
       applys typing_regular Typ.
   - Case "typing_sub".
     forwards (U & HtypU & HsubS): IHTyp...
-    exists U; eauto using (sub_transitivity_type S).
+    exists U; eauto using (sub_transitivity S).
 Qed.
 
 (************************************************************************ *)
@@ -136,7 +136,7 @@ Proof with simpl_env;
     simpl.
     destruct (X == Z); subst.
     + SCase "X = Z".
-      apply (sub_transitivity_type Q)...
+      apply (sub_transitivity Q)...
       * rewrite_nil_concat.
         apply sub_weakening...
       * rewrite (subst_tt_fresh Z P Q).
@@ -298,7 +298,7 @@ Proof with eauto using sub_reflexivity.
   - assert (WfS : Γ ⊢ S wf).
     { applys sub_regular... }
     assert (SsubDQ : Γ ⊢ S <: (D # Q)).
-    { apply sub_transitivity_type with (Q := T)... }
+    { apply sub_transitivity with (Q := T)... }
     destruct (IHTyp x ltac:(reflexivity) WfS D Q SsubDQ) as [C [R [Binds [WfD [WfC [RsubQ PureQ]]]]]].
     exists C, R.
     repeat split...
