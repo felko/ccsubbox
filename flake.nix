@@ -29,6 +29,9 @@
               python-lsp-server
             ]))
           ];
+          shellHook = ''
+            export COQ_DPDGRAPH_LIB=${coq-dpdgraph}/lib/coq/user-contrib/dpdgraph/
+          '';
         };
       }
     );

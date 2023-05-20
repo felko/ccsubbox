@@ -7,6 +7,7 @@
 *.cmx
 *.cmxa
 *.cmxs
+*.dpd
 *.glob
 *.ml.d
 *.ml4.d
