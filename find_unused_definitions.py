@@ -7,26 +7,30 @@ as well as capture prediction in CCsub_Substitutition.v.
 """
 
 import os
+import sys
 import re
 import ast
 import subprocess
 from collections import namedtuple, defaultdict, deque
-import graphlib
+import tempfile
 
 COQ_DPDGRAPH_LIB = os.getenv("COQ_DPDGRAPH_LIB")
 
 ROOTS = {
-    # 'CCsub_Infrastructure.typeN_weakening',
-    # 'CCsub_Infrastructure.subst_tt_type',
-    # 'CCsub_Infrastructure.subst_ct_type',
-    # 'CCsub_Infrastructure.open_tt_rec_pure_typeN_aux',
-    # 'CCsub_Infrastructure.open_ct_rec_pure_typeN_aux',
+    # Local lemmas testing if automation works correctly
     'CCsub_Wellformedness.__test_wf_cset_singleton2',
     'CCsub_Wellformedness.__test_wf_cset_singleton1',
     'CCsub_Lemmas.test_subcapt_regular',
-    # 'CCsub_Lemmas.subcapt_empty',
-    # 'CCsub_Lemmas.binds_sub_unique',
-    # 'CCsub_Subcapt.subcapt_from_binds',
+
+    # Lemmas defined mutually but that are only used by
+    # the other lemmas within the same `with` group
+    'CCsub_Infrastructure.typeN_weakening',
+    'CCsub_Infrastructure.subst_tt_type',
+    'CCsub_Infrastructure.subst_ct_type',
+    'CCsub_Infrastructure.open_tt_rec_pure_typeN_aux',
+    'CCsub_Infrastructure.open_ct_rec_pure_typeN_aux',
+
+    # Main results
     'CCsub_Substitution.capture_prediction',
     'CCsub_Soundness.preservation',
     'CCsub_Soundness.progress',
@@ -70,18 +74,17 @@ class CoqDependencyGraph:
             self.ids_by_name = ids_by_name
 
     @classmethod
-    def parse_dpd_file(cls, dpd_file_path):
+    def parse_dpd_file(cls, dpd_file):
         graph = cls()
-        with open(dpd_file_path) as dpd_file:
-            for line in dpd_file.readlines():
-                if line.startswith('N'):
-                    node = cls.parse_node(line)
-                    graph.add_node(node)
-                elif line.startswith('E'):
-                    used, using = cls.parse_dependency(line)
-                    graph.add_dependency(used, using)
-                else:
-                    raise CoqDPDParseError(f"unable to parse line {line!r}")
+        for line in dpd_file.readlines():
+            if line.startswith('N'):
+                node = cls.parse_node(line)
+                graph.add_node(node)
+            elif line.startswith('E'):
+                used, using = cls.parse_dependency(line)
+                graph.add_dependency(used, using)
+            else:
+                raise CoqDPDParseError(f"unable to parse line {line!r}")
         return graph
 
     @classmethod
@@ -155,14 +158,14 @@ class CoqDependencyGraph:
  
     def topsort(self, coq_module_names):
         visited = set()
-        sorted_nodes = deque()
+        sorted_components = []
         
         def go(node_id):
             visited.add(node_id)
             for using in self.reverse_dependencies[node_id]:
                 if using not in visited:
                     self.topsort_aux(using)
-            sorted_nodes.appendleft(self.nodes[node_id])
+            sorted_components[-1].appendleft(self.nodes[node_id])
  
         def module_key(node_id):
             node = self.nodes[node_id]
@@ -173,9 +176,11 @@ class CoqDependencyGraph:
 
         for node_id in sorted(self.nodes, key=module_key):
             if node_id not in visited:
+                if not sorted_components or not sorted_components[-1]:
+                    sorted_components.append(deque())
                 go(node_id)
 
-        return sorted_nodes
+        return sorted_components
 
 if __name__ == '__main__':
     coq_module_names = get_coq_module_names()
@@ -183,20 +188,20 @@ if __name__ == '__main__':
         module_name for module_name in coq_module_names
         if module_name.startswith('CCsub_')
     ]
-    dpd_file_path = "dependency-graph.dpd"
 
-    # Delete the dpd file in order to regenerate
-    if not os.path.exists(dpd_file_path):
-        generate_dpd_file(coq_module_names, dpd_file_path)
-
-    dependency_graph = CoqDependencyGraph.parse_dpd_file(dpd_file_path)
+    with tempfile.NamedTemporaryFile(mode="w+") as dpd_file:
+        generate_dpd_file(coq_module_names, dpd_file.name)
+        dependency_graph = CoqDependencyGraph.parse_dpd_file(dpd_file)
+    
     unused_set = dependency_graph.unused(ROOTS)
     unused_graph = dependency_graph.restrict(unused_set)
-    sorted_unused = unused_graph.topsort(coq_module_names)
+    sorted_components = unused_graph.topsort(coq_module_names)
 
-    for unused in sorted_unused:
-        if unused.kind == 'cnst' and \
-                unused.prop and \
-                not unused.name.endswith('_ind') and \
-                unused.module in ccsub_modules:
-            print(f"{unused.module}.{unused.name}")
+    for component in sorted_components:
+        print()
+        for unused in component:
+            if unused.kind == 'cnst' and \
+                    unused.prop and \
+                    not unused.name.endswith('_ind') and \
+                    unused.module in ccsub_modules:
+                print(f"{unused.module}.{unused.name}")
