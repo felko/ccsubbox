@@ -17,7 +17,6 @@ Lemma typing_weakening : forall Γ Θ Δ e T,
 Proof with simpl_env;
            eauto using wf_typ_weakening,
                        wf_typ_from_wf_env_typ,
-                       wf_typ_from_wf_env_sub,
                        sub_weakening,
                        subcapt_weakening.
   intros * Typ.
@@ -58,7 +57,6 @@ Proof with simpl_env;
     apply typing_unbox...
     apply wf_cset_weakening... 
 Qed.
-
 
 (************************************************************************ *)
 (** ** Narrowing for typing (7) *)
@@ -122,18 +120,6 @@ Inductive syn_cat_agree : typ -> typ -> Prop :=
     syn_cat_agree X Y
 | syn_cat_agree_concrete : forall C P D U,
     syn_cat_agree (typ_capt C P) (typ_capt D U). *)
-
-Lemma sub_of_tvar : forall Γ P (X : atom),
-  Γ ⊢ P <: X ->
-  exists (Y : atom), P = Y.
-Proof with eauto*.
-  intros * Sub.
-  assert (PureP : pure_type P).
-  { applys sub_pure_type Sub.
-    constructor.
-  }
-  dependent induction Sub...
-Qed.
 
 (*
 Lemma typing_narrowing_typ_aux : forall Q Γ Δ X P e T,

@@ -101,16 +101,6 @@ Proof with eauto*.
   intros. apply notin_fv_ct_open_tt_rec with (k := 0) (U := U)...
 Qed.
 
-Lemma notin_fv_tt_open : forall (X : atom) U T,
-  X ∉ fv_tt (open_tt T U) ->
-  X ∉ fv_ct (open_tt T U) ->
-  X ∉ (fv_tt T `u`A fv_ct T).
-Proof with auto.
- intros. apply notin_union.
- - apply notin_fv_tt_open_tt with (U := U)...
- - apply notin_fv_ct_open_tt with (U := U)...
-Qed.
-
 Lemma notin_fv_ct_open_ct_rec : forall (X : atom) T C k,
   X ∉ fv_ct (open_ct_rec k C T) ->
   X ∉ fv_ct T.
@@ -168,17 +158,6 @@ Qed.
 (*   intros. apply notin_fv_ct_open_ct_rec with (k := 0) (Y := Y)... *)
 (*   intros. apply notin_fv_ct_open_cpt_rec with (k := 0) (Y := Y)... *)
 (* Qed. *)
-
-
-Lemma notin_fv_ct_open : forall (X : atom) T C,
-  X ∉ fv_ct (open_ct T C) ->
-  X ∉ fv_tt (open_ct T C) ->
-  X ∉ (fv_tt T `u`A fv_ct T).
-Proof with auto.
-  intros. apply notin_union...
-  - apply notin_fv_tt_open_ct with (C := C)...
-  - apply notin_fv_ct_open_ct with (C := C)...
-Qed.
 
 Lemma notin_fv_wf_cset : forall Γ (x : atom) C,
   Γ ⊢ₛ C wf ->
@@ -239,35 +218,6 @@ Proof with eauto using notin_fv_wf_cset.
     fsetdec.
 Qed.
 
-Local Lemma notin_fv_vv_open_vv : forall k u x v,
-  x ∉ fv_vv (open_vv k u v) ->
-  x ∉ fv_vv v.
-Proof with eauto.
-  intros.
-  unfold fv_vv, open_vv in *.
-  destruct v...
-Qed.
-
-Local Lemma notin_fv_ve_open_ve_rec : forall k u (y x : atom) t,
-  x ∉ fv_ve (open_ve_rec k u (`cset_fvar` y) t) ->
-  x <> y ->
-  x ∉ fv_ve t.
-Proof with eauto using notin_fv_vv_open_vv.
-  intros. generalize dependent k.
-  induction t; simpl in *; intros k H; try (trivial || notin_solve)...
-  all: destruct (AtomSetNotin.elim_notin_union H)...
-  destruct v; simpl in *; enough (x ∉ `cset_fvars` c) by fsetdec; eapply notin_cset_fvars_open_cset...
-Qed.
-
-Lemma notin_fv_ve_open_ve : forall u (y x : atom) t,
-  x ∉ fv_ve (open_ve t u (`cset_fvar` y)) ->
-  x <> y ->
-  x ∉ fv_ve t.
-Proof with eauto.
-  intros. unfold open_ve in *.
-  apply (notin_fv_ve_open_ve_rec 0 u y)...
-Qed.
-
 (* Lemma notin_fv_ct_open_tt_rec : forall k (Y X : atom) T, *)
 (*   X `notin` fv_ct (open_tt_rec k Y T) -> *)
 (*   X `notin` fv_ct T *)
@@ -284,42 +234,6 @@ Qed.
 (*   generalize k. *)
 (*   induction T; simpl; intros k0 Fr; notin_simpl; try apply notin_union; eauto. *)
 (* Qed. *)
-
-Local Lemma notin_fv_ve_open_te_rec : forall k (y x : atom) t,
-  x ∉ fv_ve (open_te_rec k y t) ->
-  x <> y ->
-  x ∉ fv_ve t.
-Proof with eauto.
-  intros. generalize dependent k.
-  induction t; simpl in *; intros k H; try (trivial || notin_solve)...
-  all: destruct (AtomSetNotin.elim_notin_union H)...
-Qed.
-
-Lemma notin_fv_ve_open_te : forall (y x : atom) t,
-  x ∉ fv_ve (open_te t y) ->
-  x <> y ->
-  x ∉ fv_ve t.
-Proof with eauto.
-  intros. unfold open_ve in *.
-  apply (notin_fv_ve_open_te_rec 0 y)...
-Qed.
-
-Lemma map_subst_tb_id : forall G Z P,
-  wf_env G ->
-  Z ∉ dom G ->
-  G = map (subst_tb Z P) G.
-Proof with auto.
-  intros G Z P H.
-  induction H; intros Fr; simpl_env...
-  - rewrite <- IHwf_env...
-    simpl.
-    rewrite <- subst_tt_fresh...
-    eapply notin_fv_wf_typ; eauto.
-  - rewrite <- IHwf_env...
-    cbn [subst_tb].
-    rewrite <- subst_tt_fresh...
-    eapply notin_fv_wf_typ; eauto.
-Qed.
 
 (* ********************************************************************** *)
 (** * #<a name="cvfree"></a># Lemmas about free variables -- in particular properties of [free_for_cv] *)
@@ -520,37 +434,6 @@ Proof with eauto*.
   specialize (IHe1 k y).
   specialize (IHe2 (`succ` k) y).
   apply subset_union...
-Qed.
-
-Lemma var_cv_binds : forall Γ v (x : atom),
-  Γ ⊢ wf ->
-  Γ ⊢ₛ (var_cv v) wf ->
-  x ∈ `cset_fvars` (var_cv v) ->
-  exists C R, binds x (bind_typ (C # R)) Γ.
-Proof with eauto.
-  intros * WfEnv WfV xIn.
-  destruct v; simpl in *.
-  - inversion WfV; subst.
-    assert (x = a) by fsetdec; subst...
-  - fsetdec.
-Qed.
-
-Lemma exp_cv_binds : forall Γ e (x : atom),
-  Γ ⊢ wf ->
-  Γ ⊢ₛ (exp_cv e) wf ->
-  x ∈ `cset_fvars` (exp_cv e) ->
-  exists C R, binds x (bind_typ (C # R)) Γ.
-Proof with eauto using var_cv_binds.
-  intros * WfEnv WfCV xIn.
-  induction e; intros; simpl in *; try fsetdec...
-  - destruct (proj1 (wf_cset_over_union _ _ _) WfCV) as [WfC WfD].
-    destruct (AtomSet.F.union_1 xIn)...
-  - destruct (proj1 (wf_cset_over_union _ _ _) WfCV) as [WfC WfD].
-    destruct (AtomSet.F.union_1 xIn)...
-  - destruct (proj1 (wf_cset_over_union _ _ _) WfCV) as [WfC WfD].
-    destruct (AtomSet.F.union_1 xIn)...
-    destruct (cset_references_fvar_over_union _ _ _ xIn) as [xInC1 | xInC2]...
-    inversion WfC; subst...
 Qed.
 
 Lemma var_cv_subset_fv_vv : forall v,
@@ -758,43 +641,6 @@ Proof with eauto using wf_cset_over_union; eauto*.
     inversion H; subst.
     apply wf_concrete_cset...
 Qed. 
-
-Lemma subst_cset_fresh_for_cv_var : forall z v C,
-  z `notin` fv_vv v ->
-  subst_cset z C (var_cv v) = var_cv v.
-Proof with eauto*.
-  intros.
-  destruct v; unfold subst_cset; simpl in *...
-  - replace (AtomSet.F.mem z (singleton a)) with false by fset_mem_dec.
-    reflexivity.
-  - replace (AtomSet.F.mem z {}A) with false by fset_mem_dec.
-    reflexivity.
-Qed.
-
-Lemma subst_cset_fresh_for_cv : forall z t C,
-  z ∉ fv_ve t ->
-  subst_cset z C (exp_cv t) = exp_cv t.
-Proof with eauto using subst_cset_fresh_for_cv_var; eauto*.
-  intros.
-  induction t; simpl in H |- *...
-  - rewrite subst_cset_distributive_across_union.
-    repeat rewrite subst_cset_fresh_for_cv_var...
-  - rewrite subst_cset_distributive_across_union.
-    rewrite IHt1 by notin_solve.
-    rewrite IHt2 by notin_solve.
-    reflexivity.
-  - unfold subst_cset.
-    destruct_set_mem z {}A...
-    exfalso; clear - zIn; fsetdec.
-  - destruct c.
-    unfold subst_cset; simpl.
-    destruct_set_mem z (t `u`A `cset_fvars` (var_cv v))...
-    destruct (AtomSetNotin.elim_notin_union H).
-    destruct (AtomSet.F.union_1 zIn).
-    + exfalso; apply (H0 H2).
-    + rewrite cset_fvars_var_cv_is_fv_vv in H2.
-      exfalso; apply (H1 H2).
-Qed.
 
 (*
 Lemma subst_commutes_with_free_for_cv : forall x u C e,
@@ -1195,13 +1041,6 @@ Proof with simpl_env; auto*.
     eapply sub_regular; eassumption.
 Qed.
 
-Lemma value_regular : forall e,
-  value e ->
-  expr e.
-Proof.
-  intros e H. induction H; auto.
-Qed.
-
 Lemma eval_typing_regular : forall Γ K T U,
   Γ ⊢ K : T ⇒ U ->
   Γ ⊢ wf /\ Γ ⊢ T wf /\ Γ ⊢ U wf.
@@ -1214,61 +1053,6 @@ Proof with eauto*.
   - pick fresh x and specialize H.
     destructs typing_regular H as [wf_xTE _].
     inversion wf_xTE; subst...
-Qed.
-
-Lemma exp_cv_binds_typ : forall Γ e (x : atom) S,
-  Γ ⊢ e : S ->
-  x ∈ `cset_fvars` (exp_cv e) ->
-  exists C R, binds x (bind_typ (C # R)) Γ.
-Proof with eauto using wf_cset_over_union.
-  intros * Typ xIn.
-  induction Typ; simpl in *...
-  - assert (x = x0) by fsetdec; subst...
-  - pick fresh y.
-    forwards HA: H1 y.
-    + notin_solve.
-    + forwards (? & ? & ?): exp_cv_open_ve_rec e1 0 y.
-      unfold open_ve.
-      clear Fr;fsetdec.
-    + destruct HA as (D & Q & HA)...
-      inversion HA.
-      assert (x <> y) by notin_solve.
-      destruct (x == y)...
-      easy.
-  - destruct_union_mem xIn...
-  - pick fresh y.
-    destruct (cset_references_fvar_over_union _ _ _ xIn).
-    + apply IHTyp...
-    + forwards HA: H0 y.
-      * notin_solve.
-      * assert (cset_subset_prop (exp_cv e) (exp_cv (open_ve e y (`cset_fvar` y)))) by apply (exp_cv_open_ve_rec e 0 y).
-        assert (cset_subset_prop (exp_cv k) (exp_cv (open_ve k y (`cset_fvar` y)))) by apply (exp_cv_open_ve_rec k 0 y).
-        clear - xIn H1 H2 H3 IHTyp.
-        rewrite <- fvars_union_1 in xIn.
-        apply subset_in with (A := exp_cv k)...
-      * destruct HA as (D & Q & HA)...
-        inversion HA.
-        assert (x <> y) by notin_solve.
-        destruct (x == y)...
-        easy.
-  - pick fresh y.
-    forwards HA: H2 y.
-    + notin_solve.
-    + forwards (? & ? & ?): exp_cv_open_te_rec e1 0 y.
-      clear Fr; fsetdec.
-    + destruct HA as (D & Q & HA)...
-      inversion HA.
-      assert (x <> y) by notin_solve.
-      destruct (x == y)...
-      easy.
-  - exfalso; clear - xIn; fsetdec.
-  - destruct (AtomSet.F.union_1 xIn)...
-    clear IHTyp xIn.
-    rename select (_ ⊢ₛ _ wf) into WfC.
-    rename select (x ∈ _) into xIn.
-    destruct WfC as [fvars univ AllBound].
-    destruct (AllBound x xIn) as [D [Q B]].
-    exists D, Q...
 Qed.
 
 (* *********************************************************************** *)

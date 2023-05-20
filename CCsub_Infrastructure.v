@@ -210,24 +210,6 @@ with pure_typeN : nat -> typ -> Prop :=
 
 Hint Constructors varN typeN pure_typeN : core.
 
-Lemma varN_weakening_aux : forall n v,
-  varN n v ->
-  varN (`succ` n) v.
-Proof with eauto*.
-  intros.
-  induction H; constructor; lia.
-Qed.
-
-Lemma captN_weakening_aux : forall n C,
-  captN n C ->
-  captN (`succ` n) C.
-Proof with eauto*.
-  intros.
-  intros m mIn.
-  enough (m < n) by lia.
-  apply H, mIn.
-Qed.
-
 Lemma varN_weakening : forall n m v,
   varN n v ->
   n <= m ->
@@ -235,23 +217,6 @@ Lemma varN_weakening : forall n m v,
 Proof with eauto*.
   intros.
   induction H; constructor; lia.
-Qed.
-
-Lemma typeN_weakening_aux : forall n T,
-  typeN n T ->
-  typeN (`succ` n) T
-with pure_typeN_weakening_aux : forall n R,
-  pure_typeN n R ->
-  pure_typeN (`succ` n) R.
-Proof with eauto using varN_weakening_aux, captN_weakening_aux.
-{ clear typeN_weakening_aux.
-  intros * H.
-  destruct H...
-}
-{ clear pure_typeN_weakening_aux.
-  intros * H.
-  induction H...
-}
 Qed.
 
 Lemma captN_weakening : forall n m C,
@@ -273,7 +238,7 @@ with pure_typeN_weakening : forall n m R,
   pure_typeN n R ->
   n <= m ->
   pure_typeN m R.
-Proof with eauto using varN_weakening, captN_weakening, typeN_weakening_aux, pure_typeN_weakening_aux.
+Proof with eauto using varN_weakening, captN_weakening.
 { clear typeN_weakening.
   intros.
   destruct H...
@@ -427,16 +392,6 @@ Proof with eauto*.
 }
 Qed.
 
-Lemma capt_to_capt0 : forall C,
-  capt C -> captN 0 C.
-Proof with eauto*.
-  intros.
-  intros m mIn.
-  exfalso.
-  contradict mIn.
-  apply H.
-Qed.
-
 Lemma type_to_type0 : forall T,
   type T -> typeN 0 T
 with pure_type_to_pure_type0 : forall R,
@@ -464,22 +419,6 @@ Proof with eauto.
 }
 Qed.
 
-Lemma natset_inclusion_lemma : forall (A B : nats),
-  B = NatSet.F.union A B ->
-  NatSet.F.Subset A B.
-Proof.
-  intros. unfold NatSet.F.Subset. intros.
-  rewrite H. fnsetdec.
-Qed.
-
-Lemma atomset_inclusion_lemma : forall (A B : atoms),
-  B = AtomSet.F.union A B ->
-  AtomSet.F.Subset A B.
-Proof.
-  intros. unfold AtomSet.F.Subset. intros.
-  rewrite H. fsetdec.
-Qed.
-
 Hint Extern 1 (_ >= _) => lia : core.
 
 Lemma open_vt_typeN : forall n m S v,
@@ -504,20 +443,6 @@ Proof with eauto using open_vt_typeN.
   generalize dependent m.
   generalize dependent n.
   induction T; intros * H1 H2; simpl; inversion H1; inversion H; subst; f_equal...
-Qed.
-
-Lemma open_ct_rec_typeN : forall n m C T,
-  typeN n T ->
-  m >= n ->
-  T = open_ct_rec m C T.
-Proof with eauto*.
-  intros n m C T.
-  generalize dependent m.
-  generalize dependent n.
-  induction T; intros * H1 H2; simpl; inversion H1; inversion H; subst; f_equal...
-  unfold open_cset.
-  destruct_set_mem m (`cset_bvars` c)...
-  specialize (H4 m mIn); lia.
 Qed.
 
 Lemma open_tt_rec_type : forall T U k,
@@ -678,112 +603,7 @@ Inductive exprN : nat -> exp -> Prop :=
       varN n x ->
       exprN n (C ⟜ x).
 
-Lemma exprN_weakening_aux : forall n e,
-  exprN n e ->
-  exprN (S n) e.
-Proof with eauto using captN_weakening_aux, typeN_weakening_aux, varN_weakening; eauto*.
-  intros n e. generalize dependent n.
-  dependent induction e; intros n' H; inversion H; constructor...
-Qed.
-
-Lemma exprN_weakening : forall n m T,
-  exprN n T ->
-  n <= m ->
-  exprN m T.
-Proof with eauto using exprN_weakening_aux.
-  intros. dependent induction m...
-  assert (n = 0) by lia; subst...
-  destruct (n === `succ` m); subst...
-  assert (n <= m) by lia...
-Qed.
-
-Hint Resolve captN_weakening varN_weakening exprN_weakening typeN_weakening : core.
-
-Lemma open_vv_varN_aux : forall n s v,
-  varN n (open_vv n s v) ->
-  varN (`succ` n) v.
-Proof with eauto*.
-  intros.
-  inversion H; subst.
-  * destruct v...
-    inversion H0; subst.
-    simpl in *.
-    destruct (n === n0); subst...
-  * destruct v...
-    inversion H2; subst.
-    destruct (n === n0); subst...
-Qed.
-
-Lemma open_cset_captN_aux : forall n D C, 
-  captN n (open_cset n D C) ->
-  captN (`succ` n) C.
-Proof with eauto*.
-  intros.
-  intros m mIn.
-  unfold open_cset in H.
-  destruct_set_mem n C.
-  - unfold captN in H.
-    enough (m <= n) by lia.
-    destruct (m === n); subst...
-    enough (m < n) by lia.
-    apply H.
-    csetdec.
-  - enough (m < n) by lia.
-    apply H, mIn.
-Qed.
-
-Lemma open_ve_rec_exprN_aux : forall n s c e,
-  exprN n (open_ve_rec n s c e) ->
-  exprN (`succ` n) e.
-Proof with eauto*.
-  intros n s c e. generalize dependent n.
-  dependent induction e; simpl in *;
-    intros n' H;
-    constructor;
-    inversion H; subst;
-    eauto*;
-    eauto using open_vv_varN_aux, open_cset_captN_aux, open_ct_rec_typeN_aux.
-Qed.
-
-Lemma open_te_rec_exprN_aux : forall n S e,
-  exprN n (open_te_rec n S e) ->
-  exprN (`succ` n) e.
-Proof with eauto*.
-  intros n S e. generalize dependent n.
-  dependent induction e; simpl in *;
-    intros n' H;
-    constructor;
-    inversion H; subst;
-    eauto*;
-    eauto using open_cset_captN_aux, open_tt_rec_typeN_aux.
-Qed.
-
-Lemma expr_to_expr0 : forall e,
-  expr e -> exprN 0 e.
-Proof with eauto
-    using capt_to_capt0,
-          type_to_type0,
-          pure_type_to_pure_type0,
-          open_vt_typeN_aux,
-          open_vv_varN_aux,
-          open_cset_captN_aux,
-          open_ve_rec_exprN_aux,
-          open_te_rec_exprN_aux.
-  intros.
-  induction H; constructor...
-  all: pick fresh x for L...
-Qed.
-
-Lemma open_vv_varN : forall n s v,
-  varN n v ->
-  v = open_vv n s v.
-Proof with eauto*.
-  intros.
-  destruct H...
-  unfold open_vv.
-  destruct (n === m); subst...
-  lia.
-Qed.
+Hint Resolve captN_weakening varN_weakening typeN_weakening : core.
 
 Lemma open_cset_captN : forall n C D,
   captN n C ->
@@ -796,17 +616,6 @@ Proof with eauto*.
   unfold captN in H.
   enough (n < n) by lia.
   apply H, nIn.
-Qed.
-
-Lemma open_cset_capt : forall n C D,
-  capt C ->
-  C = open_cset n D C.
-Proof with eauto*.
-  intros.
-  apply capt_to_capt0 in H.
-  apply open_cset_captN.
-  apply captN_weakening with (n := 0)...
-  lia.
 Qed.
 
 Lemma subst_cset_intro : forall X k D C,
@@ -829,72 +638,6 @@ Proof with eauto*.
     exfalso; fsetdec.
 Qed.
 
-Lemma subst_cset_open_cset : forall C D x E k,
-  capt E ->
-  subst_cset x E (open_cset k D C) =
-    open_cset k (subst_cset x E D) (subst_cset x E C).
-Proof.
-  intros * H.
-  unfold open_cset, subst_cset.
-  unfold capt in H.
-  csetdec.
-Qed.
-
-Lemma open_ve_rec_exprN : forall n s c e,
-  exprN n e ->
-  e = open_ve_rec n s c e.
-Proof with eauto using open_cset_captN, open_vv_varN, open_tt_rec_typeN, open_ct_rec_typeN.
-  intros.
-  induction H; simpl; f_equal...
-Qed.
-
-Lemma open_te_rec_exprN : forall n S e,
-  exprN n e ->
-  e = open_te_rec n S e.
-Proof with eauto using open_cset_captN, open_tt_rec_typeN, open_ct_rec_typeN.
-  intros.
-  induction H; simpl; f_equal...
-Qed.
-
-Lemma open_te_rec_expr : forall e U k,
-  expr e ->
-  e = open_te_rec k U e.
-Proof with auto using open_cset_capt, open_tt_rec_type.
-  intros e U k WF; revert k;
-  induction WF; intros k0; simpl; f_equal; auto using open_tt_rec_type.
-  - pick fresh x. eapply open_te_rec_exprN...
-    eapply exprN_weakening with (n := 1); try lia...
-    eapply open_ve_rec_exprN_aux with (s := x) (c := `cset_fvar` x)...
-    eapply expr_to_expr0...
-    eapply H0...
-  - pick fresh x. eapply open_te_rec_exprN...
-    eapply exprN_weakening with (n := 1); try lia...
-    eapply open_ve_rec_exprN_aux with (s := x) (c := `cset_fvar` x)...
-    eapply expr_to_expr0...
-    eapply H...
-  - pick fresh X.
-    eapply open_te_rec_exprN...
-    eapply exprN_weakening with (n := 1); try lia...
-    eapply open_te_rec_exprN_aux with (S0 := X)...
-    eapply expr_to_expr0...
-    eapply H0...
-Qed.
-
-Lemma open_te_expr : forall e U,
-  expr e ->
-  e = open_te e U.
-Proof with auto*.
-  intros e U Ee.
-  apply open_te_rec_expr...
-Qed.
-
-Lemma subst_te_fresh : forall X U e,
-  X ∉ (fv_te e `u`A fv_ce e) ->
-  e = subst_te X U e.
-Proof.
-  induction e; simpl; intros; f_equal; auto using subst_cset_fresh, subst_tt_fresh.
-Qed.
-
 Lemma subst_te_open_te_rec : forall e T X U k,
   pure_type U ->
   subst_te X U (open_te_rec k T e) =
@@ -903,15 +646,6 @@ Proof with eauto*.
   intros.
   generalize dependent k.
   induction e; intros k; simpl; f_equal; auto using subst_tt_open_tt_rec.
-Qed.
-
-Lemma subst_te_open_te : forall e T X U,
-  pure_type U ->
-  subst_te X U (open_te e T) = open_te (subst_te X U e) (subst_tt X U T).
-Proof with auto*.
-  intros.
-  unfold open_te.
-  apply subst_te_open_te_rec...
 Qed.
 
 Lemma subst_te_open_te_var : forall (X Y:atom) U e,
@@ -998,166 +732,6 @@ Qed.
 (** ** Properties of expression substitution in expressions *)
 
 (** This section follows the structure of the previous two sections. *)
-
-Lemma open_cset_type_aux : forall n C D i,
-  captN n C ->
-  i >= n ->
-  C = open_cset i D C.
-Proof with eauto*.
-  intros.
-  unfold open_cset.
-  destruct_set_mem i C.
-  apply H in iIn.
-  exfalso; lia.
-Qed.
-
-Lemma open_vv_type_aux : forall n v u i,
-  varN n v ->
-  i >= n ->
-  v = open_vv i u v.
-Proof with eauto*.
-  intros.
-  unfold open_vv.
-  destruct v...
-  destruct (i === n0); subst...
-  inversion H; lia.
-Qed. 
-
-Lemma open_ve_rec_type_aux : forall n e u c i,
-  exprN n e ->
-  i >= n ->
-  e = open_ve_rec i u c e.
-Proof with eauto using open_cset_type_aux, open_vv_type_aux, open_ct_rec_type_aux.
-  intros n e; revert n.
-  dependent induction e;
-    intros * Hexpr Hineq; simpl in *;
-    inversion Hexpr; subst;
-    f_equal...
-Qed.
-
-Lemma open_ct_rec_capt : forall T j D i C,
-  i <> j ->
-  (* can't change this to `capt D` since then D can be universal. *)
-  capt D ->
-  (`cset_fvars` C) `disjoint` (`cset_fvars` D) ->
-  (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
-  open_ct_rec j D T = open_ct_rec i C (open_ct_rec j D T) ->
-  T = open_ct_rec i C T.
-Proof with eauto using open_cset_rec_capt_aux.
-  induction T; intros j D i C Neq Closed; intros HCommon HcommonU H; simpl in *; inversion H; f_equal...
-    eapply open_cset_rec_capt_aux with (V := D)...
-  + destruct C; destruct D; simpl; destr_bool...
-  + autounfold in *; fsetdec...
-Qed.
-
-Lemma open_cset_fuse : forall i j x y C,
-  i <> j ->
-  open_cset j (`cset_fvar` x) C = open_cset i (`cset_fvar` y) (open_cset j (`cset_fvar` x) C) ->
-  C = open_cset i (`cset_fvar` y) C.
-Proof with eauto*.
-  intros.
-  unfold open_cset in *.
-  destruct_set_mem j C.
-  destruct_set_mem i C.
-  destruct_set_mem i (`cset_fvar` x `u` (C N`\` j)).
-Admitted.
-
-Lemma open_vv_fuse : forall i j x y v,
-  i <> j ->
-  open_vv j x v = open_vv i y (open_vv j x v) ->
-  v = open_vv i y v.
-Proof with eauto*.
-  intros.
-  unfold open_vv in *.
-  destruct v...
-  destruct (j === n)...
-  destruct (i === n)...
-Qed.
-
-Lemma open_ve_rec_expr_aux : forall e j v u C D i,
-  i <> j ->
-  (* Does D _need_ to be a concrete capture set here?
-     open_ct_rec_capt requires this.
-   *)
-  capt D ->
-  (`cset_fvars` C) `disjoint` (`cset_fvars` D) -> 
-  (andb (`cset_uvar` C) (`cset_uvar` D)) = false ->
-  open_ve_rec j v D e = open_ve_rec i u C (open_ve_rec j v D e) ->
-  e = open_ve_rec i u C e.
-Proof with eauto using open_ct_rec_capt, open_vv_fuse, open_cset_fuse.
-  induction e; intros j x y C D i Neq Closed Disj DisjU H; simpl in *; inversion H; f_equal...
-Qed.
-
-Lemma var_cv_capt : forall v,
-  capt (var_cv v).
-Proof with eauto*.
-  intros.
-  destruct v; simpl...
-Qed.
-
-Lemma exp_cv_capt : forall e,
-  capt (exp_cv e).
-Proof with eauto using var_cv_capt.
-  intros e.
-  induction e; subst; simpl in *...
-  - assert (capt (var_cv v)) by apply var_cv_capt.
-    assert (capt (var_cv v0)) by apply var_cv_capt.
-    unfold capt in *.
-    fnsetdec.
-  - intros a.
-    simpl.
-    unfold capt in *.
-    fnsetdec.
-  - intros a.
-    simpl.
-    assert (capt (var_cv v)) by apply var_cv_capt.
-    unfold capt in *.
-    apply NatSetNotin.notin_union...
-Qed.
-
-Lemma cset_fvars_var_cv_is_fv_vv : forall v,
-  `cset_fvars` (var_cv v) = fv_vv v.
-Proof with eauto*.
-  destruct v...
-Qed.
-
-Lemma cset_fvars_exp_cv_subset_fv_ve : forall e,
-  `cset_fvars` (exp_cv e) `subset` fv_ve e.
-Proof with eauto using cset_fvars_var_cv_is_fv_vv.
-  intros.
-  induction e; simpl; f_equal; try fsetdec.
-  - destruct v; simpl; fsetdec.
-  - destruct v; destruct v0; fsetdec.
-  - destruct v; simpl; fsetdec.
-  - apply atomset_subset_union; destruct v; fsetdec.
-Qed.
-
-Lemma open_ve_rec_expr : forall u c e k,
-  expr e ->
-  e = open_ve_rec k u c e.
-Proof with auto*.
-  intros u c e k Hexpr. revert k.
-  induction Hexpr; intro k0; simpl; f_equal; auto*.
-  - pick fresh x.
-    apply open_ct_rec_type...
-  - pick fresh x.
-    specialize H1 with (x := x) (k := S k0).
-    apply open_ve_rec_expr_aux with (j := 0) (v := x) (D := (`cset_fvar` x));
-      simpl...
-    + autounfold in *. fsetdec.
-  - pick fresh x.
-    specialize H0 with (x := x) (k := S k0).
-    apply open_ve_rec_expr_aux with (j := 0) (v := x) (D := `cset_fvar` x); simpl...
-    autounfold in *.
-    fsetdec.
-  - apply open_ct_rec_type...
-  - pick fresh X.
-    unfold open_te in H0.
-    eapply (open_ve_rec_type_aux 1)...
-    apply (open_te_rec_exprN_aux 0 X).
-    apply expr_to_expr0...
-  - apply open_ct_rec_type...
-Qed.
 
 Lemma subst_ct_fresh : forall (x : atom) c t,
   x ∉ fv_ct t ->
@@ -1431,17 +1005,6 @@ Proof with auto using subst_vv_open_vv, subst_ct_open_rec, subst_cset_open_cset_
   induction e; intros k; simpl; f_equal...
 Qed.
 
-Lemma subst_ve_open_ve : forall (e : exp) (x y u : atom) (c1 c2 : cap),
-  y <> x ->
-  capt c1 ->
-  subst_ve x u c1 (open_ve e y c2) =
-  open_ve (subst_ve x u c1 e) y (subst_cset x c1 c2).
-Proof with auto*.
-  intros.
-  unfold open_ve.
-  apply subst_ve_open_ve_rec...
-Qed.
-
 Lemma subst_ve_open_ve_var : forall (x y u : atom) c e,
   y <> x ->
   expr u ->
@@ -1494,27 +1057,6 @@ Proof with auto.
 }
 Qed.
 
-Lemma subst_te_expr : forall Z P e,
-  expr e ->
-  pure_type P ->
-  expr (subst_te Z P e).
-Proof with eauto using subst_tt_type, subst_tt_pure_type.
-  intros.
-  induction H; simpl; econstructor...
-  - Case "λ (T) e1".
-    instantiate (1 := L `u`A singleton Z).
-    intros.
-    rewrite subst_te_open_ve_var...
-  - Case "let= e1 in e2".
-    instantiate (1 := L `u`A singleton Z).
-    intros.
-    rewrite subst_te_open_ve_var...
-  - Case "Λ [R] T".
-    instantiate (1 := L `u`A singleton Z).
-    intros.
-    rewrite subst_te_open_te_var...
-Qed.
-
 Local Hint Extern 1 (~ AtomSet.F.In _ _) => simpl_env in *; [fsetdec] : core.
 
 Lemma subst_ct_open_fresh : forall k z C T X,
@@ -1530,20 +1072,6 @@ Proof with eauto.
   induction T; intro k; simpl in *; try reflexivity; try destruct v; f_equal...
   symmetry.
   apply subst_cset_open_cset_fresh...
-Qed.
-
-Lemma open_tt_subst_ct_aux : forall k X z C T,
-  z <> X ->
-  capt C ->
-  X ∉ `cset_fvars` C ->
-  open_tt_rec k X (subst_ct z C T) =
-  subst_ct z C (open_tt_rec k X T).
-Proof with eauto*.
-  intros * ? ? HXfresh.
-  revert k.
-  induction T; intro k; simpl in *; f_equal...
-  destruct v; simpl...
-  destruct (k === n); subst...
 Qed.
 
 Lemma subst_ct_type : forall T z c,
@@ -1587,14 +1115,6 @@ Qed.
 
 (* *********************************************************************** *)
 (** * #<a name="auto"></a># Automation *)
-
-(** We add as hints the fact that local closure is preserved under
-    substitution.  This is part of our strategy for automatically
-    discharging local-closure proof obligations. *)
-
-Hint Resolve subst_tt_type subst_te_expr : core.
-
-
 
 (** When reasoning about the [binds] relation and [map], we
     occasionally encounter situations where the binding is
@@ -1645,14 +1165,6 @@ Proof with auto using open_cset_capt, open_ct_rec_type, subst_ct_open_tt_rec.
   apply subst_ct_open_tt_rec...
 Qed.
 
-Lemma subst_ct_open_ct : forall x c1 T c2,
-  capt c1 ->
-  x ∉ fv_tt T ->
-  subst_ct x c1 (open_ct T c2) = open_ct (subst_ct x c1 T) (subst_cset x c1 c2).
-Proof with eauto using open_cset_capt, open_ct_rec_type, subst_ct_open_rec.
-  induction T...
-Qed.
-
 Lemma open_ct_subst_tt : forall x C S T,
   type S ->
   x ∉ `cset_fvars` C ->
@@ -1682,43 +1194,4 @@ Proof with auto*.
   symmetry.
   apply subst_tt_open_ct_rec; trivial.
   notin_solve.
-Qed.
-
-Lemma subst_ct_useless_repetition : forall x C D T,
-  x ∉ `cset_fvars` D ->
-  subst_ct x C (subst_ct x D T) = subst_ct x D T.
-Proof with auto using subst_cset_useless_repetition.
-  intros.
-  induction T; simpl; try reflexivity; f_equal...
-  destruct v...
-Qed.
-
-Lemma notin_open_vv_fv_vv : forall k y z v, 
-  y ∉ (fv_vv v `u`A singleton z) ->
-  y ∉ fv_vv (open_vv k z v).
-Proof with eauto*.
-  intros.
-  destruct v; simpl in *...
-  destruct (k === n); subst; simpl...
-Qed.
-
-Lemma notin_open_ve_rec_fv_ve : forall k y z C e,
-  y ∉ (fv_ve e `u`A singleton z) ->
-  y ∉ fv_ve (open_ve_rec k z C e).
-Proof with eauto using notin_open_vv_fv_vv.
-  intros * y_notin_e_z.
-  generalize dependent k.
-  induction e; intros k; simpl in *...
-  unfold open_cset.
-  destruct c; simpl.
-  destruct_set_mem k t0...
-Qed.
-
-Lemma notin_open_te_rec_fv_ve : forall k y z e,
-  y ∉ (fv_ve e `u`A singleton z) ->
-  y ∉ fv_ve (open_te_rec k z e).
-Proof with auto.
-  intros * y_notin_e_z.
-  generalize dependent k.
-  induction e; simpl in *; intros k...
 Qed.

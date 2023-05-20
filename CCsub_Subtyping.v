@@ -213,19 +213,6 @@ Proof with eauto 6 using wf_cset_narrowing, wf_env_narrowing.
     intros ? ?...
 Qed.
 
-Lemma transitivity_on_capt_type_from_transitivity_on_pure_type : forall CQ Q,
-  transitivity_on Q ->
-  transitivity_on (CQ # Q).
-Proof with eauto*.
-  intros * TransQ Γ S T SsubCQ CQsubT.
-  destruct (proj2 (sub_capt_type _ _ _ SsubCQ) ltac:(eauto)) as [CP [P EQ]]; subst.
-  destruct (proj1 (sub_capt_type _ _ _ CQsubT) ltac:(eauto)) as [CR [R EQ]]; subst.
-  inversion SsubCQ; subst.
-  inversion CQsubT; subst.
-  apply sub_capt...
-  apply subcapt_transitivity with (D := CQ)...
-Qed.
-
 Lemma sub_narrowing_aux : forall Q Δ Γ Z P S T,
   transitivity_on Q ->
   (Δ ++ [(Z, bind_sub Q)] ++ Γ) ⊢ S <: T ->

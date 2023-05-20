@@ -483,9 +483,3 @@ Local Ltac cset_unfold_union0 :=
 Ltac cset_unfold_union := repeat cset_unfold_union0.
 
 Ltac _csetsimpl_hook ::= cset_unfold_union.
-
-Local Lemma __test_cset_concrete_unfold : forall C xs us,
-  wf_cset nil C ->
-  wf_cset nil (C `u` (cset_set xs {}N us)) ->
-  exists xs' us', wf_cset nil (cset_set (xs' `u`A xs) {}N (us' || us)).
-Proof. intros * H; csetsimpl; eauto. Qed.

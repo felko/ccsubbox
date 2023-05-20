@@ -17,28 +17,6 @@ Hint Constructors store_typing eval_typing state_typing : core.
 Definition no_type_bindings (Γ : env) : Prop :=
   forall X U, ~ binds X (bind_sub U) Γ.
 
-Lemma no_type_bindings_cons : forall Γ x T,
-  no_type_bindings Γ ->
-  no_type_bindings ([(x, bind_typ T)] ++ Γ).
-Proof with eauto*.
-  intros * NTB.
-  intros y U.
-  intros Binds.
-  binds_cases Binds.
-  apply (NTB y U), H.
-Qed.
-
-Lemma no_type_bindings_strengthening : forall Δ Γ,
-  ok (Δ ++ Γ) ->
-  no_type_bindings (Δ ++ Γ) ->
-  no_type_bindings Γ.
-Proof with eauto*.
-  intros * Ok NTB.
-  intros X U Binds.
-  eapply binds_weaken_at_head in Binds...
-  apply (NTB X U Binds).
-Qed.
-
 Lemma store_typing_no_type_bindings : forall S Γ,
   S ∷ Γ ->
   no_type_bindings Γ.
@@ -50,50 +28,6 @@ Proof with eauto*.
     binds_cases Binds.
     rename select (binds _ (bind_sub _) _) into Binds.
     applys IHStoreTyp Binds.
-Qed.
-
-Lemma sub_capt_inversion : forall Γ C P T,
-  Γ ⊢ (C # P) <: T ->
-  exists D Q, T = D # Q
-           /\ pure_type Q
-           /\ Γ ⊢ₛ C <: D
-           /\ Γ ⊢ P <: Q.
-Proof with eauto using sub_pure_type.
-  intros * Sub; inversion Sub; subst.
-  + exists C2, R2.
-    repeat split... 
-  + inversion select (pure_type (_ # _)).
-Qed.
-
-Lemma typing_var_inversion : forall Γ (x : atom) T,
-  Γ ⊢ x : T ->
-  exists C P D Q, T = D # Q
-              /\ Γ ⊢ P <: Q
-              /\ Γ ⊢ₛ (`cset_fvar` x) <: D
-              /\ binds x (bind_typ (C # P)) Γ.
-Proof with eauto using sub_reflexivity, subcapt_reflexivity.
-  intros * Typ.
-  dependent induction Typ...
-  - exists C, R, (`cset_fvar` x), R.
-    repeat split...
-    + apply sub_reflexivity...
-      enough (WfCR : Γ ⊢ (C # R) wf) by (inversion WfCR; auto).
-      eapply wf_typ_from_binds_typ...
-    + apply subcapt_reflexivity.
-      apply wf_concrete_cset.
-      intros y yIn.
-      exists C, R.
-      assert (x = y) by fsetdec; subst.
-      assumption.
-  - destruct (IHTyp x ltac:(reflexivity)) as [C [P [D [Q [Eq [PsubQ [xsubD Binds]]]]]]].
-    rename select (Γ ⊢ S <: T) into Sub.
-    rewrite Eq in Sub.
-    destruct (sub_capt_inversion _ _ _ _ Sub) as [C' [P' [Eq' [PureP' [DsubC' QsubP']]]]].
-    exists C, P, C', P'.
-    repeat split...
-    * apply sub_transitivity_pure with (Q := Q)...
-      applys sub_pure_type...
-    * apply subcapt_transitivity with (D := D)...
 Qed.
 
 Ltac impossible_typing Typ :=
@@ -359,17 +293,6 @@ Proof with auto using subst_cset_cv_var_commutes_with_subst_vv.
     csetdec.
 Qed.
 
-(* TODO: move to lemmas *)
-Lemma cset_fvars_subset_subst_cset : forall C x D,
-  x ∉ `cset_fvars` C ->
- `cset_fvars` C ⊆ `cset_fvars` (subst_cset x D C).
-Proof with eauto*.
-  intros * NotIn x xIn.
-  destruct C.
-  unfold subst_cset.
-  destruct_set_mem x0 t...
-Qed.
-
 Lemma subst_cset_empty : forall x c,
   subst_cset x c {} = {}.
 Proof with eauto*.
@@ -380,221 +303,6 @@ Proof with eauto*.
 Qed.
 
 Lemma typing_through_subst_ve : forall Γ Δ x T C R e (u : atom),
-  (Δ ++ [(x, bind_typ (C # R))] ++ Γ) ⊢ e : T ->
-  binds u (bind_typ (C # R)) Γ ->
-  (map (subst_cb x (`cset_fvar` u)) Δ ++ Γ) ⊢ (subst_ve x u (`cset_fvar` u) e) : (subst_ct x (`cset_fvar` u) T).
-Proof with eauto*.
-  intros * Typ Binds.
-  forwards (WfEnv & _ & WfT): typing_regular Typ.
-  assert (WfEnv' : Γ ⊢ wf) by (repeat apply wf_env_tail in WfEnv; assumption).
-  assert (WfU : Γ ⊢ₛ (`cset_fvar` u) wf) by (eapply wf_cset_from_binds; eauto).
-  assert (uNotInΔ : u ∉ dom Δ).
-  { eapply tail_not_in_head...
-    apply binds_In in Binds.
-    simpl; fsetdec.
-  }
-  assert (xNotInΓ : x ∉ dom Γ) by (eapply fresh_mid_tail; eauto).
-  assert (xNotInΔ : x ∉ dom Δ) by (eapply fresh_mid_head; eauto).
-  dependent induction Typ; simpl.
-  - Case "typing_var".
-    unfold subst_cset.
-    destruct (x0 == x); destruct_set_mem x {x0}A; subst; try (exfalso; fsetdec).
-    + rename select (binds x _ _) into Binds'.
-      clear xIn.
-      binds_cases Binds'.
-      * exfalso; simpl in *; fsetdec.
-      * inversion select (bind_typ _ = bind_typ _); subst.
-        unfold subst_cset.
-        csetsimpl.
-        replace ({u}A `u`A {x}A `\`A x)
-           with {u}A by fsetdec.
-        eapply typing_var...
-        -- eapply wf_env_subst_cb...
-        -- apply binds_tail...
-           rewrite <- subst_ct_fresh...
-           eapply wf_typ_notin_fv_ct...
-      * rename select (binds x _ _) into Binds'.
-        apply binds_In in Binds'.
-        contradiction.
-    + rename select (binds x0 _ _) into Binds'.
-      clear xIn.
-      binds_cases Binds'.
-      * eapply typing_var with (C := C0)...
-        -- eapply wf_env_subst_cb...
-        -- apply binds_tail...
-           rewrite <- subst_ct_fresh...
-           eapply wf_typ_notin_fv_ct with (Γ := Γ)...
-           rename select (binds x0 _ _) into Binds'.
-           destruct (wf_typ_env_bind_typ _ _ _ WfEnv' Binds') as [D [Q [Eq WfDQ]]]; inversion Eq; subst; clear Eq.
-           inversion WfDQ; subst...
-      * eapply typing_var with (C := subst_cset x (`cset_fvar` u) C0)...
-        -- eapply wf_env_subst_cb...
-        -- rename select (binds x0 _ _) into Binds'.
-           replace (bind_typ (subst_cset x (`cset_fvar` u) C0 # subst_ct x (`cset_fvar` u) R0))
-              with (subst_cb x (`cset_fvar` u) (bind_typ (C0 # R0)))
-                by reflexivity.
-           apply binds_head, binds_map, Binds'.
-  - Case "typing_abs".
-    rewrite subst_cset_cv_commutes_with_susbt_ve.
-    pick fresh y and apply typing_abs.
-    + replace (subst_cset x (`cset_fvar` u) C0 # subst_ct x (`cset_fvar` u) R0)
-         with (subst_ct x (`cset_fvar` u) (C0 # R0))
-           by reflexivity.
-      eapply wf_typ_subst_cb...
-    + rename select (forall x0 : atom, x0 ∉ L -> _ ⊢ open_ve _ _ _ : open_ct _ _) into e1Typ.
-      specialize (e1Typ y ltac:(clear - Fr; fsetdec)).
-      assert (Neq : x <> y) by (clear - Fr; fsetdec).
-      rewrite_env (map (subst_cb x (`cset_fvar` u)) ([(y, bind_typ (C0 # R0))] ++ Δ) ++ Γ).
-      rewrite subst_ct_open_ct_var.
-      2-3: auto.
-      rewrite subst_ve_open_ve_var.
-      2-3: auto.
-      rename select (forall x0 : atom, x0 ∉ L -> forall (Γ0 Δ0 : env), _) into IH.
-      apply IH with (C1 := C) (R1 := R)...
-      * apply wf_env_typ...
-      * applys typing_regular e1Typ.
-      * eapply capt_from_wf_cset... 
-  - Case "typing_app".
-    assert (Iff : (if f == x then var_f u else var_f f) = var_f (if f == x then u else f))
-      by (destruct_if; reflexivity).
-    rewrite Iff.
-    destruct (x0 == x); subst.
-    + SCase "x0 = x".
-      rewrite <- subst_ct_open_ct_not_fresh.
-      eapply typing_app.
-      * rewrite <- Iff.
-        eapply IHTyp1...
-        applys typing_regular Typ1.
-      * fold subst_ct.
-        replace (subst_cset x (`cset_fvar` u) D # subst_ct x (`cset_fvar` u) Q)
-           with (subst_ct x (`cset_fvar` u) (D # Q))
-             by reflexivity.
-        replace (exp_var u) with (subst_ve x u (`cset_fvar` u) x).
-        2: simpl; destruct_if...
-        eapply IHTyp2...
-        applys typing_regular Typ2.
-    + SCase "x0 <> x".
-      rewrite <- subst_ct_open_ct_var...
-      apply typing_app with (D := subst_cset x (`cset_fvar` u) D) (Q := subst_ct x (`cset_fvar` u) Q) (C := subst_cset x (`cset_fvar` u) C0) (T := subst_ct x (`cset_fvar` u) T)...
-      * replace (subst_cset x (`cset_fvar` u) C0 # ∀ ((subst_cset x (`cset_fvar` u) D # subst_ct x (`cset_fvar` u) Q)) subst_ct x (`cset_fvar` u) T)
-           with (subst_ct x (`cset_fvar` u) (C0 # ∀ (D # Q) T))
-             by reflexivity.
-        rewrite <- Iff.
-        eapply IHTyp1...
-        applys typing_regular Typ1.
-      * replace (subst_cset x (`cset_fvar` u) D # subst_ct x (`cset_fvar` u) Q)
-           with (subst_ct x (`cset_fvar` u) (D # Q))
-             by reflexivity.
-        erewrite subst_ve_fresh with (x := x) (u := u) (c := `cset_fvar` u) (e := x0).
-        2: simpl; fsetdec.
-        eapply IHTyp2...
-        applys typing_regular Typ2.
-  - Case "typing_let".
-    pick fresh y and apply typing_let.
-    + eapply IHTyp...
-      applys typing_regular Typ.
-    + rewrite subst_ve_open_ve_var...
-      fold subst_ct.
-      replace ([(y, bind_typ (subst_cset x (`cset_fvar` u) C1 # subst_ct x (`cset_fvar` u) T1))] ++ map (subst_cb x (`cset_fvar` u)) Δ ++ Γ)
-         with (map (subst_cb x (`cset_fvar` u)) ([(y, bind_typ (C1 # T1))] ++ Δ) ++ Γ)
-           by reflexivity.
-      rename select (forall x0 : atom, x0 ∉ L -> forall (Γ0 Δ0 : env), _) into IH.
-      eapply IH...
-      * apply wf_env_typ...
-        applys typing_regular Typ.
-      * rewrite concat_assoc.
-        apply wf_typ_weaken_head...
-  - Case "typing_tabs".
-    rewrite subst_cset_cv_commutes_with_susbt_ve.
-    pick fresh Y and apply typing_tabs.
-    + eapply wf_typ_subst_cb... 
-    + apply subst_ct_pure_type...
-    + rename select (forall X : atom, X ∉ L -> _ ⊢ open_te _ _ : open_tt _ _) into e1Typ.
-      specialize (e1Typ Y ltac:(clear - Fr; fsetdec)).
-      assert (Neq : x <> Y) by (clear - Fr; fsetdec).
-      rewrite_env (map (subst_cb x (`cset_fvar` u)) ([(Y, bind_sub V)] ++ Δ) ++ Γ).
-      rewrite subst_ve_open_te_var.
-      2-3: auto.
-      rewrite subst_ct_open_tt_var.
-      2-3: auto.
-      rename select (forall X : atom, X ∉ L -> forall (Γ0 Δ0 : env), _) into IH.
-      eapply IH...
-      * apply wf_env_sub...
-      * applys typing_regular e1Typ.
-  - Case "typing_tapp".
-    assert (Ifx0 : (if x0 == x then var_f u else var_f x0) = (var_f (if x0 == x then u else x0)))
-      by (destruct_if; reflexivity).
-    rewrite Ifx0.
-    rewrite subst_ct_open_tt...
-    2: eapply bind_typ_notin_fv_tt with (S := C # R) (Γ := Δ ++ [(x, bind_typ (C # R))] ++ Γ)...
-    apply typing_tapp with (Q := subst_ct x (`cset_fvar` u) Q) (C := subst_cset x (`cset_fvar` u) C0).
-    + replace (subst_cset x (`cset_fvar` u) C # ∀ [subst_ct x (`cset_fvar` u) Q] subst_ct x (`cset_fvar` u) T)
-         with (subst_ct x (`cset_fvar` u) (C # ∀ [Q] T))
-           by reflexivity.
-      rewrite <- Ifx0.
-      eapply IHTyp...
-      applys typing_regular Typ.
-    + apply sub_through_subst_ct with (CU := C) (U := R)...
-      eapply subcapt_var...
-      apply subcapt_reflexivity.
-      enough (WfCR : Γ ⊢ (C # R) wf) by (inversion WfCR; auto).
-      destruct (wf_typ_env_bind_typ _ _ _ WfEnv' Binds) as [C' [R' [Eq WfC'R']]]; inversion Eq; subst; clear Eq.
-      assumption.
-  - Case "typing_box".
-    assert (Ifx0 : (if x0 == x then var_f u else var_f x0) = (var_f (if x0 == x then u else x0)))
-      by (destruct_if; reflexivity).
-    rewrite Ifx0.
-    rewrite subst_cset_empty.
-    eapply typing_box.
-    + replace (subst_cset x (`cset_fvar` u) C0 # subst_ct x (`cset_fvar` u) R0)
-         with (subst_ct x (`cset_fvar` u) (C0 # R0))
-           by reflexivity.
-      rewrite <- Ifx0.
-      eapply IHTyp...
-      applys typing_regular Typ.
-    + rename select (_ ⊆ _) into Subset.
-      rewrite dom_concat in Subset |- *.
-      rewrite dom_map.
-      simpl in Subset.
-      intros y yIn.
-      unfold subst_cset in yIn.
-      assert (WfC0R0 : (Δ ++ [(x, bind_typ (C # R))] ++ Γ) ⊢ (C0 # R0) wf) by applys typing_regular Typ.
-      assert (WfC0 : (Δ ++ [(x, bind_typ (C # R))] ++ Γ) ⊢ₛ C0 wf) by (inversion WfC0R0; assumption).
-      destruct WfC0; csetsimpl.
-      destruct_set_mem x fvars.
-      * destruct (AtomSet.F.union_1 yIn).
-        -- assert (y = u) by fsetdec; subst.
-           apply binds_In in Binds.
-           fsetdec.
-        -- fsetdec.
-      * fsetdec.
-  - Case "typing_unbox".
-    assert (Ifx0 : (if x0 == x then var_f u else var_f x0) = (var_f (if x0 == x then u else x0)))
-      by (destruct_if; reflexivity).
-    rewrite Ifx0.
-    apply typing_unbox.
-    + replace ({} # (□ subst_cset x (`cset_fvar` u) C0 # subst_ct x (`cset_fvar` u) R0))
-         with (subst_ct x (`cset_fvar` u) ({} # (□ C0 # R0))).
-      2: {
-        simpl.
-        f_equal...
-        apply subst_cset_empty.
-      }
-      rewrite <- Ifx0.
-      eapply IHTyp...
-      applys typing_regular Typ.
-    + eapply wf_cset_over_subst... 
-  - Case "typing_sub".
-    apply typing_sub with (S := subst_ct x (`cset_fvar` u) S).
-    + eapply IHTyp...
-    + apply sub_through_subst_ct with (CU := C) (U := R)...
-      apply subcapt_var with (C1 := C) (R := R)...
-      apply subcapt_reflexivity.
-      enough (WfCR : Γ ⊢ (C # R) wf) by (inversion WfCR; assumption).
-      eapply wf_typ_from_binds_typ...
-Qed.
-
-Lemma typing_through_subst_ve_typing : forall Γ Δ x T C R e (u : atom),
   (Δ ++ [(x, bind_typ (C # R))] ++ Γ) ⊢ e : T ->
   Γ ⊢ u : (C # R) ->
   (map (subst_cb x (`cset_fvar` u)) Δ ++ Γ) ⊢ (subst_ve x u (`cset_fvar` u) e) : (subst_ct x (`cset_fvar` u) T).
@@ -932,7 +640,7 @@ Proof with eauto*.
   replace T
      with (subst_ct y (`cset_fvar` x) T)
        by (rewrite <- subst_ct_fresh; auto).
-  eapply typing_through_subst_ve_typing with (C := `cset_fvar` x) (R := Q).
+  eapply typing_through_subst_ve with (C := `cset_fvar` x) (R := Q).
   - eapply typing_narrowing_typ with (D := C) (Q := R)...
     apply sub_capt...
     applys sub_pure_type QsubR...
@@ -960,7 +668,7 @@ Proof with eauto*.
   replace (open_ct T (`cset_fvar` x))
      with (subst_ct y (`cset_fvar` x) (open_ct T (`cset_fvar` y)))
        by (rewrite <- subst_ct_intro; auto).
-  eapply typing_through_subst_ve_typing with (C := `cset_fvar` x) (R := Q).
+  eapply typing_through_subst_ve with (C := `cset_fvar` x) (R := Q).
   - eapply typing_narrowing_typ with (D := C) (Q := R)...
     apply sub_capt...
     applys sub_pure_type QsubR...

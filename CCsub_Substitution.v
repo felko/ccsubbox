@@ -96,64 +96,12 @@ Qed.
 (************************************************************************ *)
 (** ** Other helpers *)
 
-Lemma subst_cset_in_exp_cv : forall x C e,
-    x ∈ `cset_fvars` (exp_cv e) ->
-    subst_cset x C (exp_cv e) = C `u` (exp_cv e A`\` x).
-Proof with eauto*.
-  intros.
-  unfold subst_cset.
-  destruct_set_mem x (`cset_fvars` (exp_cv e)).
-  - reflexivity.
-  - destruct (exp_cv e) eqn:?.
-    csetdec.
-Qed.
-
-Lemma subst_vv_notin_var_cv : forall u x v,
-  x ∉ `cset_fvars` (var_cv v) ->
-  var_cv v = var_cv (subst_vv x u v).
-Proof with eauto*.
-  intros.
-  destruct v...
-  simpl in *.
-  destruct (a == x); subst...
-  clear - H; fsetdec.
-Qed.
-
-Lemma subst_ve_notin_exp_cv : forall u x C e,
-  x ∉ `cset_fvars` (exp_cv e) ->
-  exp_cv e = exp_cv (subst_ve x u C e).
-Proof with eauto using subst_vv_notin_var_cv.
-  intros * Hin.
-  induction e; simpl in *...
-  - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
-    f_equal...
-  - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
-    f_equal...
-  - apply notin_cset_fvars_distributive_over_cset_union in Hin as (? & ?)...
-    eremember (subst_cset x (`cset_fvar` u) c) as c'.
-    f_equal...
-    unfold subst_cset in *.
-    destruct_set_mem x (`cset_fvars` c).
-    + exfalso; apply (H xIn).
-    + subst; reflexivity. 
-Qed.
-
 Lemma subst_te_fresh_exp_cv : forall Z R e,
   exp_cv e = exp_cv (subst_te Z R e).
 Proof with eauto*.
   intros.
   induction e; simpl in *...
 Qed.
-
-Lemma subst_trivia2_var : forall x v (u : atom),
-  x ∈ `cset_fvars` (var_cv v) ->
-  var_cv u `u` (var_cv v A`\` x) = var_cv (subst_vv x u v).
-Proof with eauto*.
-  intros.
-  destruct v; simpl in *.
-  - destruct (a == x); csetdec.
-  - csetdec.
-Qed.   
 
 (* x in (fv e) ->
   (fv u) union (fv e remove x) = fv (e[x !-> u][x !-> fv u])
@@ -223,17 +171,6 @@ Proof with eauto using cv_free_never_universal, subst_trivia2_var.
   - fsetdec.
 Qed.
 *)
-
-Lemma fvar_open_inversion : forall (x : atom) e y C,
-  exp_var x = open_ve e y C ->
-  e = x \/ exists (n : nat), e = n.
-Proof with eauto*.
-  intros. induction e;
-    try solve [exfalso; cbv [open_ve open_ve_rec] in H; fold open_ve_rec in H; discriminate].
-  destruct v.
-  - left...
-  - right. exists n...
-Qed.
 
 (* REVIEW: where is this needed? *)
 (*
@@ -658,13 +595,6 @@ Proof with eauto using wf_env_subst_cb,
     apply sub_box.
     fold subst_ct.
     apply IHSub...
-Qed.
-
-Lemma subst_cset_univ_idempotent : forall x C,
-  subst_cset x C {*} = {*}.
-Proof.
-  intros. cbv.
-  destruct_set_mem x {}A. fsetdec. trivial.
 Qed.
 
 Lemma wf_pretyp_from_wf_env_typ : forall x C P Γ,

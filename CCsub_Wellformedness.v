@@ -29,16 +29,6 @@ Proof with eauto*.
   split; intros ? ?; assert (x `in` (T1 `u`A T2)) by fsetdec...
 Qed.
 
-Lemma allbound_weaken : forall Γ T1 T2,
-  T1 `c`A T2 ->
-  allbound Γ T2 ->
-  allbound Γ T1.
-Proof with eauto*.
-  intros * T1_subset_T2 T2_bound.
-  intros x x_in_T1.
-  apply (T2_bound x ltac:(fsetdec)).
-Qed.
-
 Lemma ok_from_wf_env : forall Γ,
   Γ ⊢ wf ->
   ok Γ.
@@ -72,20 +62,6 @@ match goal with
   enough (ok (Δ ++ b ++ Γ))
 end : core.
 
-(* TODO WHERE TO PUT THIS? *)
-Lemma dom_x_subst_away : forall x f b Γ Δ,
-  (Δ ++ [(x, b)] ++ Γ) ⊢ wf ->
-  dom (map f Δ ++ Γ) = dom (Δ ++ [(x, b)] ++ Γ) `remove` x.
-Proof with eauto*.
-  intros * Hwf.
-  simpl_env in *.
-  assert (x `notin` (dom Δ `u`A dom Γ)). {
-    pose proof (binding_uniq_from_ok _ Δ Γ x _ ltac:(eauto)).
-    fsetdec.
-  }
-  fsetdec.
-Qed.
-
 Lemma binding_uniq_from_wf_env : forall F E x b,
   (F ++ ([(x, b)]) ++ E) ⊢ wf ->
   x ∉ (dom F `union` dom E).
@@ -94,19 +70,6 @@ Proof.
   apply ok_from_wf_env in H.
   eapply binding_uniq_from_ok; eauto.
 Qed.
-
-Lemma distinct_binding_from_wf_env : forall F x b E y,
-  (F ++ [(x, b)] ++ E) ⊢ wf ->
-  y `in`A dom E ->
-  y ∉ dom F.
-Proof.
-  intros * H ?.
-  induction F.
-  - simpl_env; fsetdec.
-  - inversion H; subst;
-      specialize (IHF H3); simpl_env in *; fsetdec.
-Qed.
-
 
 (* ********************************************************************** *)
 (** * #<a name="wfset"></a># Properties of [wf_cset] *)
@@ -143,19 +106,6 @@ Proof with eauto.
   intros.
   rewrite AtomSetFacts.union_iff in *.
   auto*.
-Qed.
-
-Lemma wf_cset_remove_fvar : forall Γ C x,
-  Γ ⊢ₛ C wf ->
-  Γ ⊢ₛ (C A`\` x) wf.
-Proof with eauto.
-  intros.
-  induction H; simpl...
-  constructor...
-  unfold allbound in *.
-  intros.
-  apply H.
-  fsetdec.
 Qed.
 
 Lemma wf_cset_over_union : forall Γ C D,
@@ -366,15 +316,6 @@ Ltac wf_typ_inversion H :=
   | _ => idtac
   end; subst.
 
-Local Lemma test_wf_typ_inversion : forall Γ C S T,
-  Γ ⊢ C # ∀ (S) T wf ->
-  Γ ⊢ S wf.
-Proof.
-  intros * H1.
-  wf_typ_inversion H1.
-  assumption.
-Qed.
-
 (** If a type is well-formed in an environment, then it is locally
     closed. *)
 
@@ -569,13 +510,6 @@ Qed.
 
 Lemma wf_typ_from_wf_env_typ : forall x T Γ,
   ([(x, bind_typ T)] ++ Γ) ⊢ wf ->
-  Γ ⊢ T wf.
-Proof.
-  intros * H; inversion H; auto.
-Qed.
-
-Lemma wf_typ_from_wf_env_sub : forall x T Γ,
-  ([(x, bind_sub T)] ++ Γ) ⊢ wf ->
   Γ ⊢ T wf.
 Proof.
   intros * H; inversion H; auto.
@@ -844,17 +778,6 @@ Proof with simpl_env; eauto*.
          by reflexivity...
 Qed.
 
-(*
-  opening capture sets in types preserves well-formedness. *)
-Lemma open_ct_wf_typ : forall Γ T C,
-  Γ ⊢ T wf ->
-  Γ ⊢ (open_ct T C) wf.
-Proof with eauto using type_from_wf_typ.
-  intros *.
-  intros H.
-  closed_type...
-Qed.
-
 Lemma wf_typ_open_capt : forall Γ C S T,
   ok Γ ->
   Γ ⊢ (∀ (S) T) wf ->
@@ -969,102 +892,8 @@ Proof with eauto using wf_typ_subst_cb.
     + rewrite dom_concat, dom_map...
 Qed.
 
-Lemma wf_typ_preserved_by_subst_wf_cset : forall Γ x C T,
-  Γ ⊢ wf ->
-  x ∉ dom Γ ->
-  Γ ⊢ₛ C wf ->
-  Γ ⊢ T wf ->
-  Γ ⊢ (subst_ct x C T) wf.
-Proof with eauto.
-  intros * WfΓ NotIn WfC WfT.
-  induction WfT; simpl...
-  - Case "∀ (S) T".
-    pick fresh y and apply wf_typ_arr...
-    rewrite subst_ct_open_ct_var; [| notin_solve | eapply capt_from_wf_cset]...
-    rewrite_nil_concat.
-    apply wf_typ_ignores_typ_bindings with (C1 := C0) (R1 := R); simpl.
-    apply H0.
-    + fsetdec.
-    + apply wf_env_typ...
-    + rewrite dom_concat...
-    + apply wf_cset_weaken_head...
-  - Case "∀ [R] T".
-    pick fresh Y and apply wf_typ_all...
-    1: apply subst_ct_pure_type...
-    rewrite_nil_concat.
-    apply wf_typ_ignores_sub_bindings with (V := R); simpl.
-    rewrite subst_ct_open_tt_var; [| notin_solve | eapply capt_from_wf_cset]...
-    rename select (_ -> _ -> _ -> Γ ⊢ subst_ct x C R wf) into IHWfR.
-    rename select (forall X, _ -> _ -> _ -> _ -> _ ⊢ subst_ct x C (open_tt T _) wf) into IHWfT. 
-    apply IHWfT.
-    + fsetdec.
-    + apply wf_env_sub...
-    + rewrite dom_concat...
-    + apply wf_cset_weaken_head...
-  - Case "C # R".
-    apply wf_typ_capt.
-    + unfold subst_cset.
-      destruct_if; eauto using wf_cset_union, wf_cset_remove_fvar.
-    + apply IHWfT...
-    + apply subst_ct_pure_type...
-Qed.
-
 (* ********************************************************************** *)
 (** * #<a name="okt"></a># Properties of [wf_env] *)
-
-Lemma wf_env_strengthening : forall Γ Δ,
-  (Δ ++ Γ) ⊢ wf ->
-  Γ ⊢ wf.
-Proof with eauto.
-  induction Δ...
-Qed.
-
-Lemma wf_env_strengthening_typ : forall Γ Δ x T,
-  x ∉ fv_cctx Δ ->
-  (Δ ++ [(x, bind_typ T)] ++ Γ) ⊢ wf ->
-  (Δ ++ Γ) ⊢ wf.
-Proof with eauto using wf_cset_strengthen.
-  intros * NotIn WfEnv.
-  eremember (Δ ++ [(x, bind_typ T)] ++ Γ) as Ctx.
-  generalize dependent Δ.
-  induction WfEnv; intros Δ NotIn EQ.
-  - induction Δ; inversion EQ.
-  - induction Δ; simpl_env in *.
-    + inversion EQ.
-    + destruct a as [y [U | U]]; simpl in *; simpl_env in *.
-      * inversion EQ; subst.
-        assert (Ok : ok (Δ ++ [(x, bind_typ T)] ++ Γ)) by apply ok_from_wf_env, WfEnv.
-        assert (NotIn' : x ∉ dom Δ `u`A dom Γ)
-            by (apply notin_union; [ eapply fresh_mid_head | eapply fresh_mid_tail ]; apply Ok).
-        apply wf_env_sub.
-        -- apply IHWfEnv...
-        -- apply wf_typ_strengthen in H; [ apply H | ].
-           clear - NotIn NotIn'.
-           fsetdec.
-        -- assumption. 
-        -- repeat rewrite dom_concat.
-           rename select (y ∉ _) into yNotIn.
-           repeat rewrite dom_concat in yNotIn; simpl in yNotIn.
-           clear - yNotIn; fsetdec.
-      * inversion EQ; subst.
-  - induction Δ; simpl_env in *.
-    + inversion EQ; subst...
-    + destruct a as [y [U | U]]; simpl in *; simpl_env in *.
-      * inversion EQ; subst.
-      * inversion EQ; subst.
-        assert (Ok : ok (Δ ++ [(x, bind_typ T)] ++ Γ)) by apply ok_from_wf_env, WfEnv.
-        assert (NotIn' : x ∉ dom Δ `u`A dom Γ)
-            by (apply notin_union; [ eapply fresh_mid_head | eapply fresh_mid_tail ]; apply Ok).
-        apply wf_env_typ.
-        -- apply IHWfEnv...
-        -- apply wf_typ_strengthen in H; [ apply H | ].
-           clear - NotIn NotIn'.
-           fsetdec.
-        -- repeat rewrite dom_concat.
-           rename select (y ∉ _) into yNotIn.
-           repeat rewrite dom_concat in yNotIn; simpl in yNotIn.
-           clear - yNotIn; fsetdec.
-Qed.
 
 Lemma wf_env_narrowing : forall Γ Δ V U X,
   (Δ ++ [(X, bind_sub V)] ++ Γ) ⊢ wf ->
@@ -1083,13 +912,4 @@ Lemma wf_env_narrowing_typ : forall Γ Δ C1 R1 C2 R2 X,
 Proof with eauto using wf_typ_ignores_sub_bindings, wf_typ_ignores_typ_bindings.
   induction Δ; intros * WfEnv Wf;
     inversion WfEnv; subst; simpl_env in *...
-Qed.
-
-Lemma wf_env_inv : forall Γ Δ Z b,
-  (Δ ++ [(Z, b)] ++ Γ) ⊢ wf ->
-  Γ ⊢ wf /\ Z ∉ dom Γ.
-Proof with eauto.
-  induction Δ ; intros ; simpl_env in *.
-  inversion H ; subst...
-  inversion H ; subst...
 Qed.
