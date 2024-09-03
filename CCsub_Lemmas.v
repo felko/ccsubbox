@@ -50,14 +50,17 @@ Proof with eauto.
 Qed.
 
 Lemma notin_cset_fvars_open_cset : forall X k C c,
-  X ∉ `cset_fvars` (open_cset k C c) ->
-  X ∉ `cset_fvars` c.
-Proof.
+  X ∉ cse_fvars (open_cse k C c) ->
+  X ∉ cse_fvars c.
+Proof with auto.
   intros.
-  destruct c.
-  intros XIn.
-  cbv in H.
-  csetdec.
+  induction c; eauto*.
+  simpl. unfold not in H. unfold not. intros. apply H.
+  simpl. rewrite AtomSetFacts.union_iff in H0. destruct H0.
+  - rewrite AtomSetFacts.union_iff. left.
+    induction c1; auto; fsetdec.
+  - rewrite AtomSetFacts.union_iff. right.
+    induction c1; auto; fsetdec.  
 Qed.
 
 Lemma notin_fv_tt_open_ct_rec : forall k (X : atom) C T,
@@ -113,24 +116,23 @@ Proof with auto.
   intros. apply notin_fv_ct_open_ct_rec with (k := 0) (C := C)...
 Qed.
 
-Lemma notin_fv_wf_cset : forall Γ (x : atom) C,
+Lemma notin_fv_wf_cse : forall Γ (x : atom) C,
   Γ ⊢ₛ C wf ->
   x ∉ dom Γ ->
-  x ∉ `cset_fvars` C.
+  x ∉ `cse_fvars` C.
 Proof with eauto*.
   intros * WfC NotIn.
-  destruct WfC as [fvars univ AllBound].
-  contradict AllBound; rename AllBound into In; intros AllBound.
-  destruct (AllBound x In) as [C [R Binds]].
-  apply NotIn.
-  eapply binds_In, Binds.
+  dependent induction WfC; eauto*.
+  destruct (x == x0).
+  - exfalso. subst. apply binds_In in H...
+  - auto. 
 Qed.
 
 Lemma notin_fv_wf_typ : forall Γ (X : atom) T,
   Γ ⊢ T wf ->
   X ∉ dom Γ ->
   X ∉ (fv_tt T `u`A fv_ct T).
-Proof with eauto using notin_fv_wf_cset.
+Proof with eauto using notin_fv_wf_cse.
   intros * WfT.
   induction WfT; intros NotIn; simpl.
   - Case "wf_typ_var".
@@ -168,7 +170,7 @@ Proof with eauto using notin_fv_wf_cset.
   - Case "C # R".
     specialize (IHWfT NotIn).
     rename select (Γ ⊢ₛ C wf) into WfC.
-    assert (X ∉ `cset_fvars` C) by (eapply notin_fv_wf_cset; eauto).
+    assert (X ∉ `cse_fvars` C) by (eapply notin_fv_wf_cse; eauto).
     fsetdec.
 Qed.
 

@@ -294,6 +294,28 @@ Proof with eauto*.
   - f_equal; auto. 
 Qed.
 
+Definition cset_subset_prop (c : cap) (d : cap) : Prop :=
+  AtomSet.F.Subset (`cset_fvars` c) (`cset_fvars` d)
+    /\ NatSet.F.Subset (`cset_bvars` c) (`cset_bvars` d)
+    /\  (leb (`cset_uvar` c) (`cset_uvar` d)).
+
+Inductive cse_subset_prop : cse -> cse -> Prop :=
+| cse_subset_top : forall C,
+    cse_subset_prop C cse_top
+| cse_subset_bot : forall C,
+    cse_subset_prop cse_bot C
+| cse_subset_join_intro_1 : forall C R1 R2,
+    cse_subset_prop C R1 ->
+    cse_subset_prop C (cse_join R1 R2)
+| cse_subset_join_intro_2 : forall C R1 R2,
+    cse_subset_prop C R2 ->
+    cse_subset_prop C (cse_join R1 R2)
+| cse_subset_join_elim : forall R1 R2 C
+    cse_subset_prop R1 C ->
+    cse_subset_prop R2 C ->
+    cse_subset_prop (cse_join R1 R2) C
+| cse_subset_f : forall E,
+    wf_cse E cse_bot
 (** ************************************************** *)
 (** Logical Predicates *)
 (** ************************************************** *)
