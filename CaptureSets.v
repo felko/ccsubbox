@@ -65,15 +65,15 @@ Fixpoint cse_bvars C :=
 Notation "`cse_bvars` C" := (cse_bvars C)
                                 (at level 10, C at level 9) : cse_shorthand.
 
-(* Fixpoint cse_uvar C := *)
-(*   match C with *)
-(*   | cse_top => true *)
-(*   | cse_join c1 c2 => orb (cse_uvar c1) (cse_uvar c2) *)
-(*   | _ => false *)
-(*   end. *)
-(**)
-(* Notation "`cse_uvar` C" := (cse_uvar C) *)
-(*                                 (at level 10, C at level 9) : cse_shorthand. *)
+Fixpoint cse_uvar C :=
+  match C with
+  | cse_top => true
+  | cse_join c1 c2 => orb (cse_uvar c1) (cse_uvar c2)
+  | _ => false
+  end.
+
+Notation "`cse_uvar` C" := (cse_uvar C)
+                                (at level 10, C at level 9) : cse_shorthand.
 
 
 (** ************************************************** *)
@@ -294,28 +294,11 @@ Proof with eauto*.
   - f_equal; auto. 
 Qed.
 
-Definition cset_subset_prop (c : cap) (d : cap) : Prop :=
-  AtomSet.F.Subset (`cset_fvars` c) (`cset_fvars` d)
-    /\ NatSet.F.Subset (`cset_bvars` c) (`cset_bvars` d)
-    /\  (leb (`cset_uvar` c) (`cset_uvar` d)).
+Definition cse_subset_prop (c : cse) (d : cse) : Prop :=
+  AtomSet.F.Subset (`cse_fvars` c) (`cse_fvars` d)
+    /\ NatSet.F.Subset (`cse_bvars` c) (`cse_bvars` d)
+    /\  (leb (`cse_uvar` c) (`cse_uvar` d)).
 
-Inductive cse_subset_prop : cse -> cse -> Prop :=
-| cse_subset_top : forall C,
-    cse_subset_prop C cse_top
-| cse_subset_bot : forall C,
-    cse_subset_prop cse_bot C
-| cse_subset_join_intro_1 : forall C R1 R2,
-    cse_subset_prop C R1 ->
-    cse_subset_prop C (cse_join R1 R2)
-| cse_subset_join_intro_2 : forall C R1 R2,
-    cse_subset_prop C R2 ->
-    cse_subset_prop C (cse_join R1 R2)
-| cse_subset_join_elim : forall R1 R2 C
-    cse_subset_prop R1 C ->
-    cse_subset_prop R2 C ->
-    cse_subset_prop (cse_join R1 R2) C
-| cse_subset_f : forall E,
-    wf_cse E cse_bot
 (** ************************************************** *)
 (** Logical Predicates *)
 (** ************************************************** *)

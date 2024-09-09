@@ -179,18 +179,16 @@ Qed.
 (** TODO Maybe have a separate file for free_for_cv lemmas **)
 
 Lemma var_cv_open : forall v k (y : atom),
-  cset_subset_prop (var_cv v) (var_cv (open_vv k y v)).
+  cse_subset_prop (var_cv v) (var_cv (open_vv k y v)).
 Proof with eauto*.
   intros.
   destruct v; simpl...
-  destruct (k === n); subst; simpl...
-  unfold cset_subset_prop.
-  repeat split...
-  fsetdec.
+  - unfold cse_subset_prop. simpl. fsetdec.
+  - destruct (k === n); unfold cse_subset_prop; simpl; repeat split; fsetdec...
 Qed.
 
 Lemma exp_cv_open_ve_rec : forall e k (y : atom) C,
-  cset_subset_prop (exp_cv e) (exp_cv (open_ve_rec k y C e)).
+  cse_subset_prop (exp_cv e) (exp_cv (open_ve_rec k y C e)).
 Proof with eauto using var_cv_open, subset_union.
   intros e.
   induction e; intros; simpl...
