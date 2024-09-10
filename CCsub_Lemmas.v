@@ -187,25 +187,60 @@ Proof with eauto*.
   - destruct (k === n); unfold cse_subset_prop; simpl; repeat split; fsetdec...
 Qed.
 
+
+(* TODO: Code duplication in this proof *)
 Lemma exp_cv_open_ve_rec : forall e k (y : atom) C,
   cse_subset_prop (exp_cv e) (exp_cv (open_ve_rec k y C e)).
 Proof with eauto using var_cv_open, subset_union.
   intros e.
   induction e; intros; simpl...
-  destruct v; csetsimpl; destruct c.
-  - repeat split; unfold open_cset.
-    + destruct_set_mem k t0; simpl; fsetdec.
-    + fsetdec.
-    + destruct_set_mem k t0; simpl; fsetdec.
-  - repeat split; unfold open_cset; csetsimpl.
-    + destruct_set_mem k t0; simpl; fsetdec.
-    + destruct (k === n); simpl; fsetdec.
-    + destruct_set_mem k t0; destruct (k === n); subst; unfold leb; destruct b; simpl...
+  - repeat split; simpl; fsetdec.
+  - destruct v; simpl.
+    + induction c; repeat split; simpl; eauto*; try fsetdec; try fnsetdec.
+      -- destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+        simpl in *.
+        fsetdec. 
+      -- destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+        simpl in *.
+        fnsetdec.
+      -- destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+        simpl in *.
+        destruct (`cse_uvar` (remove_all_bvars c1)); 
+        destruct (`cse_uvar` (remove_all_bvars c2)); intuition.
+    + destruct (k === n).
+      -- induction c; repeat split; simpl; 
+        eauto*; try fsetdec; try fnsetdec.
+        ++ destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+          simpl in *.
+          fsetdec.
+        ++ destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+          simpl in *.
+          fnsetdec.
+        ++ destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+          simpl in *.
+          destruct (`cse_uvar` (remove_all_bvars c1));
+          destruct (`cse_uvar` (remove_all_bvars c2)); simpl; intuition. 
+      -- induction c; repeat split; simpl;
+        eauto*; try fsetdec; try fnsetdec.
+        ++ destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+          simpl in *.
+          fsetdec.
+        ++ destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+          simpl in *.
+          fnsetdec.
+        ++ destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+        simpl in *.
+        destruct (`cse_uvar` (remove_all_bvars c1));
+        destruct (`cse_uvar` (remove_all_bvars c2)); simpl; intuition. 
 Qed.
 
 Lemma exp_cv_open_te_rec : forall e k (y : atom),
-  cset_subset_prop (exp_cv e) (exp_cv (open_te_rec k y e)).
+  cse_subset_prop (exp_cv e) (exp_cv (open_te_rec k y e)).
 Proof with eauto*.
+  assert ( forall c, cse_subset_prop c c ).
+  { intros. induction c; simpl; repeat split; try fsetdec.
+    - destruct IHc1 as [H1 [H2 H3]]. destruct IHc2 as [H1' [H2' H3']].
+      simpl in *. destruct (`cse_uvar` c1); auto. }
   induction e; intros; simpl...
   specialize (IHe1 k y).
   specialize (IHe2 (`succ` k) y).
