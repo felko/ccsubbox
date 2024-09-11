@@ -248,33 +248,43 @@ Proof with eauto*.
 Qed.
 
 Lemma var_cv_subset_fv_vv : forall v,
-  `cset_fvars` (var_cv v) `c`A fv_vv v.
+  `cse_fvars` (var_cv v) `c`A fv_vv v.
 Proof with eauto.
   intros v.
   destruct v; simpl; fsetdec.
 Qed.
 
 Lemma var_cv_closed : forall v,
-  `cset_bvars` (var_cv v) = {}N.
+  `cse_bvars` (var_cv v) = {}N.
 Proof with eauto*.
   destruct v...
 Qed.
 
 Lemma exp_cv_subset_fv_ve : forall e,
-  `cset_fvars` (exp_cv e) `c`A fv_ve e.
+  `cse_fvars` (exp_cv e) `c`A fv_ve e.
 Proof with eauto using var_cv_subset_fv_vv, atomset_subset_union; eauto*.
   induction e; simpl...
   - fsetdec.
   - apply atomset_subset_union...
+  induction c; simpl; fsetdec.   
 Qed.
 
 Lemma exp_cv_closed : forall e,
-  `cset_bvars` (exp_cv e) = {}N.
+  `cse_bvars` (exp_cv e) = {}N.
 Proof with eauto using var_cv_closed.
   induction e; simpl...
-  - rewrite (var_cv_closed v), (var_cv_closed v0); csetdec.
-  - rewrite IHe1, IHe2; csetdec.
-  - rewrite (var_cv_closed v); csetdec.
+  - rewrite (var_cv_closed v), (var_cv_closed v0). fnsetdec.
+  - rewrite IHe1, IHe2. fnsetdec.
+  - rewrite (var_cv_closed v).
+    + induction c; simpl; try fnsetdec.
+    assert (`cse_bvars` (remove_all_bvars c1) = {}N).
+    { assert (NatSet.F.Empty (`cse_bvars` (remove_all_bvars c1) `u`N {}N)).
+      { rewrite IHc1. fnsetdec. } fnsetdec. }
+    assert (`cse_bvars` (remove_all_bvars c2) = {}N).
+    { assert (NatSet.F.Empty (`cse_bvars` (remove_all_bvars c2) `u`N {}N)).
+      { rewrite IHc2. fnsetdec. } fnsetdec. }
+    rewrite H, H0.
+    fnsetdec.
 Qed.
 
 Lemma subcapt_empty : forall Γ C,
