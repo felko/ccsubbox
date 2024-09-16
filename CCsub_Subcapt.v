@@ -3,6 +3,7 @@ Require Import LibTactics.
 Require Export CCsub_Hints.
 Require Export CCsub_Lemmas.
 
+(* Needed *)
 Lemma subcapt_weakening : forall Γ Θ Δ C D,
   (Δ ++ Γ) ⊢ₛ C <: D ->
   (Δ ++ Θ ++ Γ) ⊢ wf ->
@@ -29,6 +30,7 @@ Qed.
 
 Hint Resolve wf_cset_fvarless : core.
 
+(* Needed *)
 Lemma subcapt_reflexivity : forall Γ C,
   Γ ⊢ₛ C wf ->
   Γ ⊢ₛ C <: C.
@@ -42,6 +44,7 @@ Proof with eauto.
   - destruct univ...
 Qed.
 
+(* Needed *)
 Lemma subcapt_transitivity : forall D Γ C E,
   Γ ⊢ wf ->
   Γ ⊢ₛ C <: D ->
@@ -70,10 +73,11 @@ Proof with eauto with fsetdec.
       inversion SDE...
 Qed.
 
+(* Needed, line 664 *)
 (* Substituting the same capture set preserves subcapturing *)
 Lemma subcapt_through_subst_cset : forall x D Q C Δ Γ C1 C2 ,
   (Δ ++ [(x, bind_typ (D # Q))] ++ Γ) ⊢ₛ C1 <: C2 ->
-  (Δ ++ [(x, bind_typ (D # Q))] ++ Γ) ⊢ wf ->
+  (* (Δ ++ [(x, bind_typ (D # Q))] ++ Γ) ⊢ wf -> *)
   Γ ⊢ₛ C <: D ->
   (map (subst_cb x C) Δ ++ Γ) ⊢ₛ (subst_cset x C C1) <: (subst_cset x C C2).
 Proof with eauto using wf_env_subst_cb, wf_cset_subst_cb with fsetdec.
@@ -450,8 +454,9 @@ Tactic Notation "subst_mem_singleton" "<-" hyp(H) :=
     | _ `in`A _ => rewrite AtomSetFacts.singleton_iff in H; symmetry in H; subst
   end.
 
+(* Needed *)
 Lemma subcapt_through_subst_tt : forall Γ P Q Δ X C D,
-  (Δ ++ [(X, bind_sub Q)] ++ Γ) ⊢ wf ->
+  (* (Δ ++ [(X, bind_sub Q)] ++ Γ) ⊢ wf -> *)
   (Δ ++ [(X, bind_sub Q)] ++ Γ) ⊢ₛ C <: D ->
   Γ ⊢ P <: Q ->
   (map (subst_tb X P) Δ ++ Γ) ⊢ₛ C <: D.

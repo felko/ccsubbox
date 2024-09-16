@@ -221,7 +221,7 @@ Inductive cset : cse -> Prop :=
 (*   capt (cse_fvar x). *)
 (* Proof. intros. unfold capt. simpl. fnsetdec. Qed. *)
 
-Lemma cse_fvars_join_union : forall C1 C2,
+Lemma cse_fvars_join_union : forall (C1: cse) (C2: cse),
   `cse_fvars` (cse_join C1 C2) = AtomSet.F.union (`cse_fvars` C1) (`cse_fvars` C2).
 Proof. auto. Qed.
 

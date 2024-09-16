@@ -226,7 +226,7 @@ Inductive wf_typ : env -> typ -> Prop :=
   | wf_typ_box : forall Γ T,
       Γ ⊢ T wf ->
       Γ ⊢ □ T wf
-  | wf_typ_capt : forall Γ C R,
+  | wf_typ_cse : forall Γ C R,
       Γ ⊢ₛ C wf ->
       Γ ⊢ R wf ->
       pure_type R ->

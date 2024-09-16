@@ -8,6 +8,7 @@ Require Import CCsub_Subcapt.
 
 (* ********************************************************************** *)
 (** ** Reflexivity (1) *)
+(* Needed *)
 Lemma sub_reflexivity : forall Γ T,
   Γ ⊢ wf ->
   Γ ⊢ T wf ->
@@ -29,6 +30,7 @@ Qed.
 (* ********************************************************************** *)
 (** ** Weakening (2) *)
 
+(* Needed *)
 Lemma sub_weakening : forall Γ Θ Δ S T,
   (Δ ++ Γ) ⊢ S <: T ->
   (Δ ++ Θ ++ Γ) ⊢ wf ->
@@ -56,6 +58,7 @@ Qed.
 (* ********************************************************************** *)
 (** ** Narrowing and transitivity (3) *)
 
+(* Needed *)
 Lemma subcapt_narrowing_typ : forall Δ Γ x CP P CQ Q C1 C2,
   Γ ⊢ (CP # P) <: (CQ # Q) ->
   (Δ ++ [(x, bind_typ (CQ # Q))] ++ Γ) ⊢ wf ->
@@ -88,6 +91,7 @@ Qed.
 Definition transitivity_on Q := forall Γ S T,
   Γ ⊢ S <: Q -> Γ ⊢ Q <: T -> Γ ⊢ S <: T.
 
+(* Needed *)
 Lemma subcapt_narrowing : forall Δ Γ Z P Q C1 C2,
   Γ ⊢ P <: Q ->
   transitivity_on Q ->
@@ -102,6 +106,7 @@ Proof with eauto 6 using wf_cset_narrowing, wf_env_narrowing.
     intros ? ?...
 Qed.
 
+(* Needed *)
 Lemma sub_narrowing_aux : forall Q Δ Γ Z P S T,
   transitivity_on Q ->
   (Δ ++ [(Z, bind_sub Q)] ++ Γ) ⊢ S <: T ->
@@ -155,6 +160,7 @@ Proof with simpl_env;
     eapply IH...
 Qed.
 
+(* Needed *)
 Lemma sub_narrowing_typ_aux : forall CQ Q Δ Γ x CP P S T,
   (Δ ++ [(x, bind_typ (CQ # Q))] ++ Γ) ⊢ S <: T ->
   Γ ⊢ (CP # P) <: (CQ # Q) ->
@@ -184,6 +190,7 @@ Proof with simpl_env;
     eapply IH...
 Qed.
 
+(* Needed *)
 Lemma sub_transitivity_mut :
      (forall Q, type Q -> transitivity_on Q)
   /\ (forall Q, pure_type Q -> transitivity_on Q).
@@ -279,6 +286,7 @@ Proof with eauto using subcapt_transitivity.
     dependent induction SsubQ; inversion QsubT; subst; eauto.
 Qed.
 
+(* Needed *)
 Lemma sub_transitivity : forall Q Γ S T,
   type Q ->
   Γ ⊢ S <: Q ->
@@ -289,6 +297,7 @@ Proof with eauto*.
   apply (proj1 sub_transitivity_mut Q)...
 Qed.
 
+(* Needed *)
 Lemma sub_narrowing : forall Q Γ Δ Z P S T,
   pure_type P ->
   Γ ⊢ P <: Q ->
@@ -300,6 +309,7 @@ Proof with auto.
   eapply sub_transitivity with (Q := Q)...
 Qed.
 
+(* Needed *)
 Lemma sub_narrowing_typ : forall Γ Δ x CP P CQ Q S T,
   (Δ ++ [(x, bind_typ (CQ # Q))] ++ Γ) ⊢ S <: T ->
   Γ ⊢ (CP # P) <: (CQ # Q) ->
