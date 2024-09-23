@@ -248,7 +248,7 @@ Lemma empty_union_empty : forall C1 C2,
   NatSet.F.Empty C1 /\ NatSet.F.Empty C2.
 Proof with eauto.
   intros.
-  split; intro; fnsetdec.
+  split; fnsetdec.
 Qed.
 
 Lemma open_cse_cset : forall i C c,
@@ -322,6 +322,13 @@ Proof.
     intuition.
   - repeat split; destruct H as [H1C1 [H2C1 H3C1]]; destruct H0 as [H1C2 [H2C2 H3C2]]; try intuition.
     simpl. destruct (`cse_uvar` C2); intuition.
+Qed.
+
+Lemma subst_cse_union : forall x D C1 C2,
+  subst_cse x D (cse_union C1 C2) = (cse_union (subst_cse x D C1) (subst_cse x D C2)).
+Proof with eauto.
+  intros.
+  induction C1; simpl...
 Qed.
 
 (** ************************************************** *)
