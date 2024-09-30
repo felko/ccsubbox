@@ -893,7 +893,7 @@ Proof with auto*.
   intros *; intros Neq Wu.
   unfold open_ct.
   symmetry.
-  apply subst_ct_open_ct_rec... apply cset_fvar.
+  apply subst_ct_open_ct_rec...
 Qed.
 
 Lemma subst_te_open_ve_rec : forall e z c Z P k,
@@ -1041,15 +1041,6 @@ Proof with auto using subst_vv_open_vv, subst_ct_open_rec, subst_cset_open_cset_
   intros * Neq Capt.
   revert k.
   induction e; intros k; simpl; f_equal...
-  - destruct c; simpl; auto...
-    + destruct (k === n); simpl; subst...
-      * destruct (x == y); simpl; subst.
-        -- contradict Neq. reflexivity.
-        -- reflexivity.
-    + destruct (x == a); simpl; subst...
-    + f_equal; simpl...
-        -- apply subst_cset_open_cset_fresh... constructor. constructor.
-        -- apply subst_cset_open_cset_fresh... constructor. constructor.
 Qed.
 
 Lemma subst_ve_open_ve_var : forall (x y u : atom) c e,

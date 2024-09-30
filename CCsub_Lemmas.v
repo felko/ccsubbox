@@ -178,17 +178,16 @@ Qed.
 (** * #<a name="cvfree"></a># Lemmas about free variables -- in particular properties of [free_for_cv] *)
 (** TODO Maybe have a separate file for free_for_cv lemmas **)
 
-(* Lemma var_cv_open : forall v k (y : atom), *)
-(*   cse_subset_prop (var_cv v) (var_cv (open_vv k y v)). *)
-(* Proof with eauto*. *)
-(*   intros. *)
-(*   destruct v; simpl... *)
-(*   - unfold cse_subset_prop. simpl. fsetdec. *)
-(*   - destruct (k === n); unfold cse_subset_prop; simpl; repeat split; fsetdec... *)
-(* Qed. *)
-(**)
-(**)
-(* (* TODO: Code duplication in this proof *) *)
+Lemma var_cv_open : forall v k (y : atom),
+  cse_subset_prop (var_cv v) (var_cv (open_vv k y v)).
+Proof with eauto*.
+  intros.
+  destruct v; simpl...
+  - unfold cse_subset_prop. simpl. fsetdec.
+  - destruct (k === n); unfold cse_subset_prop; simpl; repeat split; fsetdec...
+Qed.
+
+(* TODO: Code duplication in this proof *)
 (* Lemma exp_cv_open_ve_rec : forall e k (y : atom) C, *)
 (*   cse_subset_prop (exp_cv e) (exp_cv (open_ve_rec k y C e)). *)
 (* Proof with eauto using var_cv_open, subset_union. *)
@@ -233,7 +232,7 @@ Qed.
 (*         destruct (`cse_uvar` (remove_all_bvars c1)); *)
 (*         destruct (`cse_uvar` (remove_all_bvars c2)); simpl; intuition.  *)
 (* Qed. *)
-(**)
+
 (* Lemma exp_cv_open_te_rec : forall e k (y : atom), *)
 (*   cse_subset_prop (exp_cv e) (exp_cv (open_te_rec k y e)). *)
 (* Proof with eauto*. *)
@@ -397,12 +396,54 @@ Proof with eauto; simpl_env in *.
     apply (wf_cse_free_vars_bound X C Γ) in H0...
 Qed.
 
+Lemma cset_all_bound_wf : forall E C,
+  cset C ->
+  (forall X, X `in` `cse_fvars` C -> exists T,
+    binds X (bind_typ T) E) ->
+  wf_cse E C.
+Proof with eauto.
+  intros.
+  induction H...
+  - specialize (H0 X). simpl in H0.
+    destruct (H0 ltac:(fsetdec)) as [T Binds].
+    apply (wf_cse_term_fvar T).
+    exact Binds.
+  - rewrite cse_fvars_join_union in H0.
+    constructor...
+    assert (forall X, X `in` `cse_fvars` Q1 -> exists T, binds X (bind_typ T) E).
+    { intros. apply H0. rewrite AtomSetFacts.union_iff. left... }
+    specialize (IHcset1 H2).
+    exact IHcset1.
+    assert (forall X, X `in` `cse_fvars` Q2 -> exists T, binds X (bind_typ T) E).
+    { intros. apply H0. rewrite AtomSetFacts.union_iff. right... }
+    specialize (IHcset2 H2).
+    exact IHcset2.
+Qed.
+
+Lemma expr_cset : forall e,
+  cset (exp_cv e).
+Proof with eauto.
+  intros.
+  induction e; simpl...
+  - destruct v; simpl...
+  - destruct v; apply cset_join; destruct v0; simpl...
+  - destruct v; simpl...
+  - apply cset_join...
+    induction c; simpl...
+    destruct v; simpl...
+Qed.
+
 (** This should be easily true: free variables
     are all bound if a term has a type.... *)
 Lemma typing_cv : forall E e C R,
   typing E e (C # R) ->
   wf_cse E (exp_cv e).
-Admitted.
+Proof with eauto using wf_cset_over_join; eauto*.
+  intros * Htyp.
+  unshelve epose proof (typing_cse_all_bound E e (C # R) Htyp) as H1...
+  apply cset_all_bound_wf...
+  apply expr_cset...
+Qed.
 
 Lemma bind_typ_notin_fv_tt : forall x S Γ T,
   binds x (bind_typ S) Γ ->
@@ -457,6 +498,14 @@ Qed.
 
 (* ********************************************************************** *)
 (** * #<a name="regularity"></a># Regularity of relations *)
+
+Lemma subcapt_env_wf : forall Γ C D,
+  Γ ⊢ₛ C <: D ->
+  Γ ⊢ wf.
+Proof with eauto.
+  intros * SubCapt.
+  induction SubCapt...
+Qed.
 
 Lemma subcapt_regular : forall Γ C D,
   Γ ⊢ₛ C <: D ->
@@ -812,7 +861,7 @@ Hint Extern 1 (expr ?e) =>
 
 (** * #<a name="auto"></a># Automation Tests *)
 
-Local Lemma test_subcapt_regular : forall Γ C1 C2,
+Local Lemma test_subcset_regular : forall Γ C1 C2,
   Γ ⊢ₛ C1 <: C2 ->
   Γ ⊢ₛ C1 wf /\ Γ ⊢ₛ C2 wf.
 Proof with eauto*.
